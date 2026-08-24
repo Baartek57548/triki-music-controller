@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pl.trikimusic.controller.domain.model.GestureType
+import pl.trikimusic.controller.domain.model.MIN_PERSONALIZED_SAMPLES_PER_GESTURE
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
 import pl.trikimusic.controller.ui.components.DetailTopBar
@@ -96,6 +97,15 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
                         },
                         style = MaterialTheme.typography.titleLarge,
                     )
+                    Text(
+                        if (trainer.learnedSampleCount >= MIN_PERSONALIZED_SAMPLES_PER_GESTURE) {
+                            "Model lokalny: ${trainer.learnedSampleCount} próbek · aktywny"
+                        } else {
+                            "Model lokalny: ${trainer.learnedSampleCount}/$MIN_PERSONALIZED_SAMPLES_PER_GESTURE próbek"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                     if (trainer.recording) {
                         Text(
                             "${trainer.sampleCount} próbek · ${"%.1f".format(trainer.durationMillis / 1_000f)} s",
@@ -118,11 +128,20 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        Text(
+                            "Jakość cech accel + gyro: ${"%.0f".format(trainer.featureQuality * 100f)}%",
+                            color = if (trainer.featureReady || trainer.accepted) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                     if (trainer.accepted) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                            Text(" Zaakceptowano", color = MaterialTheme.colorScheme.primary)
+                            Text(" Dodano do modelu", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -136,15 +155,21 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
                     Icon(Icons.Default.Stop, contentDescription = null)
                     Text(" Stop i analizuj")
                 }
-            } else if (trainer.detectedGesture == null) {
+            } else {
                 Button(onClick = viewModel::startTrainer, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
-                    Text(" Start nagrania")
+                    Text(if (trainer.sampleCount > 0) " Nagraj kolejną próbkę" else " Start nagrania")
                 }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(onClick = viewModel::startTrainer, modifier = Modifier.weight(1f)) { Text("Nagraj ponownie") }
-                    Button(onClick = viewModel::acceptTrainerResult, modifier = Modifier.weight(1f)) { Text("Akceptuj") }
+                if (trainer.featureReady && !trainer.accepted) {
+                    Button(onClick = viewModel::learnTrainerSample, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                        Text(" Dodaj jako ${trainer.selectedGesture.displayName}")
+                    }
+                }
+                if (trainer.learnedSampleCount > 0) {
+                    TextButton(onClick = viewModel::clearTrainerSamples, modifier = Modifier.fillMaxWidth()) {
+                        Text("Usuń próbki modelu dla tego gestu")
+                    }
                 }
             }
         }

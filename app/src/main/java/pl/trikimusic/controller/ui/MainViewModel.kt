@@ -26,10 +26,12 @@ import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GattServiceInfo
+import pl.trikimusic.controller.domain.model.GestureFeatureVector
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.MediaSessionState
+import pl.trikimusic.controller.domain.model.MIN_PERSONALIZED_SAMPLES_PER_GESTURE
 import pl.trikimusic.controller.domain.model.RawBlePacket
 import pl.trikimusic.controller.domain.model.SensitivityLevel
 import pl.trikimusic.controller.domain.model.ThemePreference
@@ -41,6 +43,7 @@ import pl.trikimusic.controller.domain.model.defaultProfiles
 import pl.trikimusic.controller.domain.model.thresholds
 import pl.trikimusic.controller.core.gesture.CalibrationCalculator
 import pl.trikimusic.controller.core.gesture.GestureRecordingAnalyzer
+import pl.trikimusic.controller.core.gesture.GestureFeatureExtractor
 import pl.trikimusic.controller.core.permissions.PermissionState
 import pl.trikimusic.controller.runtime.RuntimeState
 import pl.trikimusic.controller.service.TrikiForegroundService
@@ -63,6 +66,9 @@ data class TrainerUiState(
     val peakGyroscopeDps: Float = 0f,
     val accelerationRangeG: ClosedFloatingPointRange<Float>? = null,
     val accepted: Boolean = false,
+    val featureQuality: Float = 0f,
+    val featureReady: Boolean = false,
+    val learnedSampleCount: Int = 0,
     val message: String? = null,
 )
 
@@ -109,6 +115,8 @@ class MainViewModel(
     private var trainerJob: Job? = null
     private val trainerSamples = mutableListOf<FilteredSensorData>()
     private val trainerAnalyzer = GestureRecordingAnalyzer()
+    private val trainerFeatureExtractor = GestureFeatureExtractor()
+    private var pendingTrainerFeatures: GestureFeatureVector? = null
     private var autoConnectRequested = false
     private var rawRecordingStartedAtMillis: Long? = null
     private var frozenRawCapture: List<RawBlePacket>? = null
@@ -293,14 +301,23 @@ class MainViewModel(
 
     fun selectTrainerGesture(gesture: GestureType) {
         cancelTrainerRecording(resetState = false)
-        mutableTrainer.value = TrainerUiState(selectedGesture = gesture)
+        pendingTrainerFeatures = null
+        mutableTrainer.value = TrainerUiState(
+            selectedGesture = gesture,
+            learnedSampleCount = container.settings.value.personalizedGestureModel.sampleCountFor(gesture),
+        )
     }
 
     fun startTrainer() {
         val selected = mutableTrainer.value.selectedGesture
+        val learnedSampleCount = maxOf(
+            mutableTrainer.value.learnedSampleCount,
+            container.settings.value.personalizedGestureModel.sampleCountFor(selected),
+        )
         if (container.bleManager.state.value.connectionState != TrikiConnectionState.READY) {
             mutableTrainer.value = TrainerUiState(
                 selectedGesture = selected,
+                learnedSampleCount = learnedSampleCount,
                 message = "Najpierw połącz Triki i poczekaj na dane IMU.",
             )
             return
@@ -308,6 +325,7 @@ class MainViewModel(
         if (!container.settings.value.calibration.isValid) {
             mutableTrainer.value = TrainerUiState(
                 selectedGesture = selected,
+                learnedSampleCount = learnedSampleCount,
                 message = "Najpierw wykonaj kalibrację nieruchomego Triki w zakładce Device.",
             )
             return
@@ -315,12 +333,14 @@ class MainViewModel(
 
         cancelTrainerRecording(resetState = false)
         trainerSamples.clear()
+        pendingTrainerFeatures = null
         // A short pre-roll gives the detector a real neutral baseline even when Start is tapped
         // immediately before the movement.
         trainerSamples += container.runtime.state.value.history.takeLast(TRAINER_PREROLL_SAMPLES)
         container.runtime.setGestureActionsSuspended(true)
         mutableTrainer.value = TrainerUiState(
             selectedGesture = selected,
+            learnedSampleCount = learnedSampleCount,
             recording = true,
             sampleCount = trainerSamples.size,
             durationMillis = captureDurationMillis(),
@@ -359,19 +379,54 @@ class MainViewModel(
     fun cancelTrainer() {
         val selected = mutableTrainer.value.selectedGesture
         cancelTrainerRecording(resetState = false)
-        mutableTrainer.value = TrainerUiState(selectedGesture = selected)
+        pendingTrainerFeatures = null
+        mutableTrainer.value = TrainerUiState(
+            selectedGesture = selected,
+            learnedSampleCount = container.settings.value.personalizedGestureModel.sampleCountFor(selected),
+        )
     }
 
-    fun acceptTrainerResult() {
+    fun learnTrainerSample() {
         val current = mutableTrainer.value
-        mutableTrainer.value = current.copy(
-            accepted = current.detectedGesture == current.selectedGesture,
-            message = if (current.detectedGesture == current.selectedGesture) {
-                "Nagranie potwierdza poprawne rozpoznawanie tego gestu."
-            } else {
-                "Wykryty ruch nie odpowiada wybranemu gestowi."
-            },
-        )
+        val features = pendingTrainerFeatures
+        if (!current.featureReady || features == null || current.recording || current.accepted) {
+            if (!current.accepted) {
+                mutableTrainer.update { it.copy(message = "Najpierw nagraj próbkę o dobrej jakości.") }
+            }
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                container.settingsRepository.saveGestureTrainingSample(current.selectedGesture, features)
+            }.onSuccess {
+                pendingTrainerFeatures = null
+                val count = (current.learnedSampleCount + 1).coerceAtMost(5)
+                mutableTrainer.update {
+                    it.copy(
+                        accepted = true,
+                        featureReady = false,
+                        learnedSampleCount = count,
+                        message = if (count >= MIN_PERSONALIZED_SAMPLES_PER_GESTURE) {
+                            "Model nauczył się tego gestu z $count próbek. Możesz dodać kolejną w innej pozycji kapsla."
+                        } else {
+                            "Zapisano pierwszą próbkę. Nagraj jeszcze jedną w innej typowej pozycji kapsla."
+                        },
+                    )
+                }
+            }.onFailure(::showError)
+        }
+    }
+
+    fun clearTrainerSamples() {
+        val gesture = mutableTrainer.value.selectedGesture
+        launchHandled {
+            container.settingsRepository.clearGestureTraining(gesture)
+            pendingTrainerFeatures = null
+            mutableTrainer.value = TrainerUiState(
+                selectedGesture = gesture,
+                message = "Usunięto spersonalizowane próbki tego gestu.",
+            )
+        }
     }
 
     fun beginGestureWizard() {
@@ -384,7 +439,10 @@ class MainViewModel(
             selectedAction = activeProfile.actionFor(firstGesture),
             configuredActions = GestureType.entries.associateWith(activeProfile::actionFor),
         )
-        mutableTrainer.value = TrainerUiState(selectedGesture = firstGesture)
+        mutableTrainer.value = TrainerUiState(
+            selectedGesture = firstGesture,
+            learnedSampleCount = container.settings.value.personalizedGestureModel.sampleCountFor(firstGesture),
+        )
     }
 
     fun selectGestureWizardAction(action: MediaAction) {
@@ -500,20 +558,32 @@ class MainViewModel(
         val thresholds = container.settings.value.sensitivity.thresholds(
             container.settings.value.advancedThresholds,
         )
-        val result = trainerAnalyzer.analyze(trainerSamples.toList(), thresholds)
+        val result = trainerAnalyzer.analyze(
+            samples = trainerSamples.toList(),
+            thresholds = thresholds,
+            personalizedModel = container.settings.value.personalizedGestureModel,
+        )
+        val featureResult = trainerFeatureExtractor.extract(trainerSamples.toList())
+        pendingTrainerFeatures = featureResult.features.takeIf { featureResult.qualityAccepted }
         val detected = result.events.firstOrNull { it.type == selected } ?: result.strongestEvent
+        val learnedSampleCount = maxOf(
+            mutableTrainer.value.learnedSampleCount,
+            container.settings.value.personalizedGestureModel.sampleCountFor(selected),
+        )
         val message = when {
             result.sampleCount < MIN_TRAINER_SAMPLES || result.durationMillis < MIN_TRAINER_DURATION_MILLIS ->
-                "Nagranie jest za krótkie. Nagraj co najmniej sekundę: spoczynek, jeden ruch i ponowny spoczynek."
+                "Nagranie jest za krótkie. Zachowaj krótki bezruch przed lub po jednym ruchu."
+
+            !featureResult.qualityAccepted -> featureResult.message
 
             detected == null ->
-                "Nie wykryto pełnego gestu. Rozpocznij w spoczynku, wykonaj wyraźny ruch i zatrzymaj nagranie po uspokojeniu Triki."
+                "Próbka jest dobra do uczenia. Bieżący detektor jej nie rozpoznał, ale możesz przypisać jej wybrany gest."
 
             detected.type == selected && autoStopped ->
-                "Wykryto oczekiwany gest. Nagranie zatrzymano automatycznie po 15 sekundach."
+                "Próbka jest dobra do uczenia i zgodna z detektorem. Nagranie zatrzymano automatycznie."
 
-            detected.type == selected -> "Wykryto oczekiwany gest."
-            else -> "Wykryto: ${detected.type.displayName}. Oczekiwano: ${selected.displayName}."
+            detected.type == selected -> "Próbka jest dobra do uczenia i zgodna z detektorem."
+            else -> "Próbka jest dobra do uczenia wybranego gestu. Bieżący detektor wskazał: ${detected.type.displayName}."
         }
         mutableTrainer.value = TrainerUiState(
             selectedGesture = selected,
@@ -523,6 +593,9 @@ class MainViewModel(
             confidence = detected?.confidence,
             peakGyroscopeDps = result.peakGyroscopeDps,
             accelerationRangeG = result.minimumAccelerationG..result.maximumAccelerationG,
+            featureQuality = featureResult.qualityScore,
+            featureReady = featureResult.qualityAccepted,
+            learnedSampleCount = learnedSampleCount,
             message = message,
         )
     }
@@ -531,6 +604,7 @@ class MainViewModel(
         trainerJob?.cancel()
         trainerJob = null
         trainerSamples.clear()
+        pendingTrainerFeatures = null
         container.runtime.setGestureActionsSuspended(false)
         if (resetState) mutableTrainer.value = TrainerUiState()
     }
@@ -629,7 +703,7 @@ class MainViewModel(
         const val TRAINER_MAX_DURATION_MILLIS = 15_000L
         const val TRAINER_PREROLL_SAMPLES = 45
         const val TRAINER_MAX_SAMPLES = 2_000
-        const val MIN_TRAINER_SAMPLES = 70
-        const val MIN_TRAINER_DURATION_MILLIS = 900L
+        const val MIN_TRAINER_SAMPLES = 55
+        const val MIN_TRAINER_DURATION_MILLIS = 650L
     }
 }

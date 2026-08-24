@@ -5,6 +5,7 @@ import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.ControlProfile
 import pl.trikimusic.controller.domain.model.GestureThresholds
+import pl.trikimusic.controller.domain.model.GestureFeatureVector
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.SensitivityLevel
@@ -18,6 +19,8 @@ interface SettingsRepository {
     suspend fun rememberDevice(address: String, name: String)
     suspend fun forgetDevice()
     suspend fun setGestureMapping(profileId: String, gesture: GestureType, action: MediaAction)
+    suspend fun saveGestureTrainingSample(gesture: GestureType, features: GestureFeatureVector)
+    suspend fun clearGestureTraining(gesture: GestureType)
     suspend fun createProfile(name: String): Result<ControlProfile>
     suspend fun copyProfile(profileId: String, newName: String): Result<ControlProfile>
     suspend fun renameProfile(profileId: String, newName: String): Result<Unit>

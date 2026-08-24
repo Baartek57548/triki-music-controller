@@ -1,8 +1,19 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+val releaseSigningPropertiesFile =
+    file(System.getProperty("user.home") + "/.android/release-keys/triki-music-controller-signing.properties")
+val releaseSigningProperties = Properties().apply {
+    if (releaseSigningPropertiesFile.isFile) {
+        releaseSigningPropertiesFile.inputStream().use(::load)
+    }
 }
 
 android {
@@ -13,11 +24,37 @@ android {
         applicationId = "pl.trikimusic.controller"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        if (releaseSigningPropertiesFile.isFile) {
+            create("release") {
+                val configuredStoreFile = File(
+                    releaseSigningProperties.getProperty("storeFile")
+                        ?: error("Missing storeFile in release signing properties"),
+                )
+                storeFile = if (configuredStoreFile.isAbsolute) {
+                    configuredStoreFile
+                } else {
+                    releaseSigningPropertiesFile.parentFile.resolve(configuredStoreFile)
+                }
+                storePassword = releaseSigningProperties.getProperty("storePassword")
+                    ?: error("Missing storePassword in release signing properties")
+                keyAlias = releaseSigningProperties.getProperty("keyAlias")
+                    ?: error("Missing keyAlias in release signing properties")
+                keyPassword = releaseSigningProperties.getProperty("keyPassword")
+                    ?: error("Missing keyPassword in release signing properties")
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
     }
 
     buildTypes {
@@ -28,6 +65,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            if (releaseSigningPropertiesFile.isFile) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

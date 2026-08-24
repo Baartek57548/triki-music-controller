@@ -10,7 +10,9 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 - potwierdzony dekoder ramek IMU z resynchronizacją po rozciętych i sklejonych notyfikacjach;
 - `GestureEngine` niezależny od UI: tilt, rotate, shake, double shake, flip i throw-up klasyfikowane po pełnym oknie ruchu;
 - dynamiczna baza neutralna, wymagany cykl spoczynek–ruch–spoczynek oraz cooldown per gest;
+- wielostopniowa filtracja IMU: mediana odrzucająca pojedyncze skoki, adaptacyjna martwa strefa gyro, low-pass i filtr komplementarny;
 - kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu; bez poprawnej kalibracji akcje są bezpiecznie blokowane;
+- lokalny model few-shot k-NN uczony z 2–5 przykładów gestu; 39 cech łączy akcelerometr i żyroskop oraz ogranicza zależność od pozycji kapsla;
 - konfigurowalne mapowania oraz profile zapisywane w Preferences DataStore;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i Now Playing;
@@ -39,7 +41,7 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 5. Nadaj dostęp do urządzeń w pobliżu. Na Androidzie 8–11 system wymaga podczas skanowania BLE uprawnienia lokalizacji, mimo że aplikacja nie odczytuje GPS.
 6. Włącz dostęp listenera powiadomień. Android wiąże z nim prawo do wywołania `MediaSessionManager.getActiveSessions()`.
 7. Naciśnij przycisk Triki, wybierz **Device → Skanuj urządzenia**, a następnie **Połącz**.
-8. Po stanie **Gotowe** wykonaj kalibrację. Aplikacja automatycznie otworzy kreator, w którym przejdziesz przez wszystkie gesty, przetestujesz ich rozpoznawanie i wybierzesz akcje.
+8. Po stanie **Gotowe** wykonaj kalibrację. Aplikacja automatycznie otworzy kreator, w którym wybierzesz akcje i opcjonalnie nagrasz po dwie krótkie próby gestu z różnych typowych pozycji kapsla.
 9. Uruchom muzykę. Kreator można później powtórzyć z ekranu **Gestures → Kreator gestów**.
 
 Build z linii poleceń na Windows:
@@ -78,7 +80,9 @@ TrikiProtocolDecoder
     ↓
 SensorFilter + calibration + complementary orientation
     ↓
-GestureEngine
+GestureFeatureExtractor + lokalny model k-NN
+    ↓
+GestureEngine + reguły bezpieczeństwa
     ↓
 ActionMapper + aktywny ControlProfile
     ↓
@@ -115,7 +119,7 @@ Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [
 
 ## Gesture Engine
 
-Presety czułości zmieniają spójny zestaw progów, siłę wygładzania i cooldown. Tryb Advanced pozwala zmienić progi tilt/rotate/shake/throw bez naruszania mechanizmów zapobiegających spamowi. Silnik najpierw ustala lokalny spoczynek, następnie zbiera ruch i klasyfikuje najwyżej jeden gest po ponownym uspokojeniu kontrolera. Nieruchome Triki leżące pod kątem nie może więc samo wywołać `NEXT` lub `PREVIOUS`.
+Presety czułości zmieniają spójny zestaw progów, siłę wygładzania i cooldown. Tryb Advanced pozwala zmienić progi tilt/rotate/shake/throw bez naruszania mechanizmów zapobiegających spamowi. Silnik najpierw ustala lokalny spoczynek, następnie zbiera ruch i klasyfikuje najwyżej jeden gest po ponownym uspokojeniu kontrolera. Model k-NN może skorygować wynik dla nauczonego sposobu użycia, ale nie omija fizycznych bramek bezpieczeństwa. Nieruchome Triki leżące pod kątem nie może więc samo wywołać `NEXT` lub `PREVIOUS`.
 
 Opis stanów, kompromisów i testowania: [GESTURE_ENGINE.md](docs/GESTURE_ENGINE.md).
 
@@ -134,7 +138,8 @@ Po włączeniu **Settings → Developer Mode** dostępne są:
 Testy JVM obejmują:
 
 - dekodowanie little-endian, skalowanie, status przycisku, startup discard i resynchronizację parsera;
-- smoothing, korekcję biasu i walidację kalibracji;
+- medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
+- ekstrakcję cech accel + gyro, odporność cech grawitacyjnych na obrót kapsla, uczenie k-NN, odrzucanie obcych próbek i fizyczne bramki gestów;
 - pełne cykle tilt, rotate, flip, throw i single/double shake, nagranie Start/Stop oraz regresje dla długiego spoczynku, szumu, uszkodzonej próbki i stałego błędu gyro;
 - mapowanie gest → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, profili, mapowań, kalibracji i stanu ukończenia kreatora, wraz z migracją danych ze starszej wersji.
@@ -144,6 +149,7 @@ Testy JVM obejmują:
 - Fizyczna walidacja wymaga konkretnego egzemplarza Triki. Projekt kompiluje się i ma testy dekodera na potwierdzonych ramkach, ale bieżące środowisko CI/deweloperskie nie miało dostępu do rzeczywistego kapsla. Inspector jest celowo częścią aplikacji, aby porównać firmware i zebrać brakujące pakiety bez fikcyjnego dekodowania.
 - Częstotliwość IMU nie jest zakodowana jako gwarantowana stała protokołu. UI pokazuje wartość mierzoną na żywo; parser interpoluje znaczniki wewnątrz burstu wyłącznie na potrzeby stabilnego filtru.
 - Yaw bez magnetometru dryfuje. Pitch i roll są korygowane grawitacją, natomiast yaw opiera się na całkowaniu żyroskopu.
+- Bez magnetometru nie istnieje absolutny kierunek poziomy. Dlatego model nie nadpisuje samodzielnie kierunku `tilt left/right` po dowolnym obrocie kapsla; te dwa gesty należy wykonywać względem oznaczenia na obudowie albo pozostawić regułom bazowym.
 - Dostępność metadanych, okładki i komend `next/previous/stop` zależy od implementacji MediaSession przez aktywny odtwarzacz.
 - Akcje specyficzne dla Spotify/YouTube Music, takie jak like, shuffle i repeat, nie mają wspólnego publicznego API Android MediaSession. Architektura pozwala dodać jawne integracje w przyszłości, ale obecna wersja nie udaje ich działania.
 

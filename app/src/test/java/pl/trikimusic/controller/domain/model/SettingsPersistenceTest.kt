@@ -15,15 +15,31 @@ class SettingsPersistenceTest {
             name = "Workout",
             mappings = GestureType.entries.map { GestureMapping(it, MediaAction.PLAY_PAUSE) },
         )
+        val learnedModel = PersonalizedGestureModel(
+            samples = listOf(
+                LearnedGestureSample(
+                    gesture = GestureType.SHAKE,
+                    features = GestureFeatureVector(values = List(GESTURE_FEATURE_DIMENSION) { it / 100f }),
+                    capturedAtMillis = 100L,
+                ),
+                LearnedGestureSample(
+                    gesture = GestureType.SHAKE,
+                    features = GestureFeatureVector(values = List(GESTURE_FEATURE_DIMENSION) { it / 90f }),
+                    capturedAtMillis = 200L,
+                ),
+            ),
+        )
         val original = AppSettings(
             onboardingComplete = true,
             gestureWizardCompleted = true,
+            gestureLearningVersion = CURRENT_GESTURE_LEARNING_VERSION,
             knownDeviceAddress = "AA:BB:CC:DD:EE:FF",
             knownDeviceName = "Triki 42",
             activeProfileId = custom.id,
             profiles = defaultProfiles() + custom,
             sensitivity = SensitivityLevel.HIGH,
             calibration = CalibrationProfile(sampleCount = 200, calibratedAtMillis = 123L),
+            personalizedGestureModel = learnedModel,
             developerMode = true,
             backgroundEnabled = false,
             theme = ThemePreference.DARK,
@@ -35,6 +51,8 @@ class SettingsPersistenceTest {
         assertEquals(original, restored)
         assertEquals(MediaAction.PLAY_PAUSE, restored.activeProfile.actionFor(GestureType.FLIP))
         assertTrue(restored.gestureWizardCompleted)
+        assertEquals(CURRENT_GESTURE_LEARNING_VERSION, restored.gestureLearningVersion)
+        assertTrue(restored.personalizedGestureModel.isTrained(GestureType.SHAKE))
         assertTrue(restored.calibration.isValid)
     }
 
@@ -61,5 +79,7 @@ class SettingsPersistenceTest {
         val restored = json.decodeFromString(AppSettings.serializer(), encodedWithoutWizardFlag)
 
         assertEquals(false, restored.gestureWizardCompleted)
+        assertEquals(0, restored.gestureLearningVersion)
+        assertTrue(restored.personalizedGestureModel.samples.isEmpty())
     }
 }

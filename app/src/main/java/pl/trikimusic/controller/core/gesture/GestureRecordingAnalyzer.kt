@@ -5,6 +5,7 @@ import kotlin.math.min
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GestureEvent
 import pl.trikimusic.controller.domain.model.GestureThresholds
+import pl.trikimusic.controller.domain.model.PersonalizedGestureModel
 
 data class GestureRecordingResult(
     val events: List<GestureEvent>,
@@ -23,6 +24,7 @@ class GestureRecordingAnalyzer {
     fun analyze(
         samples: List<FilteredSensorData>,
         thresholds: GestureThresholds,
+        personalizedModel: PersonalizedGestureModel = PersonalizedGestureModel(),
     ): GestureRecordingResult {
         if (samples.isEmpty()) {
             return GestureRecordingResult(emptyList(), 0, 0L, 0f, 0f, 0f)
@@ -40,8 +42,8 @@ class GestureRecordingAnalyzer {
 
         val engine = GestureEngine()
         val events = buildList {
-            ordered.forEach { sample -> addAll(engine.process(sample, thresholds)) }
-            engine.finishRecording(thresholds)?.let(::add)
+            ordered.forEach { sample -> addAll(engine.process(sample, thresholds, personalizedModel)) }
+            engine.finishRecording(thresholds, personalizedModel)?.let(::add)
         }
 
         var peakGyroscope = 0f

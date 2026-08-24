@@ -7,12 +7,14 @@ Gesture engine otrzymuje dane już zdekodowane i skalibrowane. Nie zna Bluetooth
 ## Pipeline
 
 1. Bias żyroskopu i akcelerometru jest odejmowany zgodnie z profilem kalibracji.
-2. Low-pass filter wygładza każdą oś: `filtered += alpha × (current − filtered)`.
-3. Filtr komplementarny łączy tilt z grawitacji z całkowaniem gyro. Korekcja accel działa tylko dla magnitude 0,72–1,28 g, aby dynamiczny ruch nie przechylał sztucznie orientacji.
-4. Silnik czeka na co najmniej 280 ms stabilnego spoczynku i zapamiętuje bieżący kąt jako lokalną bazę neutralną.
-5. Po wykryciu faktycznego ruchu zbierane jest jedno ograniczone okno `spoczynek → ruch → spoczynek`.
-6. Klasyfikator analizuje całe okno, zwraca najwyżej jeden gest, a potem ponownie wymaga stabilnego uzbrojenia.
-7. Cooldown pozostaje dodatkową ochroną między dwoma świadomymi gestami tego samego typu.
+2. Mediana z trzech kolejnych wartości każdej osi odrzuca pojedynczy skok pakietu, zanim zostanie rozciągnięty przez wygładzanie.
+3. Składowe gyro mniejsze od `max(2,5°/s, 2,8 × szum kalibracji)` są zerowane jako drgania spoczynkowe.
+4. Low-pass filter wygładza każdą oś: `filtered += alpha × (current − filtered)`.
+5. Filtr komplementarny łączy tilt z grawitacji z całkowaniem gyro. Korekcja accel działa tylko dla magnitude 0,72–1,28 g, aby dynamiczny ruch nie przechylał sztucznie orientacji.
+6. Silnik czeka na co najmniej 280 ms stabilnego spoczynku i zapamiętuje bieżący kąt oraz 12 ostatnich próbek jako lokalną bazę neutralną.
+7. Po wykryciu faktycznego ruchu zbierane jest jedno ograniczone okno `spoczynek → ruch → spoczynek`.
+8. Reguły fizyczne i lokalny model k-NN analizują całe okno. Wynik musi przejść limit odległości, margines między klasami oraz bramkę właściwą dla danego typu ruchu.
+9. Silnik zwraca najwyżej jeden gest, ponownie wymaga stabilnego uzbrojenia, a cooldown chroni przed szybkim powtórzeniem.
 
 ## Gesty
 
@@ -51,7 +53,9 @@ Kalibracja jest odrzucana, jeśli:
 
 Ekran **Naucz gest** rejestruje dokładny przedział wybrany przez użytkownika. Start dodaje krótki pre-roll z historii, Stop kończy okno i uruchamia ten sam klasyfikator co tryb live. Podczas nagrania wykonywanie akcji multimedialnych jest zawieszone, ale filtrowane próbki nadal trafiają na wykres i do analizatora.
 
-Ten sam mechanizm zasila kreator pierwszej konfiguracji. Użytkownik otrzymuje instrukcję właściwą dla każdego z ośmiu gestów, może potwierdzić rozpoznanie, powtórzyć próbę, pominąć ją oraz przypisać inną akcję lub `Brak akcji`. Kreator nie zapisuje pojedynczego nagrania jako wzorca biometrycznego i nie zmienia deterministycznego klasyfikatora; dzięki temu pojedyncza nietypowa próba nie obniża bezpieczeństwa działania w tle.
+Ten sam mechanizm zasila kreator pierwszej konfiguracji. Użytkownik otrzymuje instrukcję właściwą dla każdego z ośmiu gestów, może dodać próbkę nawet wtedy, gdy klasyczny detektor wskazał inną klasę, powtórzyć ruch z innej pozycji, pominąć go oraz przypisać inną akcję lub `Brak akcji`.
+
+Każde zaakceptowane nagranie jest przycinane do aktywnego ruchu i zamieniane na 39 cech z akcelerometru i żyroskopu. Dwie próbki aktywują personalizację gestu, a maksymalnie pięć ostatnich pozwala pokryć kilka typowych pozycji kapsla. Surowy przebieg nie jest utrwalany. Pojedyncza próbka może tylko potwierdzić regułę bazową; nadpisanie klasy wymaga dojrzałego modelu, wysokiej pewności i fizycznej zgodności ruchu.
 
 Nagranie jest ograniczone do 15 sekund i 2000 próbek. Wynik pokazuje wykryty gest, pewność, peak gyro oraz zakres magnitude akcelerometru. Akceptacja potwierdza jakość nagrania; nie obniża automatycznie progów bezpieczeństwa.
 
@@ -60,11 +64,12 @@ Nagranie jest ograniczone do 15 sekund i 2000 próbek. Wynik pokazuje wykryty ge
 - Mocniejsze smoothing ogranicza jitter, ale zwiększa opóźnienie.
 - Dłuższy cooldown eliminuje przypadkowe podwójne akcje, ale ogranicza tempo świadomych powtórzeń.
 - Oczekiwanie na końcowy spoczynek dodaje około 280 ms opóźnienia, ale eliminuje akcje od statycznego kąta i ogranicza jeden ruch do jednego zdarzenia.
-- Yaw jest gyro-only, więc długoterminowo dryfuje. Gesty rotate bazują na chwilowej prędkości Z, a nie absolutnym yaw.
+- Yaw jest gyro-only, więc długoterminowo dryfuje. Cechy obrotu wykorzystują całkę rzutu gyro na chwilowy wektor grawitacji, a nie absolutny yaw.
+- Akcelerometr wyznacza pion, ale bez magnetometru nie wyznacza kierunku poziomego. Personalizacja może filtrować `tilt left/right`, lecz nie wolno jej samodzielnie odwracać tego kierunku po dowolnej zmianie yaw.
 - Throw bazujący na free-fall jest bezpieczniejszy niż integracja przyspieszenia do pozycji, która szybko akumuluje błąd bez dodatkowych sensorów.
 
 ## Testowanie
 
-`GestureEngineTest` podaje sztuczne `FilteredSensorData` z kontrolowanym czasem. Testy obejmują 1000 próbek nieruchomego urządzenia pod kątem, 2000 zaszumionych próbek spoczynkowych, pojedynczy uszkodzony sample, stały błąd gyro, pełne cykle wszystkich gestów oraz analizę ręcznego nagrania. `SensorFilterAndCalibrationTest` pokrywa wygładzanie, bias oraz walidację stabilności.
+`GestureEngineTest` podaje sztuczne `FilteredSensorData` z kontrolowanym czasem. Testy obejmują 1000 próbek nieruchomego urządzenia pod kątem, 2000 zaszumionych próbek spoczynkowych, pojedynczy uszkodzony sample, stały błąd gyro, pełne cykle wszystkich gestów, personalizowany flip z pozycji bocznej oraz analizę ręcznego nagrania. `SensorFilterAndCalibrationTest` pokrywa medianę, wygładzanie, bias oraz walidację stabilności. `PersonalizedGestureClassifierTest` weryfikuje wymiar cech, jakość obu sensorów, odporność grawitacyjną na obrót, uczenie k-NN i fizyczne odrzucanie niezgodnej próbki.
 
 W buildzie debug `FakeTrikiDataSource` generuje pełne sekwencje IMU i przechodzi przez ten sam `TrikiRuntime`, `GestureEngine` i `ActionMapper` co fizyczny kontroler.

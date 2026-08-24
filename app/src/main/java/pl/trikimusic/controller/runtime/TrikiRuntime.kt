@@ -65,8 +65,9 @@ class TrikiRuntime(
             settingsRepository.settings.collectLatest { value ->
                 val calibrationChanged = value.calibration != settings.calibration
                 val sensitivityChanged = value.sensitivity != settings.sensitivity || value.advancedThresholds != settings.advancedThresholds
+                val personalizedModelChanged = value.personalizedGestureModel != settings.personalizedGestureModel
                 settings = value
-                if (calibrationChanged || sensitivityChanged) resetProcessing()
+                if (calibrationChanged || sensitivityChanged || personalizedModelChanged) resetProcessing()
             }
         }
         scope.launch {
@@ -118,7 +119,7 @@ class TrikiRuntime(
         // An uncalibrated or explicitly suspended controller may still feed diagnostics,
         // but it must never execute a media action.
         if (!settings.calibration.isValid || gestureActionsSuspended) return
-        gestureEngine.process(filtered, thresholds).forEach { event ->
+        gestureEngine.process(filtered, thresholds, settings.personalizedGestureModel).forEach { event ->
             mutableEvents.tryEmit(event)
             val execution = actionMapper.execute(event, settings.activeProfile)
             logger.log(

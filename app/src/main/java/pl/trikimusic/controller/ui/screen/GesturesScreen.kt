@@ -52,6 +52,7 @@ import pl.trikimusic.controller.domain.model.ControlProfile
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.MediaAction
+import pl.trikimusic.controller.domain.model.MIN_PERSONALIZED_SAMPLES_PER_GESTURE
 import pl.trikimusic.controller.domain.model.SensitivityLevel
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
@@ -150,7 +151,11 @@ fun GesturesScreen(
                 Column {
                     GestureType.entries.forEachIndexed { index, gesture ->
                         val action = profile.actionFor(gesture)
-                        MappingRow(gesture, action) {
+                        MappingRow(
+                            gesture = gesture,
+                            action = action,
+                            learnedSamples = state.settings.personalizedGestureModel.sampleCountFor(gesture),
+                        ) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             selectedGesture = gesture
                         }
@@ -254,12 +259,30 @@ private fun ProfilePicker(
 }
 
 @Composable
-private fun MappingRow(gesture: GestureType, action: MediaAction, onClick: () -> Unit) {
+private fun MappingRow(
+    gesture: GestureType,
+    action: MediaAction,
+    learnedSamples: Int,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 15.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(gesture.displayName, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.weight(1f)) {
+            Text(gesture.displayName, style = MaterialTheme.typography.bodyLarge)
+            if (learnedSamples > 0) {
+                Text(
+                    if (learnedSamples >= MIN_PERSONALIZED_SAMPLES_PER_GESTURE) {
+                        "ML lokalny · $learnedSamples próbek"
+                    } else {
+                        "ML lokalny · 1/$MIN_PERSONALIZED_SAMPLES_PER_GESTURE próbek"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
         TextButton(onClick = onClick) { Text(action.displayName) }
     }
 }

@@ -1,7 +1,8 @@
 package pl.trikimusic.controller.core.gesture
 
-import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.max
 import kotlin.math.sqrt
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
@@ -15,12 +16,16 @@ class SensorFilter {
     private var filteredAccelerometer: Vector3? = null
     private var orientation = OrientationData()
     private var previousTimestampNanos: Long? = null
+    private val gyroscopeMedian = MedianOfThreeVectorFilter()
+    private val accelerometerMedian = MedianOfThreeVectorFilter()
 
     fun reset() {
         filteredGyroscope = null
         filteredAccelerometer = null
         orientation = OrientationData()
         previousTimestampNanos = null
+        gyroscopeMedian.reset()
+        accelerometerMedian.reset()
     }
 
     fun process(
@@ -38,9 +43,17 @@ class SensorFilter {
             calibration.accelerometerBiasY,
             calibration.accelerometerBiasZ,
         )
+        // Median-of-three rejects an isolated BLE/IMU spike before the low-pass stage can smear
+        // it over multiple frames. The calibrated noise floor then removes residual gyro chatter.
+        val medianGyroscope = gyroscopeMedian.process(calibratedGyroscope)
+        val medianAccelerometer = accelerometerMedian.process(calibratedAccelerometer)
+        val stabilizedGyroscope = applyGyroscopeNoiseFloor(
+            medianGyroscope,
+            max(MIN_GYROSCOPE_NOISE_FLOOR_DPS, calibration.gyroscopeNoise * GYROSCOPE_NOISE_MULTIPLIER),
+        )
         val alpha = thresholds.filterAlpha
-        filteredGyroscope = lowPass(filteredGyroscope, calibratedGyroscope, alpha)
-        filteredAccelerometer = lowPass(filteredAccelerometer, calibratedAccelerometer, alpha)
+        filteredGyroscope = lowPass(filteredGyroscope, stabilizedGyroscope, alpha)
+        filteredAccelerometer = lowPass(filteredAccelerometer, medianAccelerometer, alpha)
 
         val dt = previousTimestampNanos?.let { previous ->
             ((sample.timestampNanos - previous).coerceIn(MIN_DT_NANOS, MAX_DT_NANOS) / 1_000_000_000f)
@@ -69,6 +82,12 @@ class SensorFilter {
             previous.z + alpha * (current.z - previous.z),
         )
     }
+
+    private fun applyGyroscopeNoiseFloor(value: Vector3, noiseFloor: Float): Vector3 = Vector3(
+        x = value.x.takeUnless { abs(it) <= noiseFloor } ?: 0f,
+        y = value.y.takeUnless { abs(it) <= noiseFloor } ?: 0f,
+        z = value.z.takeUnless { abs(it) <= noiseFloor } ?: 0f,
+    )
 
     private fun updateOrientation(
         previous: OrientationData,
@@ -112,5 +131,33 @@ class SensorFilter {
         const val DEFAULT_DT_SECONDS = 0.0096f
         const val MIN_DT_NANOS = 1_000_000L
         const val MAX_DT_NANOS = 100_000_000L
+        const val MIN_GYROSCOPE_NOISE_FLOOR_DPS = 2.5f
+        const val GYROSCOPE_NOISE_MULTIPLIER = 2.8f
+    }
+
+    private class MedianOfThreeVectorFilter {
+        private var older: Vector3? = null
+        private var previous: Vector3? = null
+
+        fun reset() {
+            older = null
+            previous = null
+        }
+
+        fun process(current: Vector3): Vector3 {
+            val first = older
+            val second = previous
+            older = second
+            previous = current
+            if (first == null || second == null) return current
+            return Vector3(
+                x = median(first.x, second.x, current.x),
+                y = median(first.y, second.y, current.y),
+                z = median(first.z, second.z, current.z),
+            )
+        }
+
+        private fun median(first: Float, second: Float, third: Float): Float =
+            first + second + third - minOf(first, second, third) - maxOf(first, second, third)
     }
 }

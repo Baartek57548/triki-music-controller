@@ -25,6 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import pl.trikimusic.controller.domain.model.CURRENT_GESTURE_LEARNING_VERSION
 import pl.trikimusic.controller.ui.screen.AboutScreen
 import pl.trikimusic.controller.ui.screen.BleInspectorScreen
 import pl.trikimusic.controller.ui.screen.CalibrationScreen
@@ -71,10 +72,10 @@ fun TrikiMusicApp(
     val mainRoutes = MainDestination.entries.map { it.route }.toSet()
     val showBottomBar = currentDestination?.route in mainRoutes
 
-    LaunchedEffect(state.settings.calibration.isValid, state.settings.gestureWizardCompleted) {
+    LaunchedEffect(state.settings.calibration.isValid, state.settings.gestureLearningVersion) {
         if (
             state.settings.calibration.isValid &&
-            !state.settings.gestureWizardCompleted &&
+            state.settings.gestureLearningVersion < CURRENT_GESTURE_LEARNING_VERSION &&
             currentDestination?.route != Routes.GESTURE_WIZARD
         ) {
             navController.navigate(Routes.GESTURE_WIZARD) { launchSingleTop = true }

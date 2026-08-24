@@ -1,6 +1,7 @@
 package pl.trikimusic.controller.core.gesture
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -10,9 +11,11 @@ import pl.trikimusic.controller.data.bluetooth.FakeTrikiDataSource
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GestureThresholds
+import pl.trikimusic.controller.domain.model.LearnedGestureSample
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.OrientationData
 import pl.trikimusic.controller.domain.model.RawVector3
+import pl.trikimusic.controller.domain.model.PersonalizedGestureModel
 import pl.trikimusic.controller.domain.model.TrikiSensorData
 import pl.trikimusic.controller.domain.model.Vector3
 
@@ -186,6 +189,41 @@ class GestureEngineTest {
 
             assertTrue("Expected $expected, detected $detected", expected in detected)
         }
+    }
+
+    @Test
+    fun `personalized model recognizes flip when cap starts on its side`() {
+        var timestamp = 0L
+        val sideCapture = buildList {
+            repeat(35) {
+                timestamp += PERIOD_NANOS
+                add(filtered(timestamp, 0f, Vector3(0f, 0f, 0f), Vector3(1f, 0f, 0f)))
+            }
+            repeat(20) {
+                timestamp += PERIOD_NANOS
+                add(filtered(timestamp, 0f, Vector3(0f, 250f, 0f), Vector3(-1f, 0f, 0f)))
+            }
+            repeat(70) {
+                timestamp += PERIOD_NANOS
+                add(filtered(timestamp, 0f, Vector3(0f, 0f, 0f), Vector3(-1f, 0f, 0f)))
+            }
+        }
+        val features = requireNotNull(GestureFeatureExtractor().extract(sideCapture).features)
+        val model = PersonalizedGestureModel(
+            samples = listOf(
+                LearnedGestureSample(GestureType.FLIP, features, 1L),
+                LearnedGestureSample(GestureType.FLIP, features, 2L),
+            ),
+        )
+        val engine = GestureEngine()
+
+        val detected = sideCapture
+            .flatMap { engine.process(it, thresholds, model) }
+            .map { it.type }
+
+        assertNotNull(engine.lastCapturedFeatures)
+        assertEquals(GestureType.FLIP, engine.lastPersonalizedRecognition?.gesture)
+        assertEquals(listOf(GestureType.FLIP), detected)
     }
 
     private class Fixture(private val thresholds: GestureThresholds) {

@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.MediaAction
+import pl.trikimusic.controller.domain.model.MIN_PERSONALIZED_SAMPLES_PER_GESTURE
 import pl.trikimusic.controller.domain.model.TrikiConnectionState
 import pl.trikimusic.controller.ui.GestureWizardUiState
 import pl.trikimusic.controller.ui.MainUiState
@@ -92,6 +93,7 @@ fun GestureWizardScreen(
             WizardBottomBar(
                 wizard = wizard,
                 trainer = trainer,
+                learnedSampleCount = state.settings.personalizedGestureModel.sampleCountFor(wizard.currentGesture),
                 onPrevious = viewModel::previousGestureWizardStep,
                 onSaveStep = viewModel::saveGestureWizardStep,
                 onFinish = viewModel::finishGestureWizard,
@@ -99,7 +101,7 @@ fun GestureWizardScreen(
         },
     ) { padding ->
         if (wizard.summaryVisible) {
-            WizardSummary(wizard, padding)
+            WizardSummary(state, wizard, padding)
         } else {
             GestureStep(state, wizard, trainer, viewModel, padding)
         }
@@ -117,7 +119,7 @@ private fun GestureStep(
     val gesture = wizard.currentGesture
     val guide = gestureGuide(gesture)
     val resultBelongsToStep = trainer.selectedGesture == gesture
-    val correctlyDetected = resultBelongsToStep && trainer.detectedGesture == gesture
+    val modelReady = trainer.learnedSampleCount >= MIN_PERSONALIZED_SAMPLES_PER_GESTURE
     val history = state.runtime.history.takeLast(160)
 
     LazyColumn(
@@ -203,6 +205,18 @@ private fun GestureStep(
             }
         }
         item {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+            ) {
+                Text(
+                    "Uczenie lokalne: zapisz 2 krótkie próby — każdą z innej typowej pozycji kapsla. Model porówna jednocześnie akcelerometr i żyroskop. Możesz też pominąć gest.",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Akcja dla gestu", style = MaterialTheme.typography.titleMedium)
                 ActionDropdown(
@@ -242,6 +256,15 @@ private fun GestureStep(
                         colors = listOf(Color(0xFF34D399), Color(0xFF60A5FA), Color(0xFFF59E0B)),
                     )
                     RecordingResult(gesture, trainer, resultBelongsToStep)
+                    Text(
+                        if (modelReady) {
+                            "Model gestu: ${trainer.learnedSampleCount} próbek · gotowy"
+                        } else {
+                            "Model gestu: ${trainer.learnedSampleCount}/$MIN_PERSONALIZED_SAMPLES_PER_GESTURE próbek"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (modelReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     if (trainer.recording && resultBelongsToStep) {
                         Button(
                             onClick = viewModel::stopTrainer,
@@ -261,13 +284,27 @@ private fun GestureStep(
                             Text(if (trainer.sampleCount > 0 && resultBelongsToStep) " Nagraj ponownie" else " Start nagrania")
                         }
                     }
-                    if (correctlyDetected) {
+                    if (trainer.featureReady && !trainer.accepted) {
+                        Button(
+                            onClick = viewModel::learnTrainerSample,
+                            enabled = !wizard.saving,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null)
+                            Text(" Dodaj próbkę jako ${gesture.displayName}")
+                        }
+                    }
+                    if (trainer.accepted || modelReady) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Text("Gest rozpoznany poprawnie", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (modelReady) "Model gestu jest gotowy" else "Próbka została dodana",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
                     }
                 }
@@ -311,6 +348,15 @@ private fun RecordingResult(
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Jakość accel + gyro: ${"%.0f".format(trainer.featureQuality * 100f)}%",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (trainer.featureReady || trainer.accepted) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
         )
     }
 }
@@ -357,13 +403,16 @@ private fun ActionDropdown(
 private fun WizardBottomBar(
     wizard: GestureWizardUiState,
     trainer: TrainerUiState,
+    learnedSampleCount: Int,
     onPrevious: () -> Unit,
     onSaveStep: (Boolean) -> Unit,
     onFinish: () -> Unit,
 ) {
     val gesture = wizard.currentGesture
-    val correctlyDetected = trainer.selectedGesture == gesture && trainer.detectedGesture == gesture
-    val verifiedInThisSession = correctlyDetected || gesture in wizard.verifiedGestures
+    val learnedInThisSession = trainer.selectedGesture == gesture && trainer.accepted
+    val verifiedInThisSession = learnedInThisSession ||
+        learnedSampleCount > 0 ||
+        gesture in wizard.verifiedGestures
     Surface(shadowElevation = 8.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -420,7 +469,7 @@ private fun WizardBottomBar(
 }
 
 @Composable
-private fun WizardSummary(wizard: GestureWizardUiState, padding: PaddingValues) {
+private fun WizardSummary(state: MainUiState, wizard: GestureWizardUiState, padding: PaddingValues) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -436,7 +485,7 @@ private fun WizardSummary(wizard: GestureWizardUiState, padding: PaddingValues) 
                 Icon(Icons.Default.DoneAll, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text("Gesty skonfigurowane", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Poprawnie sprawdzone: ${wizard.verifiedGestures.size} z ${GestureType.entries.size}. Pominięte próby nie blokują zapisanych mapowań.",
+                    "Próbki uczące dodano dla ${wizard.verifiedGestures.size} z ${GestureType.entries.size} gestów. Pominięte gesty nadal mogą działać przez bezpieczne reguły bazowe.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -447,6 +496,7 @@ private fun WizardSummary(wizard: GestureWizardUiState, padding: PaddingValues) 
                 Column {
                     GestureType.entries.forEachIndexed { index, gesture ->
                         val action = wizard.configuredActions[gesture] ?: MediaAction.NONE
+                        val learnedSamples = state.settings.personalizedGestureModel.sampleCountFor(gesture)
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -461,9 +511,13 @@ private fun WizardSummary(wizard: GestureWizardUiState, padding: PaddingValues) 
                                 )
                             }
                             Text(
-                                if (gesture in wizard.verifiedGestures) "Sprawdzony" else "Pominięty",
+                                when {
+                                    learnedSamples >= MIN_PERSONALIZED_SAMPLES_PER_GESTURE -> "Model: $learnedSamples"
+                                    learnedSamples == 1 || gesture in wizard.verifiedGestures -> "Model: 1 próbka"
+                                    else -> "Reguły bazowe"
+                                },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (gesture in wizard.verifiedGestures) {
+                                color = if (learnedSamples > 0 || gesture in wizard.verifiedGestures) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -499,12 +553,12 @@ private data class GestureGuide(
 
 private fun gestureGuide(gesture: GestureType): GestureGuide = when (gesture) {
     GestureType.TILT_LEFT -> GestureGuide(
-        instruction = "Zacznij nieruchomo. Przechyl Triki w lewo o około 30°, przytrzymaj chwilę, wróć do pozycji startowej i odczekaj sekundę.",
-        tip = "Przechylaj płynnie bez obracania urządzenia po blacie.",
+        instruction = "Zacznij w dowolnej stabilnej pozycji. Przechyl Triki w lewo względem oznaczenia na kapslu, wróć do pozycji startowej i odczekaj chwilę.",
+        tip = "Drugą próbę nagraj z innego typowego ułożenia, ale zawsze zachowaj kierunek względem obudowy.",
     )
     GestureType.TILT_RIGHT -> GestureGuide(
-        instruction = "Zacznij nieruchomo. Przechyl Triki w prawo o około 30°, przytrzymaj chwilę, wróć do pozycji startowej i odczekaj sekundę.",
-        tip = "Przechylaj płynnie bez obracania urządzenia po blacie.",
+        instruction = "Zacznij w dowolnej stabilnej pozycji. Przechyl Triki w prawo względem oznaczenia na kapslu, wróć do pozycji startowej i odczekaj chwilę.",
+        tip = "Drugą próbę nagraj z innego typowego ułożenia, ale zawsze zachowaj kierunek względem obudowy.",
     )
     GestureType.SHAKE -> GestureGuide(
         instruction = "Po chwili bezruchu wykonaj jeden krótki, zdecydowany ruch tam i z powrotem, a następnie zatrzymaj Triki.",
@@ -515,8 +569,8 @@ private fun gestureGuide(gesture: GestureType): GestureGuide = when (gesture) {
         tip = "Zachowaj krótki odstęp między impulsami; nie wykonuj długiej serii ruchów.",
     )
     GestureType.FLIP -> GestureGuide(
-        instruction = "Zacznij stroną z logo do góry, odwróć Triki do góry dnem i pozostaw je nieruchomo w tej pozycji.",
-        tip = "Nie odwracaj urządzenia z powrotem przed zakończeniem nagrania.",
+        instruction = "Zacznij nieruchomo, odwróć Triki na przeciwną stronę o około 180° i pozostaw je stabilnie w nowej pozycji.",
+        tip = "Pierwszą próbę możesz wykonać logo do góry, a drugą z pozycji bocznej.",
     )
     GestureType.ROTATE_LEFT -> GestureGuide(
         instruction = "Obróć Triki w płaszczyźnie stołu co najmniej o 70° w lewo i zatrzymaj je w nowym położeniu.",

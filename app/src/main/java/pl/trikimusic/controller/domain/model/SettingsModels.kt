@@ -96,6 +96,7 @@ enum class ThemePreference(val displayName: String) {
 data class AppSettings(
     val onboardingComplete: Boolean = false,
     val gestureWizardCompleted: Boolean = false,
+    val gestureLearningVersion: Int = 0,
     val knownDeviceAddress: String? = null,
     val knownDeviceName: String? = null,
     val activeProfileId: String = DEFAULT_PROFILE_ID,
@@ -103,6 +104,7 @@ data class AppSettings(
     val sensitivity: SensitivityLevel = SensitivityLevel.NORMAL,
     val advancedThresholds: GestureThresholds = GestureThresholds(),
     val calibration: CalibrationProfile = CalibrationProfile(),
+    val personalizedGestureModel: PersonalizedGestureModel = PersonalizedGestureModel(),
     val developerMode: Boolean = false,
     val backgroundEnabled: Boolean = true,
     val theme: ThemePreference = ThemePreference.SYSTEM,

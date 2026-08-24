@@ -36,6 +36,30 @@ class SensorFilterAndCalibrationTest {
     }
 
     @Test
+    fun `median stage rejects one sample spike from both sensors`() {
+        val filter = SensorFilter()
+        val calibration = CalibrationProfile()
+        val thresholds = GestureThresholds(filterAlpha = 1f)
+        filter.process(sample(0L), calibration, thresholds)
+        filter.process(sample(10_000_000L), calibration, thresholds)
+
+        val spike = filter.process(
+            sample(
+                20_000_000L,
+                gyro = Vector3(900f, -700f, 500f),
+                accel = Vector3(8f, -6f, 5f),
+            ),
+            calibration,
+            thresholds,
+        )
+
+        assertEquals(0f, spike.gyroscopeMagnitude, 0.0001f)
+        assertEquals(0f, spike.accelerometerG.x, 0.0001f)
+        assertEquals(0f, spike.accelerometerG.y, 0.0001f)
+        assertEquals(1f, spike.accelerometerG.z, 0.0001f)
+    }
+
+    @Test
     fun `calibration computes stable bias and valid profile`() {
         val samples = List(120) { index ->
             sample(

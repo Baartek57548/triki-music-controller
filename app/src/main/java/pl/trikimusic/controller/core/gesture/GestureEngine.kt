@@ -4,8 +4,11 @@ import kotlin.math.abs
 import kotlin.math.max
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GestureEvent
+import pl.trikimusic.controller.domain.model.GestureFeatureVector
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
+import pl.trikimusic.controller.domain.model.MIN_PERSONALIZED_SAMPLES_PER_GESTURE
+import pl.trikimusic.controller.domain.model.PersonalizedGestureModel
 import pl.trikimusic.controller.domain.model.Vector3
 
 /**
@@ -14,6 +17,8 @@ import pl.trikimusic.controller.domain.model.Vector3
  * sensor bias, or a single corrupted packet from executing media actions.
  */
 class GestureEngine {
+    private val featureExtractor = GestureFeatureExtractor()
+    private val personalizedClassifier = PersonalizedGestureClassifier()
     private val lastEmittedAt = mutableMapOf<GestureType, Long>()
     private var phase = Phase.WARMING_UP
     private var stableSinceNanos: Long? = null
@@ -21,14 +26,23 @@ class GestureEngine {
     private var baselineRoll = 0f
     private var previousRoll = 0f
     private var previousAccelerometer: Vector3? = null
+    private val stableHistory = ArrayDeque<FilteredSensorData>(STABLE_HISTORY_SAMPLES)
     private var motionWindow: MotionWindow? = null
+    internal var lastCapturedFeatures: GestureFeatureVector? = null
+        private set
+    internal var lastPersonalizedRecognition: PersonalizedRecognition? = null
+        private set
 
     fun reset() {
         lastEmittedAt.clear()
         resetStreamState()
     }
 
-    fun process(sample: FilteredSensorData, thresholds: GestureThresholds): List<GestureEvent> {
+    fun process(
+        sample: FilteredSensorData,
+        thresholds: GestureThresholds,
+        personalizedModel: PersonalizedGestureModel = PersonalizedGestureModel(),
+    ): List<GestureEvent> {
         val now = sample.source.timestampNanos
         val previousTimestamp = lastTimestampNanos
         if (
@@ -63,7 +77,7 @@ class GestureEngine {
 
             Phase.READY -> {
                 if (moving) {
-                    motionWindow = MotionWindow(now, baselineRoll).also {
+                    motionWindow = MotionWindow(now, baselineRoll, stableHistory.toList()).also {
                         it.add(sample, dtNanos, rollRateDps, thresholds)
                     }
                     stableSinceNanos = null
@@ -71,20 +85,33 @@ class GestureEngine {
                 } else if (stable) {
                     // Following the resting angle makes the detector independent of how Triki lies on a table.
                     baselineRoll = interpolateAngle(baselineRoll, sample.orientation.roll, BASELINE_TRACKING_ALPHA)
+                    rememberStableSample(sample)
                 }
                 emptyList()
             }
 
-            Phase.RECORDING -> processMotion(sample, thresholds, now, dtNanos, rollRateDps, stable, moving)
+            Phase.RECORDING -> processMotion(
+                sample,
+                thresholds,
+                personalizedModel,
+                now,
+                dtNanos,
+                rollRateDps,
+                stable,
+                moving,
+            )
         }
     }
 
     /** Finalizes a user-controlled Start/Stop capture without weakening live detection. */
-    fun finishRecording(thresholds: GestureThresholds): GestureEvent? {
+    fun finishRecording(
+        thresholds: GestureThresholds,
+        personalizedModel: PersonalizedGestureModel = PersonalizedGestureModel(),
+    ): GestureEvent? {
         val window = motionWindow ?: return null
         val timestamp = lastTimestampNanos ?: return null
         if (timestamp - window.startedAtNanos < MIN_RECORDED_MOTION_NANOS) return null
-        val event = classify(window, timestamp, thresholds)
+        val event = classify(window, timestamp, thresholds, personalizedModel)
         resetStreamState()
         return event
     }
@@ -96,6 +123,7 @@ class GestureEngine {
         }
         val stableSince = stableSinceNanos ?: now.also { stableSinceNanos = it }
         baselineRoll = interpolateAngle(baselineRoll, sample.orientation.roll, BASELINE_TRACKING_ALPHA)
+        rememberStableSample(sample)
         if (now - stableSince >= ARMING_STABLE_NANOS) {
             baselineRoll = sample.orientation.roll
             stableSinceNanos = null
@@ -106,6 +134,7 @@ class GestureEngine {
     private fun processMotion(
         sample: FilteredSensorData,
         thresholds: GestureThresholds,
+        personalizedModel: PersonalizedGestureModel,
         now: Long,
         dtNanos: Long,
         rollRateDps: Float,
@@ -137,13 +166,18 @@ class GestureEngine {
         }
         if (now - stableSince < requiredStableNanos) return emptyList()
 
-        val event = classify(window, now, thresholds)
+        val event = classify(window, now, thresholds, personalizedModel)
         resetAfterMotion(sample, stable = true)
         return listOfNotNull(event)
     }
 
-    private fun classify(window: MotionWindow, timestampNanos: Long, thresholds: GestureThresholds): GestureEvent? {
-        val recognition = when {
+    private fun classify(
+        window: MotionWindow,
+        timestampNanos: Long,
+        thresholds: GestureThresholds,
+        personalizedModel: PersonalizedGestureModel,
+    ): GestureEvent? {
+        val deterministic = when {
             window.freeFallNanos >= MIN_FREE_FALL_NANOS && window.impactAfterFreeFall -> Recognition(
                 GestureType.THROW_UP,
                 (window.peakAccelerationMagnitude / thresholds.impactG).coerceIn(0f, 1f),
@@ -186,7 +220,11 @@ class GestureEngine {
             )
 
             else -> null
-        } ?: return null
+        }
+        lastCapturedFeatures = featureExtractor.extract(window.capturedSamples).features
+        val personalized = lastCapturedFeatures?.let { personalizedClassifier.classify(it, personalizedModel) }
+        lastPersonalizedRecognition = personalized
+        val recognition = resolveRecognition(deterministic, personalized, personalizedModel) ?: return null
 
         return emit(
             recognition.type,
@@ -195,6 +233,39 @@ class GestureEngine {
             recognition.magnitude,
             thresholds,
         )
+    }
+
+    private fun resolveRecognition(
+        deterministic: Recognition?,
+        personalized: PersonalizedRecognition?,
+        model: PersonalizedGestureModel,
+    ): Recognition? {
+        if (!model.enabled || model.samples.isEmpty()) return deterministic
+        if (personalized != null) {
+            if (deterministic?.type == personalized.gesture) {
+                return deterministic.copy(confidence = max(deterministic.confidence, personalized.confidence))
+            }
+            val mature = personalized.trainedSampleCount >= MIN_PERSONALIZED_SAMPLES_PER_GESTURE
+            val requiredConfidence = if (deterministic == null) {
+                PERSONALIZED_ONLY_MIN_CONFIDENCE
+            } else {
+                PERSONALIZED_OVERRIDE_MIN_CONFIDENCE
+            }
+            val directionCanBeResolvedWithoutHeading = personalized.gesture != GestureType.TILT_LEFT &&
+                personalized.gesture != GestureType.TILT_RIGHT
+            if (mature && directionCanBeResolvedWithoutHeading && personalized.confidence >= requiredConfidence) {
+                return Recognition(
+                    type = personalized.gesture,
+                    confidence = personalized.confidence,
+                    magnitude = (1f - personalized.distance).coerceIn(0f, 1f),
+                )
+            }
+        }
+        if (deterministic != null && model.isTrained(deterministic.type)) {
+            // A mature personalized model can veto a rule match that is unlike the user's samples.
+            return null
+        }
+        return deterministic
     }
 
     private fun emit(
@@ -215,6 +286,8 @@ class GestureEngine {
         motionWindow = null
         stableSinceNanos = if (stable) sample.source.timestampNanos else null
         baselineRoll = sample.orientation.roll
+        stableHistory.clear()
+        if (stable) rememberStableSample(sample)
         phase = Phase.WARMING_UP
     }
 
@@ -225,6 +298,8 @@ class GestureEngine {
         baselineRoll = sample.orientation.roll
         previousRoll = sample.orientation.roll
         previousAccelerometer = sample.accelerometerG
+        stableHistory.clear()
+        rememberStableSample(sample)
         motionWindow = null
     }
 
@@ -235,7 +310,14 @@ class GestureEngine {
         baselineRoll = 0f
         previousRoll = 0f
         previousAccelerometer = null
+        stableHistory.clear()
         motionWindow = null
+    }
+
+    private fun rememberStableSample(sample: FilteredSensorData) {
+        if (stableHistory.lastOrNull()?.source?.timestampNanos == sample.source.timestampNanos) return
+        if (stableHistory.size == STABLE_HISTORY_SAMPLES) stableHistory.removeFirst()
+        stableHistory.addLast(sample)
     }
 
     private fun isStable(sample: FilteredSensorData, rollRateDps: Float, accelerationDelta: Float): Boolean =
@@ -270,7 +352,9 @@ class GestureEngine {
     private inner class MotionWindow(
         val startedAtNanos: Long,
         private val initialRoll: Float,
+        baselineSamples: List<FilteredSensorData>,
     ) {
+        val capturedSamples = ArrayList<FilteredSensorData>(256)
         var signedPeakRollDelta = 0f
             private set
         var peakRollRateDps = 0f
@@ -306,12 +390,17 @@ class GestureEngine {
         private var shakeInactiveNanos = 0L
         private var shakeActiveSamples = 0
 
+        init {
+            capturedSamples.addAll(baselineSamples.takeLast(STABLE_HISTORY_SAMPLES))
+        }
+
         fun add(
             sample: FilteredSensorData,
             dtNanos: Long,
             rollRateDps: Float,
             thresholds: GestureThresholds,
         ) {
+            if (capturedSamples.size < MAX_CAPTURED_MOTION_SAMPLES) capturedSamples.add(sample)
             val dtSeconds = dtNanos / NANOS_PER_SECOND_F
             val rollDelta = angularDelta(initialRoll, sample.orientation.roll)
             if (abs(rollDelta) > abs(signedPeakRollDelta)) signedPeakRollDelta = rollDelta
@@ -430,5 +519,9 @@ class GestureEngine {
         const val SHAKE_RELEASE_NANOS = 140_000_000L
         const val SHAKE_MIN_ACTIVE_SAMPLES = 4
         const val SHAKE_REVERSAL_DOT_THRESHOLD = -0.35f
+        const val MAX_CAPTURED_MOTION_SAMPLES = 512
+        const val STABLE_HISTORY_SAMPLES = 12
+        const val PERSONALIZED_ONLY_MIN_CONFIDENCE = 0.7f
+        const val PERSONALIZED_OVERRIDE_MIN_CONFIDENCE = 0.76f
     }
 }

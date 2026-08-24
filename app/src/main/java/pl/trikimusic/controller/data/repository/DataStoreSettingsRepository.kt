@@ -17,10 +17,13 @@ import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.ControlProfile
+import pl.trikimusic.controller.domain.model.CURRENT_GESTURE_LEARNING_VERSION
 import pl.trikimusic.controller.domain.model.GestureMapping
+import pl.trikimusic.controller.domain.model.GestureFeatureVector
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.LogCategory
+import pl.trikimusic.controller.domain.model.LearnedGestureSample
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.SensitivityLevel
 import pl.trikimusic.controller.domain.model.ThemePreference
@@ -52,7 +55,12 @@ class DataStoreSettingsRepository(
 
     override suspend fun completeOnboarding() = update { copy(onboardingComplete = true) }
 
-    override suspend fun completeGestureWizard() = update { copy(gestureWizardCompleted = true) }
+    override suspend fun completeGestureWizard() = update {
+        copy(
+            gestureWizardCompleted = true,
+            gestureLearningVersion = CURRENT_GESTURE_LEARNING_VERSION,
+        )
+    }
 
     override suspend fun rememberDevice(address: String, name: String) {
         require(address.isNotBlank())
@@ -77,6 +85,19 @@ class DataStoreSettingsRepository(
             copy(profiles = changed)
         }
     }
+
+    override suspend fun saveGestureTrainingSample(gesture: GestureType, features: GestureFeatureVector) {
+        require(features.isValid) { "Nie można zapisać nieprawidłowej próbki modelu gestów." }
+        val sample = LearnedGestureSample(
+            gesture = gesture,
+            features = features,
+            capturedAtMillis = System.currentTimeMillis(),
+        )
+        update { copy(personalizedGestureModel = personalizedGestureModel.withSample(sample)) }
+    }
+
+    override suspend fun clearGestureTraining(gesture: GestureType) =
+        update { copy(personalizedGestureModel = personalizedGestureModel.withoutGesture(gesture)) }
 
     override suspend fun createProfile(name: String): Result<ControlProfile> = runCatching {
         val validName = validateProfileName(name)
@@ -169,7 +190,11 @@ class DataStoreSettingsRepository(
     private fun AppSettings.normalized(): AppSettings {
         val safeProfiles = profiles.ifEmpty { defaultProfiles() }
         val safeActive = activeProfileId.takeIf { id -> safeProfiles.any { it.id == id } } ?: safeProfiles.first().id
-        return copy(profiles = safeProfiles, activeProfileId = safeActive)
+        return copy(
+            profiles = safeProfiles,
+            activeProfileId = safeActive,
+            personalizedGestureModel = personalizedGestureModel.normalized(),
+        )
     }
 
     private fun validateProfileName(name: String): String {
