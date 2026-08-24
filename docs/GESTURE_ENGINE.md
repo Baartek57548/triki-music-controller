@@ -60,6 +60,8 @@ Każde zaakceptowane nagranie jest przycinane do aktywnego ruchu i zamieniane na
 
 Nagranie jest ograniczone do 15 sekund i 2000 próbek. Wynik pokazuje wykryty gest, pewność, peak gyro oraz zakres magnitude akcelerometru. Akceptacja potwierdza jakość nagrania; nie obniża automatycznie progów bezpieczeństwa.
 
+Po analizie przycisk **Zapisz nagranie CSV** eksportuje dokładnie zachowane okno wraz z etykietą wybraną przez użytkownika i wynikiem detektora. Każdy wiersz zawiera timestamp i odstęp od poprzedniej ramki, bajt statusu, surowe osie `int16`, wartości przeskalowane, wartości po filtrze oraz pitch/roll/yaw. Nagłówek zapisuje aktywne progi, pełną kalibrację, jakość cech i pewność, dzięki czemu nieudany ruch można odtworzyć i analizować bez dostępu do telefonu.
+
 ## Kompromisy
 
 - Mocniejsze smoothing ogranicza jitter, ale zwiększa opóźnienie.
@@ -82,5 +84,7 @@ Mapowania są częścią profilu i mogą zostać zmienione tak samo jak mapowani
 `ReferenceMotionCompatibilityTest` zaczyna od potwierdzonego spoczynku `(24, 0, −2051)`, skali `0,070°/s/LSB`, `2048 LSB/g` i okresu 19,23 ms. Odtwarza profile ruchu z publicznych testów TRIKI-Control przez produkcyjny `SensorFilter` i `GestureEngine`: oba kierunki krótkiego skrętu, łagodne przechylenie 14°, płaski ślizg, impuls `−2600` oraz odwrócenie. Sprawdza ciszę zaszumionego `−Z` i możliwość nauczenia modelu wszystkich sześciu klas. Każdy z sześciu ruchów jest następnie obracany do pięciu pozycji 3D z szumem accel + gyro oraz resamplowany do 40, 52 i 65 Hz z deterministycznym jitterem timestampów; oczekiwana klasa musi pozostać niezmieniona.
 
 `TrikiButtonInterpreterTest` sprawdza pojedynczy, podwójny i potrójny klik, brak zdarzeń dla licznika `0..15` oraz naprzemiennego `0/1`, odbicia styku, długie przytrzymanie, zmianę wariantu i lukę w strumieniu.
+
+`GestureCaptureExporterTest` sprawdza etykiety, wszystkie etapy toru accel + gyro, sortowanie po timestampie, metadane kalibracji oraz odrzucanie pustego lub niepoprawnego nagrania.
 
 W buildzie debug `FakeTrikiDataSource` generuje pełne sekwencje IMU i przechodzi przez ten sam `TrikiRuntime`, `GestureEngine` i `ActionMapper` co fizyczny kontroler.

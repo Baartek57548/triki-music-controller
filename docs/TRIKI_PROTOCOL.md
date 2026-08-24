@@ -91,4 +91,6 @@ BLE Inspector pokazuje:
 - każdą notyfikację wraz z characteristic UUID, timestampem, HEX i DEC;
 - eksport ograniczonej sesji do pliku tekstowego.
 
+Ekran **Naucz gest** uzupełnia ten zapis o etykietowany CSV po dekodowaniu: zachowuje RAW `int16`, przeskalowane i filtrowane accel + gyro, status, timestampy, orientację, kalibrację, progi oraz wynik klasyfikatora. To jest preferowany materiał do analizy błędnego rozpoznania ruchu; BLE Inspector pozostaje właściwym narzędziem do diagnozy nieznanej ramki lub firmware.
+
 Nieznany pakiet pozostaje RAW. Decoder nie dopasowuje „podobnych” ramek ani nie zgaduje skali.

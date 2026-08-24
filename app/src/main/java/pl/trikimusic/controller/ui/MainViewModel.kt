@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import pl.trikimusic.controller.AppContainer
 import pl.trikimusic.controller.BuildConfig
+import pl.trikimusic.controller.core.gesture.GestureCaptureExporter
 import pl.trikimusic.controller.domain.model.AppLogEntry
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.ButtonClickType
@@ -420,6 +421,21 @@ class MainViewModel(
                 }
             }.onFailure(::showError)
         }
+    }
+
+    fun trainerCaptureCsv(): String {
+        val trainerState = mutableTrainer.value
+        check(!trainerState.recording) { "Najpierw zatrzymaj nagranie." }
+        val settings = container.settings.value
+        return GestureCaptureExporter.toCsv(
+            samples = trainerSamples.toList(),
+            expectedGesture = trainerState.selectedGesture,
+            detectedGesture = trainerState.detectedGesture,
+            confidence = trainerState.confidence,
+            featureQuality = trainerState.featureQuality,
+            thresholds = settings.sensitivity.thresholds(settings.advancedThresholds),
+            calibration = settings.calibration,
+        )
     }
 
     fun clearTrainerSamples() {

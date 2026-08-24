@@ -1,5 +1,8 @@
 package pl.trikimusic.controller.ui.screen
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,10 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -20,15 +25,20 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pl.trikimusic.controller.domain.model.GestureType
@@ -40,9 +50,23 @@ import pl.trikimusic.controller.ui.components.LiveLineChart
 
 @Composable
 fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: () -> Unit) {
+    val context = LocalContext.current
     val trainer by viewModel.trainer.collectAsStateWithLifecycle()
     val detectedGesture = trainer.detectedGesture
     val history = state.runtime.history.takeLast(180)
+    var captureText by remember { mutableStateOf("") }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(captureText) }
+                    ?: error("Nie można otworzyć pliku do zapisu.")
+            }.onSuccess {
+                Toast.makeText(context, "Zapisano nagranie gestu.", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, it.message ?: "Błąd zapisu.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     DisposableEffect(viewModel) {
         onDispose { viewModel.cancelTrainer() }
     }
@@ -55,7 +79,11 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Wybierz gest", style = MaterialTheme.typography.titleMedium)
@@ -164,6 +192,29 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
                     Button(onClick = viewModel::learnTrainerSample, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Text(" Dodaj jako ${trainer.selectedGesture.displayName}")
+                    }
+                }
+                if (trainer.sampleCount > 0) {
+                    OutlinedButton(
+                        onClick = {
+                            runCatching { viewModel.trainerCaptureCsv() }
+                                .onSuccess { csv ->
+                                    captureText = csv
+                                    val gesture = trainer.selectedGesture.name.lowercase()
+                                    exportLauncher.launch("triki-gesture-$gesture-${System.currentTimeMillis()}.csv")
+                                }
+                                .onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        it.message ?: "Nie można przygotować eksportu.",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null)
+                        Text(" Zapisz nagranie CSV")
                     }
                 }
                 if (trainer.learnedSampleCount > 0) {

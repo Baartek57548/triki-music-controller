@@ -133,6 +133,7 @@ Po włączeniu **Settings → Developer Mode** dostępne są:
 - Sensor Monitor z wykresami X/Y/Z, orientation, magnitude, RSSI i baterią;
 - BLE Inspector z usługami, charakterystykami, properties, descriptorami i odczytanymi wartościami;
 - nagrywanie krótkiej sesji RAW i eksport do pliku tekstowego w HEX/DEC;
+- eksport ostatniej próby z ekranu **Naucz gest** do etykietowanego CSV: RAW, wartości przeskalowane i filtrowane z obu sensorów, orientacja, timing, status ramki, progi, kalibracja i wynik klasyfikacji;
 - kategorie logów `BLE`, `PROTOCOL`, `IMU`, `GESTURE`, `MEDIA`, `SERVICE`, `PERMISSION`;
 - Fake Triki generujący kontrolowane sekwencje wszystkich obsługiwanych gestów oraz jednego, dwóch i trzech kliknięć.
 
@@ -148,11 +149,12 @@ Testy JVM obejmują:
 - profile referencyjne TRIKI-Control w skali prawdziwej ramki: spoczynek na `−Z`, krótkie skręty, lean 14°, płaski slide, stamp i flip, w tym uczenie wszystkich sześciu podstawowych klas;
 - wszystkie sześć podstawowych gestów po pięciu obrotach 3D kapsla, z szumem obu sensorów oraz przy 40/52/65 Hz i jitterze timestampów;
 - mapowanie gest/przycisk → akcja i brak wywołania dla `NONE`;
+- kompletność i kolejność czasową diagnostycznego eksportu CSV oraz walidację jego metadanych;
 - round-trip serializacji ustawień, profili, mapowań, kalibracji i stanu ukończenia kreatora, wraz z migracją danych ze starszej wersji.
 
 ## Znane ograniczenia
 
-- Fizyczna walidacja wymaga konkretnego egzemplarza Triki. Projekt kompiluje się i ma testy dekodera na potwierdzonych ramkach, ale bieżące środowisko CI/deweloperskie nie miało dostępu do rzeczywistego kapsla. Inspector jest celowo częścią aplikacji, aby porównać firmware i zebrać brakujące pakiety bez fikcyjnego dekodowania.
+- Fizyczna walidacja wymaga konkretnego egzemplarza Triki. Projekt kompiluje się i ma testy dekodera na potwierdzonych ramkach, ale bieżące środowisko CI/deweloperskie nie miało dostępu do rzeczywistego kapsla. Inspector oraz etykietowany eksport gestu są celowo częścią aplikacji, aby porównać firmware i dostroić detektor z prawdziwych danych bez fikcyjnego dekodowania.
 - Częstotliwość IMU nie jest zakodowana jako gwarantowana stała protokołu. UI pokazuje wartość mierzoną na żywo; parser interpoluje znaczniki wewnątrz burstu wyłącznie na potrzeby stabilnego filtru.
 - Yaw bez magnetometru dryfuje. Pitch i roll są korygowane grawitacją, natomiast yaw opiera się na całkowaniu żyroskopu.
 - Bez magnetometru nie istnieje absolutny kierunek poziomy. Dlatego podstawowe mapowanie używa bezkierunkowego `Lean` i płaskiego `Slide`, natomiast kierunek lewo/prawo rozróżnia tylko obrót wokół grawitacji.
