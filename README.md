@@ -121,7 +121,7 @@ Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [
 
 Presety czułości zmieniają spójny zestaw progów, siłę wygładzania i cooldown. Tryb Advanced pozwala zmienić progi lean/rotate/shake/tap bez naruszania mechanizmów zapobiegających spamowi. Silnik najpierw ustala lokalny spoczynek, następnie zbiera ruch i klasyfikuje najwyżej jeden gest po ponownym uspokojeniu kontrolera. Model k-NN może skorygować wynik dla nauczonego sposobu użycia, ale nie omija fizycznych bramek bezpieczeństwa. Nieruchome Triki leżące pod kątem nie może więc samo wywołać `NEXT` lub `PREVIOUS`.
 
-Opis stanów, kompromisów i testowania: [GESTURE_ENGINE.md](docs/GESTURE_ENGINE.md).
+Opis stanów, kompromisów i testowania: [GESTURE_ENGINE.md](docs/GESTURE_ENGINE.md). Porównanie publicznych implementacji, uzasadnienie odczytu accel + gyro oraz kryteria walidacji sprzętowej: [GESTURE_RESEARCH.md](docs/GESTURE_RESEARCH.md).
 
 ## Diagnostyka
 
