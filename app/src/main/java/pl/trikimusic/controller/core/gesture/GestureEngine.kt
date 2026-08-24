@@ -1,6 +1,7 @@
 package pl.trikimusic.controller.core.gesture
 
 import kotlin.math.abs
+import kotlin.math.acos
 import kotlin.math.max
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GestureEvent
@@ -77,8 +78,8 @@ class GestureEngine {
 
             Phase.READY -> {
                 if (moving) {
-                    motionWindow = MotionWindow(now, baselineRoll, stableHistory.toList()).also {
-                        it.add(sample, dtNanos, rollRateDps, thresholds)
+                    motionWindow = MotionWindow(now, stableHistory.toList()).also {
+                        it.add(sample, dtNanos, thresholds)
                     }
                     stableSinceNanos = null
                     phase = Phase.RECORDING
@@ -96,7 +97,6 @@ class GestureEngine {
                 personalizedModel,
                 now,
                 dtNanos,
-                rollRateDps,
                 stable,
                 moving,
             )
@@ -111,6 +111,10 @@ class GestureEngine {
         val window = motionWindow ?: return null
         val timestamp = lastTimestampNanos ?: return null
         if (timestamp - window.startedAtNanos < MIN_RECORDED_MOTION_NANOS) return null
+        if (window.emittedDuringMotion) {
+            resetStreamState()
+            return null
+        }
         val event = classify(window, timestamp, thresholds, personalizedModel)
         resetStreamState()
         return event
@@ -137,12 +141,24 @@ class GestureEngine {
         personalizedModel: PersonalizedGestureModel,
         now: Long,
         dtNanos: Long,
-        rollRateDps: Float,
         stable: Boolean,
         moving: Boolean,
     ): List<GestureEvent> {
         val window = requireNotNull(motionWindow)
-        window.add(sample, dtNanos, rollRateDps, thresholds)
+        window.add(sample, dtNanos, thresholds)
+        val liveEvent = if (!window.emittedDuringMotion) {
+            window.liveRecognition(thresholds)?.let { recognition ->
+                emit(
+                    recognition.type,
+                    now,
+                    recognition.confidence,
+                    recognition.magnitude,
+                    thresholds,
+                )?.also { window.emittedDuringMotion = true }
+            }
+        } else {
+            null
+        }
 
         if (moving) {
             stableSinceNanos = null
@@ -155,20 +171,20 @@ class GestureEngine {
         if (now - window.startedAtNanos >= MAX_MOTION_WINDOW_NANOS) {
             // A permanently non-neutral stream indicates bias or corrupt data, not a deliberate gesture.
             resetAfterMotion(sample, stable)
-            return emptyList()
+            return listOfNotNull(liveEvent)
         }
 
-        val stableSince = stableSinceNanos ?: return emptyList()
+        val stableSince = stableSinceNanos ?: return listOfNotNull(liveEvent)
         val requiredStableNanos = if (window.shakeCycles == 1) {
             SINGLE_SHAKE_END_STABLE_NANOS
         } else {
             MOTION_END_STABLE_NANOS
         }
-        if (now - stableSince < requiredStableNanos) return emptyList()
+        if (now - stableSince < requiredStableNanos) return listOfNotNull(liveEvent)
 
-        val event = classify(window, now, thresholds, personalizedModel)
+        val event = if (window.emittedDuringMotion) null else classify(window, now, thresholds, personalizedModel)
         resetAfterMotion(sample, stable = true)
-        return listOfNotNull(event)
+        return listOfNotNull(liveEvent, event)
     }
 
     private fun classify(
@@ -179,9 +195,15 @@ class GestureEngine {
     ): GestureEvent? {
         val deterministic = when {
             window.freeFallNanos >= MIN_FREE_FALL_NANOS && window.impactAfterFreeFall -> Recognition(
-                GestureType.THROW_UP,
+                GestureType.TAP,
                 (window.peakAccelerationMagnitude / thresholds.impactG).coerceIn(0f, 1f),
                 window.peakAccelerationMagnitude,
+            )
+
+            window.isCleanTap(thresholds) -> Recognition(
+                GestureType.TAP,
+                (window.peakRawAccelerationMagnitude / (thresholds.impactG * 1.7f)).coerceIn(0f, 1f),
+                window.peakRawAccelerationMagnitude,
             )
 
             window.shakeCycles >= 2 -> Recognition(
@@ -197,26 +219,33 @@ class GestureEngine {
             )
 
             window.longestUpsideDownNanos >= MIN_FLIP_HOLD_NANOS &&
-                window.finalAccelerationZ < FLIP_FINAL_Z_THRESHOLD &&
+                window.finalGravityProjection < FLIP_FINAL_Z_THRESHOLD &&
                 window.peakGyroscopeMagnitude >= MIN_FLIP_GYROSCOPE_DPS -> Recognition(
                 GestureType.FLIP,
-                abs(window.finalAccelerationZ).coerceIn(0f, 1f),
+                abs(window.finalGravityProjection).coerceIn(0f, 1f),
                 window.peakGyroscopeMagnitude,
             )
 
-            abs(window.integratedRotationZDegrees) >= MIN_ROTATION_DEGREES &&
-                window.peakRotationDps >= thresholds.rotationDps -> Recognition(
-                if (window.integratedRotationZDegrees > 0f) GestureType.ROTATE_RIGHT else GestureType.ROTATE_LEFT,
-                (abs(window.integratedRotationZDegrees) / STRONG_ROTATION_DEGREES).coerceIn(0f, 1f),
-                abs(window.integratedRotationZDegrees),
+            abs(window.integratedTwistDegrees) >= MIN_ROTATION_DEGREES &&
+                window.peakTwistDps >= thresholds.rotationDps &&
+                window.peakTwistDominance >= MIN_TWIST_DOMINANCE -> Recognition(
+                if (window.integratedTwistDegrees > 0f) GestureType.ROTATE_RIGHT else GestureType.ROTATE_LEFT,
+                (abs(window.integratedTwistDegrees) / STRONG_ROTATION_DEGREES).coerceIn(0f, 1f),
+                abs(window.integratedTwistDegrees),
             )
 
-            abs(window.signedPeakRollDelta) >= thresholds.tiltDegrees &&
-                window.longestTiltThresholdNanos >= MIN_TILT_HOLD_NANOS &&
-                window.peakRollRateDps >= MIN_TILT_RATE_DPS -> Recognition(
-                if (window.signedPeakRollDelta > 0f) GestureType.TILT_RIGHT else GestureType.TILT_LEFT,
-                (abs(window.signedPeakRollDelta) / STRONG_TILT_DEGREES).coerceIn(0f, 1f),
-                abs(window.signedPeakRollDelta),
+            window.peakGravityAngleDegrees >= thresholds.tiltDegrees &&
+                window.longestLeanThresholdNanos >= MIN_LEAN_HOLD_NANOS &&
+                window.peakGyroscopeMagnitude >= MIN_LEAN_GYROSCOPE_DPS -> Recognition(
+                GestureType.LEAN,
+                (window.peakGravityAngleDegrees / STRONG_LEAN_DEGREES).coerceIn(0f, 1f),
+                window.peakGravityAngleDegrees,
+            )
+
+            window.isFlatSlide() -> Recognition(
+                GestureType.SLIDE,
+                (window.peakHorizontalAccelerationG / STRONG_SLIDE_ACCELERATION_G).coerceIn(0f, 1f),
+                window.peakHorizontalAccelerationG,
             )
 
             else -> null
@@ -251,9 +280,10 @@ class GestureEngine {
             } else {
                 PERSONALIZED_OVERRIDE_MIN_CONFIDENCE
             }
-            val directionCanBeResolvedWithoutHeading = personalized.gesture != GestureType.TILT_LEFT &&
-                personalized.gesture != GestureType.TILT_RIGHT
-            if (mature && directionCanBeResolvedWithoutHeading && personalized.confidence >= requiredConfidence) {
+            // A learned result may supplement the invariant physical recognizers.
+            // The physical gate prevents a numerically similar rest/noise sample
+            // from taking over a media action.
+            if (mature && personalized.confidence >= requiredConfidence) {
                 return Recognition(
                     type = personalized.gesture,
                     confidence = personalized.confidence,
@@ -261,10 +291,9 @@ class GestureEngine {
                 )
             }
         }
-        if (deterministic != null && model.isTrained(deterministic.type)) {
-            // A mature personalized model can veto a rule match that is unlike the user's samples.
-            return null
-        }
+        // Personalization may add or strengthen a recognition, but it must not
+        // veto a physically valid base gesture. A poor or mislabeled training
+        // sample must never disable controls that worked before training.
         return deterministic
     }
 
@@ -329,6 +358,7 @@ class GestureEngine {
     private fun isMoving(sample: FilteredSensorData, rollRateDps: Float, accelerationDelta: Float): Boolean =
         sample.gyroscopeMagnitude >= MOTION_START_GYROSCOPE_DPS ||
             abs(sample.accelerationMagnitude - 1f) >= MOTION_START_ACCELERATION_DELTA_G ||
+            abs(sample.source.accelerometerG.magnitude - 1f) >= MOTION_START_RAW_ACCELERATION_DELTA_G ||
             accelerationDelta >= MOTION_START_ACCELERATION_STEP_G ||
             rollRateDps >= MOTION_START_ROLL_RATE_DPS
 
@@ -351,23 +381,34 @@ class GestureEngine {
 
     private inner class MotionWindow(
         val startedAtNanos: Long,
-        private val initialRoll: Float,
         baselineSamples: List<FilteredSensorData>,
     ) {
         val capturedSamples = ArrayList<FilteredSensorData>(256)
-        var signedPeakRollDelta = 0f
+        private val gravityReference = averageGravity(baselineSamples)
+        var peakGravityAngleDegrees = 0f
             private set
-        var peakRollRateDps = 0f
+        var longestLeanThresholdNanos = 0L
             private set
-        var longestTiltThresholdNanos = 0L
+        private var currentGravityAngleDegrees = 0f
+        var peakHorizontalAccelerationG = 0f
             private set
-        var integratedRotationZDegrees = 0f
+        private var currentHorizontalAccelerationG = 0f
+        private var longestHorizontalAccelerationNanos = 0L
+        var integratedTwistDegrees = 0f
             private set
-        var peakRotationDps = 0f
+        var peakTwistDps = 0f
             private set
+        var peakTwistDominance = 0f
+            private set
+        private var currentTwistDps = 0f
         var peakGyroscopeMagnitude = 0f
             private set
+        private var currentGyroscopeMagnitude = 0f
         var peakAccelerationMagnitude = 0f
+            private set
+        var peakRawAccelerationMagnitude = 0f
+            private set
+        var peakVerticalImpactDeltaG = 0f
             private set
         var freeFallNanos = 0L
             private set
@@ -375,20 +416,23 @@ class GestureEngine {
             private set
         var longestUpsideDownNanos = 0L
             private set
-        var finalAccelerationZ = 1f
+        var finalGravityProjection = 1f
             private set
         var shakeCycles = 0
             private set
 
         private var currentFreeFallNanos = 0L
         private var confirmedFreeFall = false
-        private var currentTiltThresholdNanos = 0L
+        private var currentLeanThresholdNanos = 0L
+        private var currentHorizontalAccelerationNanos = 0L
         private var currentUpsideDownNanos = 0L
         private var shakeInitialVector: Vector3? = null
         private var shakeInitialMagnitude = 0f
         private var shakeLatched = false
         private var shakeInactiveNanos = 0L
         private var shakeActiveSamples = 0
+        private var tapCandidateAgeNanos = 0L
+        var emittedDuringMotion = false
 
         init {
             capturedSamples.addAll(baselineSamples.takeLast(STABLE_HISTORY_SAMPLES))
@@ -397,43 +441,154 @@ class GestureEngine {
         fun add(
             sample: FilteredSensorData,
             dtNanos: Long,
-            rollRateDps: Float,
             thresholds: GestureThresholds,
         ) {
             if (capturedSamples.size < MAX_CAPTURED_MOTION_SAMPLES) capturedSamples.add(sample)
             val dtSeconds = dtNanos / NANOS_PER_SECOND_F
-            val rollDelta = angularDelta(initialRoll, sample.orientation.roll)
-            if (abs(rollDelta) > abs(signedPeakRollDelta)) signedPeakRollDelta = rollDelta
-            peakRollRateDps = max(peakRollRateDps, rollRateDps)
-            currentTiltThresholdNanos = if (abs(rollDelta) >= thresholds.tiltDegrees) {
-                currentTiltThresholdNanos + dtNanos
+            val twistDps = dot(sample.gyroscopeDps, gravityReference)
+            currentTwistDps = twistDps
+            integratedTwistDegrees += twistDps * dtSeconds
+            peakTwistDps = max(peakTwistDps, abs(twistDps))
+            peakGyroscopeMagnitude = max(peakGyroscopeMagnitude, sample.gyroscopeMagnitude)
+            currentGyroscopeMagnitude = sample.gyroscopeMagnitude
+            if (sample.gyroscopeMagnitude > 0.001f) {
+                peakTwistDominance = max(peakTwistDominance, abs(twistDps) / sample.gyroscopeMagnitude)
+            }
+            peakAccelerationMagnitude = max(peakAccelerationMagnitude, sample.accelerationMagnitude)
+            val rawAccelerationMagnitude = sample.source.accelerometerG.magnitude
+            peakRawAccelerationMagnitude = max(peakRawAccelerationMagnitude, rawAccelerationMagnitude)
+            val gravityProjection = dot(sample.accelerometerG, gravityReference)
+            finalGravityProjection = gravityProjection
+            val rawGravityProjection = dot(sample.source.accelerometerG, gravityReference)
+            currentGravityAngleDegrees = gravityAngleDegrees(sample.accelerometerG)
+            peakGravityAngleDegrees = max(peakGravityAngleDegrees, currentGravityAngleDegrees)
+            currentLeanThresholdNanos = if (currentGravityAngleDegrees >= thresholds.tiltDegrees) {
+                currentLeanThresholdNanos + dtNanos
             } else {
                 0L
             }
-            longestTiltThresholdNanos = max(longestTiltThresholdNanos, currentTiltThresholdNanos)
-            integratedRotationZDegrees += sample.gyroscopeDps.z * dtSeconds
-            peakRotationDps = max(peakRotationDps, abs(sample.gyroscopeDps.z))
-            peakGyroscopeMagnitude = max(peakGyroscopeMagnitude, sample.gyroscopeMagnitude)
-            peakAccelerationMagnitude = max(peakAccelerationMagnitude, sample.accelerationMagnitude)
-            finalAccelerationZ = sample.accelerometerG.z
+            longestLeanThresholdNanos = max(longestLeanThresholdNanos, currentLeanThresholdNanos)
 
-            if (sample.accelerationMagnitude < thresholds.freeFallG) {
+            val rawAcceleration = sample.source.accelerometerG
+            val horizontalAcceleration = Vector3(
+                rawAcceleration.x - gravityReference.x * rawGravityProjection,
+                rawAcceleration.y - gravityReference.y * rawGravityProjection,
+                rawAcceleration.z - gravityReference.z * rawGravityProjection,
+            ).magnitude
+            currentHorizontalAccelerationG = horizontalAcceleration
+            peakHorizontalAccelerationG = max(peakHorizontalAccelerationG, horizontalAcceleration)
+            currentHorizontalAccelerationNanos = if (horizontalAcceleration >= MIN_SLIDE_ACCELERATION_G) {
+                currentHorizontalAccelerationNanos + dtNanos
+            } else {
+                0L
+            }
+            longestHorizontalAccelerationNanos = max(
+                longestHorizontalAccelerationNanos,
+                currentHorizontalAccelerationNanos,
+            )
+            peakVerticalImpactDeltaG = max(peakVerticalImpactDeltaG, abs(abs(rawGravityProjection) - 1f))
+            tapCandidateAgeNanos = if (
+                rawAccelerationMagnitude >= thresholds.impactG &&
+                peakVerticalImpactDeltaG >= MIN_TAP_VERTICAL_DELTA_G
+            ) {
+                max(tapCandidateAgeNanos, dtNanos)
+            } else if (tapCandidateAgeNanos > 0L) {
+                tapCandidateAgeNanos + dtNanos
+            } else {
+                0L
+            }
+
+            if (rawAccelerationMagnitude < thresholds.freeFallG) {
                 currentFreeFallNanos += dtNanos
                 freeFallNanos = max(freeFallNanos, currentFreeFallNanos)
                 if (currentFreeFallNanos >= MIN_FREE_FALL_NANOS) confirmedFreeFall = true
             } else {
-                if (confirmedFreeFall && sample.accelerationMagnitude >= thresholds.impactG) {
+                if (confirmedFreeFall && rawAccelerationMagnitude >= thresholds.impactG) {
                     impactAfterFreeFall = true
                 }
                 currentFreeFallNanos = 0L
             }
 
-            val upsideDown = sample.accelerometerG.z < FLIP_Z_THRESHOLD &&
+            val upsideDown = gravityProjection < FLIP_Z_THRESHOLD &&
                 sample.accelerationMagnitude in FLIP_GRAVITY_MIN_G..FLIP_GRAVITY_MAX_G
             currentUpsideDownNanos = if (upsideDown) currentUpsideDownNanos + dtNanos else 0L
             longestUpsideDownNanos = max(longestUpsideDownNanos, currentUpsideDownNanos)
 
             updateShake(sample, dtNanos, thresholds)
+        }
+
+        fun liveRecognition(thresholds: GestureThresholds): Recognition? = when {
+            isCleanTap(thresholds) && tapCandidateAgeNanos >= TAP_CONFIRM_NANOS -> Recognition(
+                GestureType.TAP,
+                (peakRawAccelerationMagnitude / (thresholds.impactG * 1.7f)).coerceIn(0f, 1f),
+                peakRawAccelerationMagnitude,
+            )
+
+            abs(integratedTwistDegrees) >= LIVE_ROTATION_DEGREES &&
+                peakTwistDps >= thresholds.rotationDps &&
+                peakTwistDominance >= MIN_TWIST_DOMINANCE &&
+                abs(currentTwistDps) <= max(MIN_ROTATION_RELEASE_DPS, thresholds.rotationDps * ROTATION_RELEASE_RATIO) -> Recognition(
+                if (integratedTwistDegrees > 0f) GestureType.ROTATE_RIGHT else GestureType.ROTATE_LEFT,
+                (abs(integratedTwistDegrees) / STRONG_ROTATION_DEGREES).coerceIn(0f, 1f),
+                abs(integratedTwistDegrees),
+            )
+
+            peakGravityAngleDegrees >= thresholds.tiltDegrees &&
+                longestLeanThresholdNanos >= LIVE_LEAN_HOLD_NANOS &&
+                peakGyroscopeMagnitude >= MIN_LEAN_GYROSCOPE_DPS &&
+                currentGyroscopeMagnitude <= MAX_LIVE_LEAN_GYROSCOPE_DPS &&
+                currentGravityAngleDegrees >= thresholds.tiltReleaseDegrees &&
+                finalGravityProjection >= MIN_LIVE_LEAN_GRAVITY_PROJECTION -> Recognition(
+                GestureType.LEAN,
+                (peakGravityAngleDegrees / STRONG_LEAN_DEGREES).coerceIn(0f, 1f),
+                peakGravityAngleDegrees,
+            )
+
+            isFlatSlide() && currentHorizontalAccelerationG <= SLIDE_RELEASE_ACCELERATION_G -> Recognition(
+                GestureType.SLIDE,
+                (peakHorizontalAccelerationG / STRONG_SLIDE_ACCELERATION_G).coerceIn(0f, 1f),
+                peakHorizontalAccelerationG,
+            )
+
+            else -> null
+        }
+
+        fun isCleanTap(thresholds: GestureThresholds): Boolean =
+            peakRawAccelerationMagnitude >= thresholds.impactG &&
+                peakVerticalImpactDeltaG >= MIN_TAP_VERTICAL_DELTA_G &&
+                peakGyroscopeMagnitude <= MAX_TAP_GYROSCOPE_DPS &&
+                peakGravityAngleDegrees <= MAX_TAP_TILT_DEGREES
+
+        fun isFlatSlide(): Boolean =
+            peakHorizontalAccelerationG >= MIN_SLIDE_ACCELERATION_G &&
+                longestHorizontalAccelerationNanos >= MIN_SLIDE_ACTIVE_NANOS &&
+                peakGravityAngleDegrees <= MAX_SLIDE_GRAVITY_ANGLE_DEGREES &&
+                peakGyroscopeMagnitude <= MAX_SLIDE_GYROSCOPE_DPS &&
+                peakVerticalImpactDeltaG <= MAX_SLIDE_VERTICAL_IMPACT_G
+
+        private fun gravityAngleDegrees(acceleration: Vector3): Float {
+            val magnitude = acceleration.magnitude
+            if (magnitude !in RELIABLE_GRAVITY_MIN_G..RELIABLE_GRAVITY_MAX_G) {
+                return currentGravityAngleDegrees
+            }
+            val normalizedDot = (dot(acceleration, gravityReference) / magnitude).coerceIn(-1f, 1f)
+            return Math.toDegrees(acos(normalizedDot).toDouble()).toFloat()
+        }
+
+        private fun averageGravity(samples: List<FilteredSensorData>): Vector3 {
+            if (samples.isEmpty()) return Vector3(0f, 0f, 1f)
+            val selected = samples.takeLast(STABLE_HISTORY_SAMPLES)
+            val average = Vector3(
+                selected.sumOf { it.accelerometerG.x.toDouble() }.toFloat() / selected.size,
+                selected.sumOf { it.accelerometerG.y.toDouble() }.toFloat() / selected.size,
+                selected.sumOf { it.accelerometerG.z.toDouble() }.toFloat() / selected.size,
+            )
+            val magnitude = average.magnitude
+            return if (magnitude > 0.1f) {
+                Vector3(average.x / magnitude, average.y / magnitude, average.z / magnitude)
+            } else {
+                Vector3(0f, 0f, 1f)
+            }
         }
 
         private fun updateShake(sample: FilteredSensorData, dtNanos: Long, thresholds: GestureThresholds) {
@@ -490,7 +645,7 @@ class GestureEngine {
         const val ARMING_STABLE_NANOS = 280_000_000L
         const val MOTION_END_STABLE_NANOS = 280_000_000L
         const val SINGLE_SHAKE_END_STABLE_NANOS = 480_000_000L
-        const val MAX_MOTION_WINDOW_NANOS = 2_200_000_000L
+        const val MAX_MOTION_WINDOW_NANOS = 4_000_000_000L
         const val BASELINE_TRACKING_ALPHA = 0.08f
 
         const val REST_GYROSCOPE_MAX_DPS = 22f
@@ -499,15 +654,20 @@ class GestureEngine {
         const val REST_ROLL_RATE_DPS = 16f
         const val MOTION_START_GYROSCOPE_DPS = 34f
         const val MOTION_START_ACCELERATION_DELTA_G = 0.15f
+        const val MOTION_START_RAW_ACCELERATION_DELTA_G = 0.2f
         const val MOTION_START_ACCELERATION_STEP_G = 0.075f
         const val MOTION_START_ROLL_RATE_DPS = 28f
 
-        const val MIN_TILT_RATE_DPS = 28f
-        const val MIN_TILT_HOLD_NANOS = 40_000_000L
+        const val MIN_LEAN_GYROSCOPE_DPS = 28f
+        const val MIN_LEAN_HOLD_NANOS = 40_000_000L
         const val MIN_RECORDED_MOTION_NANOS = 80_000_000L
-        const val STRONG_TILT_DEGREES = 55f
-        const val MIN_ROTATION_DEGREES = 22f
+        const val STRONG_LEAN_DEGREES = 55f
+        const val MIN_ROTATION_DEGREES = 16f
+        const val LIVE_ROTATION_DEGREES = 12f
         const val STRONG_ROTATION_DEGREES = 70f
+        const val MIN_TWIST_DOMINANCE = 0.48f
+        const val MIN_ROTATION_RELEASE_DPS = 18f
+        const val ROTATION_RELEASE_RATIO = 0.55f
         const val MIN_FREE_FALL_NANOS = 35_000_000L
         const val MIN_FLIP_HOLD_NANOS = 80_000_000L
         const val MIN_FLIP_GYROSCOPE_DPS = 55f
@@ -515,6 +675,22 @@ class GestureEngine {
         const val FLIP_FINAL_Z_THRESHOLD = -0.55f
         const val FLIP_GRAVITY_MIN_G = 0.65f
         const val FLIP_GRAVITY_MAX_G = 1.4f
+        const val MIN_TAP_VERTICAL_DELTA_G = 0.18f
+        const val MAX_TAP_GYROSCOPE_DPS = 95f
+        const val MAX_TAP_TILT_DEGREES = 20f
+        const val TAP_CONFIRM_NANOS = 55_000_000L
+        const val LIVE_LEAN_HOLD_NANOS = 75_000_000L
+        const val MAX_LIVE_LEAN_GYROSCOPE_DPS = 55f
+        const val MIN_LIVE_LEAN_GRAVITY_PROJECTION = 0.25f
+        const val MIN_SLIDE_ACCELERATION_G = 0.14f
+        const val SLIDE_RELEASE_ACCELERATION_G = 0.075f
+        const val STRONG_SLIDE_ACCELERATION_G = 0.42f
+        const val MIN_SLIDE_ACTIVE_NANOS = 35_000_000L
+        const val MAX_SLIDE_GRAVITY_ANGLE_DEGREES = 20f
+        const val MAX_SLIDE_GYROSCOPE_DPS = 80f
+        const val MAX_SLIDE_VERTICAL_IMPACT_G = 0.16f
+        const val RELIABLE_GRAVITY_MIN_G = 0.65f
+        const val RELIABLE_GRAVITY_MAX_G = 1.4f
         const val SHAKE_ACCELERATION_DELTA_G = 0.16f
         const val SHAKE_RELEASE_NANOS = 140_000_000L
         const val SHAKE_MIN_ACTIVE_SAMPLES = 4

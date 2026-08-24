@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Button
@@ -92,10 +93,11 @@ fun PermissionsScreen(state: MainUiState, viewModel: MainViewModel, onBack: () -
             }
             PermissionCard(
                 icon = Icons.Default.PlayCircle,
-                title = "Aktywne sesje multimedialne",
-                description = "Notification Listener Access jest wymagany przez MediaSessionManager.getActiveSessions(). Nie odczytujemy ani nie zapisujemy treści powiadomień.",
+                title = "Informacje o odtwarzanym utworze",
+                description = "Dostęp jest opcjonalny: pokazuje tytuł, wykonawcę i okładkę. Play/Pauza, Następny, Poprzedni oraz głośność działają także bez niego przez systemowe przyciski multimedialne.",
                 granted = state.permissions.mediaSessionGranted,
-                actionLabel = "Włącz w systemie",
+                optional = true,
+                actionLabel = "Opcjonalnie włącz",
                 onAction = { context.startActivity(container.permissionManager.notificationListenerSettingsIntent()) },
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -121,6 +123,7 @@ private fun PermissionCard(
     title: String,
     description: String,
     granted: Boolean,
+    optional: Boolean = false,
     actionLabel: String,
     onAction: () -> Unit,
 ) {
@@ -130,9 +133,13 @@ private fun PermissionCard(
                 Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 Icon(
-                    if (granted) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                    when {
+                        granted -> Icons.Default.CheckCircle
+                        optional -> Icons.Default.Info
+                        else -> Icons.Default.ErrorOutline
+                    },
                     null,
-                    tint = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    tint = if (granted || optional) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 )
             }
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

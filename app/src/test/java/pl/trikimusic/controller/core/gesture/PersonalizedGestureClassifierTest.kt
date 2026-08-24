@@ -34,9 +34,9 @@ class PersonalizedGestureClassifierTest {
 
     @Test
     fun `gravity relative features remain close after rotating cap around vertical axis`() {
-        val original = requireNotNull(extractor.extract(filteredCapture(GestureType.TILT_LEFT)).features)
+        val original = requireNotNull(extractor.extract(filteredCapture(GestureType.LEAN)).features)
         val rotated = requireNotNull(
-            extractor.extract(filteredCapture(GestureType.TILT_LEFT, rotationQuarterTurns = 1)).features,
+            extractor.extract(filteredCapture(GestureType.LEAN, rotationQuarterTurns = 1)).features,
         )
 
         for (index in 0..15) {
@@ -76,9 +76,25 @@ class PersonalizedGestureClassifierTest {
     }
 
     @Test
+    fun `lean and flat slide remain distinguishable after cap yaw changes`() {
+        val model = modelOf(
+            GestureType.LEAN to requireNotNull(extractor.extract(filteredCapture(GestureType.LEAN)).features),
+            GestureType.LEAN to requireNotNull(extractor.extract(filteredCapture(GestureType.LEAN, 1)).features),
+            GestureType.SLIDE to requireNotNull(extractor.extract(filteredCapture(GestureType.SLIDE)).features),
+            GestureType.SLIDE to requireNotNull(extractor.extract(filteredCapture(GestureType.SLIDE, 1)).features),
+        )
+        val query = requireNotNull(extractor.extract(filteredCapture(GestureType.SLIDE, 3)).features)
+
+        val recognition = classifier.classify(query, model)
+
+        assertNotNull(recognition)
+        assertEquals(GestureType.SLIDE, recognition?.gesture)
+    }
+
+    @Test
     fun `physical gate rejects unrelated rest vector even when numerically close`() {
-        val learned = requireNotNull(extractor.extract(filteredCapture(GestureType.THROW_UP)).features)
-        val model = modelOf(GestureType.THROW_UP to learned, GestureType.THROW_UP to learned)
+        val learned = requireNotNull(extractor.extract(filteredCapture(GestureType.TAP)).features)
+        val model = modelOf(GestureType.TAP to learned, GestureType.TAP to learned)
         val invalid = learned.copy(
             values = learned.values.toMutableList().apply {
                 this[8] = 1f
@@ -103,15 +119,18 @@ class PersonalizedGestureClassifierTest {
 
     private fun generateCapture(gesture: GestureType): List<TrikiSensorData> {
         val sequence = when (gesture) {
-            GestureType.TILT_LEFT -> ramp(Vector3(140f, 0f, 0f)) { index ->
+            GestureType.LEAN -> ramp(Vector3(140f, 0f, 0f)) { index ->
                 Vector3(0f, -0.58f * index / 35f, 1f - 0.45f * index / 35f)
             }
-            GestureType.TILT_RIGHT -> ramp(Vector3(-140f, 0f, 0f)) { index ->
-                Vector3(0f, 0.58f * index / 35f, 1f - 0.45f * index / 35f)
-            }
+            GestureType.SLIDE -> listOf(
+                TestMotion(35),
+                TestMotion(10, Vector3(12f, 5f, 0f), Vector3(0.28f, 0f, 1f)),
+                TestMotion(10, Vector3(-12f, -5f, 0f), Vector3(-0.28f, 0f, 1f)),
+                TestMotion(70),
+            )
             GestureType.ROTATE_LEFT -> pulse(Vector3(0f, 0f, -420f))
             GestureType.ROTATE_RIGHT -> pulse(Vector3(0f, 0f, 420f))
-            GestureType.THROW_UP -> listOf(
+            GestureType.TAP -> listOf(
                 TestMotion(35),
                 TestMotion(10, accelerometer = Vector3(0f, 0f, 0.08f)),
                 TestMotion(8, accelerometer = Vector3(0f, 0f, 2.8f)),

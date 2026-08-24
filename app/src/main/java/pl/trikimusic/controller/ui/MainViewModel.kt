@@ -57,7 +57,7 @@ data class CalibrationUiState(
 )
 
 data class TrainerUiState(
-    val selectedGesture: GestureType = GestureType.TILT_LEFT,
+    val selectedGesture: GestureType = GestureType.LEAN,
     val recording: Boolean = false,
     val sampleCount: Int = 0,
     val durationMillis: Long = 0L,

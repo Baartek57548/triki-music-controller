@@ -190,9 +190,16 @@ class DataStoreSettingsRepository(
     private fun AppSettings.normalized(): AppSettings {
         val safeProfiles = profiles.ifEmpty { defaultProfiles() }
         val safeActive = activeProfileId.takeIf { id -> safeProfiles.any { it.id == id } } ?: safeProfiles.first().id
+        val oldSensorPipeline = gestureLearningVersion < CURRENT_GESTURE_LEARNING_VERSION
         return copy(
             profiles = safeProfiles,
             activeProfileId = safeActive,
+            sensitivity = if (oldSensorPipeline && sensitivity == SensitivityLevel.ADVANCED) {
+                SensitivityLevel.NORMAL
+            } else {
+                sensitivity
+            },
+            advancedThresholds = if (oldSensorPipeline) GestureThresholds() else advancedThresholds,
             personalizedGestureModel = personalizedGestureModel.normalized(),
         )
     }

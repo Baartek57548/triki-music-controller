@@ -78,5 +78,9 @@ data class TrikiBleState(
     val gattServices: List<GattServiceInfo> = emptyList(),
     val lastFrameMillis: Long? = null,
     val measuredSampleRateHz: Float? = null,
+    val decodedFrames: Long = 0L,
+    val discardedStartupFrames: Long = 0L,
+    val droppedProtocolBytes: Long = 0L,
+    val lastPacketId: Int? = null,
     val errorMessage: String? = null,
 )

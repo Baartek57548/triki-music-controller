@@ -2,7 +2,7 @@
 
 ## Metoda i poziom pewności
 
-Poniższe dane pochodzą z analizy publicznego projektu [Maku-hub/TrikiScope](https://github.com/Maku-hub/TrikiScope) w rewizji `8ad37643148892ca7747e1520f7327a9eb8a8239` (2026-06-18). TrikiScope opisuje obserwacje na rzeczywistym urządzeniu oraz testy parsera. W aplikacji wartości te są odseparowane w `TrikiProtocol`; informacje niepotwierdzone trafiają wyłącznie do inspectora RAW.
+Poniższe dane pochodzą z porównania [Maku-hub/TrikiScope](https://github.com/Maku-hub/TrikiScope), [koksny/TRIKI-Control](https://github.com/koksny/TRIKI-Control) oraz pomiarów sprzętowych opisanych w [matiaspalmac/everything-imu](https://github.com/matiaspalmac/everything-imu/blob/main/DEVICES.md). Źródła pokazują co najmniej dwa warianty firmware, dlatego parser przyjmuje wspólny, potwierdzony podzbiór zamiast uznawać jedną obserwację za jedyną wersję protokołu.
 
 Poziomy używane w tym dokumencie:
 
@@ -34,10 +34,10 @@ Pełny zestaw usług nie jest zakodowany na sztywno. `TrikiBleManager` zapisuje 
 Po subskrypcji CCCD charakterystyki NUS TX telefon zapisuje do NUS RX osiem bajtów:
 
 ```text
-20 10 00 D0 07 68 00 03
+20 10 00 D0 07 34 00 03
 ```
 
-Znaczenie poszczególnych pól komendy nie zostało wiarygodnie ustalone. Aplikacja nie nadaje im nazw i nie generuje alternatywnych wartości.
+Wartość `0x34` uruchamia strumień około 52–53 Hz i jest używana przez implementacje pracujące z sekwencyjnym identyfikatorem pakietu. TrikiScope obserwował również `0x68` i strumień około 104 Hz. Znaczenie pól komendy nie zostało wiarygodnie ustalone; aplikacja wybiera stabilniejszy wariant 52 Hz, który daje pełne ramki bez utraty identyfikatorów.
 
 ## Ramka IMU
 
@@ -46,32 +46,32 @@ Stała długość: **14 bajtów**.
 | Offset | Długość | Typ | Pole | Skala | Jednostka |
 |---:|---:|---|---|---:|---|
 | 0 | 1 | `uint8` | nagłówek | dokładnie `0x22` | — |
-| 1 | 1 | `uint8` | status | bit 0: `0` puszczony, `1` wciśnięty | — |
-| 2 | 2 | `int16 LE` | gyro X | ÷ 131 | °/s |
-| 4 | 2 | `int16 LE` | gyro Y | ÷ 131 | °/s |
-| 6 | 2 | `int16 LE` | gyro Z | ÷ 131 | °/s |
+| 1 | 1 | `uint8` | identyfikator/status | obserwowane `0..15`; starszy wariant `0/1` | — |
+| 2 | 2 | `int16 LE` | gyro X | × 0,070 | °/s |
+| 4 | 2 | `int16 LE` | gyro Y | × 0,070 | °/s |
+| 6 | 2 | `int16 LE` | gyro Z | × 0,070 | °/s |
 | 8 | 2 | `int16 LE` | accel X | ÷ 2048 | g |
 | 10 | 2 | `int16 LE` | accel Y | ÷ 2048 | g |
 | 12 | 2 | `int16 LE` | accel Z | ÷ 2048 | g |
 
-Format odpowiada konfiguracji LSM6DSL: żyroskop ±250 dps (`131 LSB/(°/s)`) i akcelerometr ±16 g (`2048 LSB/g`). Drugi bajt jest statusem, nie częścią osi gyro X.
+Akcelerometr pracuje w skali `2048 LSB/g`. Niezależna walidacja sprzętowa obrotami o znany kąt potwierdziła dla żyroskopu zakres ±2000 dps i `70 mdps/LSB`; wcześniejsze narzędzie TrikiScope używało skali `131 LSB/(°/s)`, która dla tego wariantu zaniża ruch około 9,17 raza. Aplikacja stosuje skalę potwierdzoną przez całkowanie rzeczywistych obrotów.
 
-Parser akceptuje wyłącznie nagłówki `22 00` oraz `22 01`. Po utracie synchronizacji wyszukuje kolejną prawidłową parę, zachowując końcowe `0x22`, jeżeli drugi bajt przyjdzie w następnej notyfikacji. Jedna notyfikacja może zawierać część ramki albo kilka ramek.
+Parser akceptuje nagłówki `22 00` … `22 0F`. To obejmuje firmware z licznikiem pakietów `0..15` i starszy wariant raportujący tylko `0/1`. Po utracie synchronizacji wyszukuje kolejną prawidłową parę, zachowując końcowe `0x22`, jeżeli drugi bajt przyjdzie w następnej notyfikacji. Jedna notyfikacja może zawierać część ramki albo kilka ramek.
 
 ## Próbkowanie i czas
 
-Capture opisany przez TrikiScope wskazuje transmisję burstami oraz efektywną częstotliwość w okolicy 98–104 Hz. Nie ma potwierdzonego pola protokołu gwarantującego dokładną częstotliwość.
+Komenda `0x34` daje natywną częstotliwość około 52–53 Hz. Nie ma potwierdzonego pola protokołu gwarantującego dokładną częstotliwość, a notyfikacje mogą grupować kilka ramek.
 
 Aplikacja:
 
 1. znakuje notyfikację czasem monotonicznym telefonu;
-2. dla kilku ramek w jednym burście rozkłada timestampy w przybliżeniu co 9,615 ms, aby filtr orientacji nie dostał `dt = 0`;
+2. dla kilku ramek w jednym burście rozkłada timestampy w przybliżeniu co 19,23 ms, aby filtr orientacji nie dostał `dt = 0`;
 3. pokazuje w UI częstotliwość wyliczoną z przesuwnego okna dwóch sekund;
-4. nie prezentuje 104 Hz jako wartości gwarantowanej.
+4. nie prezentuje 52 Hz jako wartości gwarantowanej.
 
 ## Przycisk i LED
 
-- `status & 0x01 != 0` oznacza wciśnięty fizyczny przycisk. Payload IMU zachowuje układ osi.
+- Drugi bajt może oznaczać stan przycisku tylko w firmware, które zwraca wyłącznie `0/1`. Przy liczniku `0..15` aplikacja nie interpretuje go jako przycisku.
 - Bit 0 charakterystyki `6e400004-…` steruje LED: `00` wyłącza, `01` włącza. Pozostałe bity nie mają potwierdzonego znaczenia i aplikacja ich nie zapisuje.
 
 ## Bateria i informacje o urządzeniu

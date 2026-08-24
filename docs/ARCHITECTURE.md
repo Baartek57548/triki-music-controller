@@ -42,7 +42,7 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie k
 - `TrikiProtocolDecoder` ma bufor streamu, resynchronizację, skalowanie i statystyki odrzuconych bajtów.
 - `TrikiBleManager` implementuje maszynę stanów `DISCONNECTED → SCANNING → FOUND → CONNECTING → CONNECTED → READY`, błędy i `RECONNECTING`.
 - `SensorFilter` stosuje bias kalibracyjny, medianę z trzech próbek, adaptacyjną martwą strefę żyroskopu, low-pass i filtr komplementarny pitch/roll/yaw.
-- `GestureFeatureExtractor` przycina nagranie do aktywnego ruchu i tworzy 39 znormalizowanych cech: energie i maksima obu sensorów, całki gyro, obrót względem grawitacji, zmianę wektora grawitacji, impulsy, odwrócenia kierunku oraz osiem przedziałów czasowych dla accel i gyro.
+- `GestureFeatureExtractor` przycina nagranie do aktywnego ruchu i tworzy 40 znormalizowanych cech: energie i maksima obu sensorów, całki gyro, obrót względem grawitacji, zmianę wektora grawitacji, przyspieszenie poziome, impulsy, odwrócenia kierunku oraz osiem przedziałów czasowych dla accel i gyro.
 - `PersonalizedGestureClassifier` jest małym lokalnym modelem k-NN. Przechowuje maksymalnie pięć wektorów na gest, stosuje adaptacyjny promień klasy, margines względem drugiej klasy i fizyczną bramkę bezpieczeństwa.
 - `GestureEngine` klasyfikuje kompletne okno `spoczynek → ruch → spoczynek`, łączy model personalizowany z regułami bazowymi, utrzymuje lokalną bazę kąta i zwraca najwyżej jedno zdarzenie z jednego ruchu.
 - `GestureRecordingAnalyzer` uruchamia ten sam silnik na ręcznie wybranym zakresie Start/Stop i zwraca metryki jakości nagrania.
@@ -50,13 +50,13 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie k
 
 ### Data
 
-`DataStoreSettingsRepository` zapisuje cały snapshot ustawień jako wersjonowalny JSON w atomowym Preferences DataStore. Decoder toleruje nieznane przyszłe pola, normalizuje brak profili i próbki o niewłaściwym schemacie. Zapisywane są wyłącznie 39-elementowe wektory cech oraz etykieta gestu; surowe nagrania IMU nie trafiają do modelu ani poza telefon.
+`DataStoreSettingsRepository` zapisuje cały snapshot ustawień jako wersjonowalny JSON w atomowym Preferences DataStore. Decoder toleruje nieznane przyszłe pola, normalizuje brak profili i próbki o niewłaściwym schemacie. Zapisywane są wyłącznie 40-elementowe wektory cech oraz etykieta gestu; surowe nagrania IMU nie trafiają do modelu ani poza telefon.
 
-`AndroidMediaControllerGateway` wybiera najpierw sesję w stanie playing/buffering/connecting, a w drugiej kolejności ostatnio aktualizowaną. Transport controls obsługują akcje odtwarzacza, a `AudioManager` akcje globalnej głośności strumienia muzyki.
+`AndroidMediaControllerGateway` wybiera najpierw sesję w stanie playing/buffering/connecting, a w drugiej kolejności ostatnio aktualizowaną. Gdy Xiaomi lub inny system blokuje dostęp Notification Listener, publiczne `AudioManager.dispatchMediaKeyEvent()` wysyła pełną parę DOWN/UP dla Play/Pause, Next, Previous i Stop. Dostęp do sesji pozostaje potrzebny tylko do metadanych i precyzyjnego stanu odtwarzacza. `AudioManager` obsługuje też globalną głośność strumienia muzyki.
 
 ### Runtime
 
-`TrikiRuntime` jest jedynym miejscem łączącym sensor z akcją. Utrzymuje bieżący snapshot ustawień, więc zmiana profilu lub czułości działa bez restartu połączenia. Zmiana kalibracji/progów resetuje stan filtrów, aby nie mieszać dwóch układów odniesienia. Bez ważnej kalibracji runtime publikuje dane diagnostyczne, ale blokuje akcje. Podczas nagrania treningowego lub kroku kreatora akcje są czasowo zawieszone, a `SharedFlow<FilteredSensorData>` nadal zasila analizator i wykres.
+`TrikiRuntime` jest jedynym miejscem łączącym sensor z akcją. Utrzymuje bieżący snapshot ustawień, więc zmiana profilu lub czułości działa bez restartu połączenia. Zmiana kalibracji/progów resetuje stan filtrów, aby nie mieszać dwóch układów odniesienia. Kalibracja poprawia bias i martwą strefę, ale nie jest bramką: stabilny lokalny spoczynek automatycznie uzbraja gesty. Podczas nagrania treningowego lub kroku kreatora akcje są czasowo zawieszone, a `SharedFlow<FilteredSensorData>` nadal zasila analizator i wykres.
 
 Po pierwszej poprawnej kalibracji albo zmianie wersji schematu uczenia nawigacja otwiera `GestureWizardScreen`. `GestureWizardUiState` utrzymuje bieżący krok, akcje, nauczone i pominięte próby oraz stan atomowego zapisu. Każde mapowanie i zaakceptowana próbka trafiają od razu do DataStore; numer ukończonej wersji uczenia jest zapisywany dopiero na ekranie podsumowania, więc przerwanego kreatora nie uznaje się za zakończony.
 
@@ -88,7 +88,7 @@ Android może ograniczyć start foreground service z tła. Aplikacja rozpoczyna 
 - Każdy status GATT trafia do stanu błędu i rotującego logu.
 - Brak NUS RX/TX przerywa tylko próbę streamu; inspector nadal pokazuje GATT.
 - Brak baterii/metadanych jest stanem opcjonalnym, nie wyjątkiem.
-- Brak aktywnej MediaSession zwraca kontrolowany `Result.failure`.
+- Brak aktywnej MediaSession uruchamia legalny fallback media-key; błąd jest zwracany dopiero, gdy platforma odrzuci również tę drogę.
 - Uszkodzone settings JSON wraca do bezpiecznych defaults.
 - Kalibracja odrzuca zbyt mało próbek, nieprawidłową grawitację i zbyt duży szum żyroskopu.
 

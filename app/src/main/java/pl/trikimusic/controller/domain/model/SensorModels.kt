@@ -22,8 +22,13 @@ data class TrikiSensorData(
     val rawAccelerometer: RawVector3,
     val status: Int,
 ) {
+    /** Sequence/status byte. Firmware seen in the wild cycles it through 0..15. */
+    val packetId: Int
+        get() = status
+
+    /** Only reliable on firmware whose second byte is known to be a button flag. */
     val buttonPressed: Boolean
-        get() = status and 0x01 != 0
+        get() = status in 0..1 && status == 1
 }
 
 data class RawVector3(

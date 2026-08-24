@@ -128,7 +128,7 @@ class SensorFilter {
         const val COMPLEMENTARY_ALPHA = 0.96f
         const val RELIABLE_ACCEL_MIN = 0.72f
         const val RELIABLE_ACCEL_MAX = 1.28f
-        const val DEFAULT_DT_SECONDS = 0.0096f
+        const val DEFAULT_DT_SECONDS = 0.0192f
         const val MIN_DT_NANOS = 1_000_000L
         const val MAX_DT_NANOS = 100_000_000L
         const val MIN_GYROSCOPE_NOISE_FLOOR_DPS = 2.5f

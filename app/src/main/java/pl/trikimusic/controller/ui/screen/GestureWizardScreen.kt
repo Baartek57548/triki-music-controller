@@ -188,14 +188,14 @@ private fun GestureStep(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (gesture == GestureType.THROW_UP) {
+                    if (gesture == GestureType.TAP) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Icon(Icons.Default.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                             Text(
-                                "Podrzucaj nisko, nad miękką powierzchnią i pewnie złap urządzenie.",
+                                "Najpewniejsze jest krótkie stuknięcie lub odstawienie. Podrzucanie jest opcjonalne.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -552,13 +552,13 @@ private data class GestureGuide(
 )
 
 private fun gestureGuide(gesture: GestureType): GestureGuide = when (gesture) {
-    GestureType.TILT_LEFT -> GestureGuide(
-        instruction = "Zacznij w dowolnej stabilnej pozycji. Przechyl Triki w lewo względem oznaczenia na kapslu, wróć do pozycji startowej i odczekaj chwilę.",
-        tip = "Drugą próbę nagraj z innego typowego ułożenia, ale zawsze zachowaj kierunek względem obudowy.",
+    GestureType.LEAN -> GestureGuide(
+        instruction = "Zacznij w dowolnej stabilnej pozycji. Przechyl Triki o około 30–45° w dowolną stronę, zatrzymaj na moment i wróć do pozycji startowej.",
+        tip = "Liczy się zmiana kierunku grawitacji i ruch z żyroskopu, więc obrót kapsla na stole nie zmienia znaczenia gestu.",
     )
-    GestureType.TILT_RIGHT -> GestureGuide(
-        instruction = "Zacznij w dowolnej stabilnej pozycji. Przechyl Triki w prawo względem oznaczenia na kapslu, wróć do pozycji startowej i odczekaj chwilę.",
-        tip = "Drugą próbę nagraj z innego typowego ułożenia, ale zawsze zachowaj kierunek względem obudowy.",
+    GestureType.SLIDE -> GestureGuide(
+        instruction = "Trzymając Triki płasko, wykonaj krótkie proste przesunięcie po poziomej powierzchni i zatrzymaj urządzenie.",
+        tip = "Nie obracaj ani nie przechylaj kapsla. Akcelerometr ma wykryć ruch poziomy, a żyroskop potwierdzić brak obrotu.",
     )
     GestureType.SHAKE -> GestureGuide(
         instruction = "Po chwili bezruchu wykonaj jeden krótki, zdecydowany ruch tam i z powrotem, a następnie zatrzymaj Triki.",
@@ -580,8 +580,8 @@ private fun gestureGuide(gesture: GestureType): GestureGuide = when (gesture) {
         instruction = "Obróć Triki w płaszczyźnie stołu co najmniej o 70° w prawo i zatrzymaj je w nowym położeniu.",
         tip = "Obracaj wokół osi pionowej; nie przechylaj urządzenia na bok.",
     )
-    GestureType.THROW_UP -> GestureGuide(
-        instruction = "Podrzuć Triki kilka centymetrów pionowo, pewnie je złap, odłóż i zaczekaj aż pozostanie nieruchome.",
-        tip = "Klasyfikator szuka krótkiej nieważkości, a potem wyraźnego momentu złapania.",
+    GestureType.TAP -> GestureGuide(
+        instruction = "Trzymając Triki możliwie płasko, wykonaj krótkie pionowe stuknięcie dłonią albo lekko odstaw kapsel na miękką powierzchnię.",
+        tip = "Rozpoznawany jest impuls wzdłuż grawitacji przy małym obrocie. Nie musisz podrzucać urządzenia.",
     )
 }

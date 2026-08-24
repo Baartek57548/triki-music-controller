@@ -87,6 +87,7 @@ class GestureFeatureExtractor {
         var freeFallSamples = 0
         var integratedGyroscope = ZERO_VECTOR
         var peakAccelerationStep = 0f
+        var peakHorizontalAcceleration = 0f
         var previousGyroscope: Vector3? = null
         var previousSample: FilteredSensorData? = null
         var previousAccelerationForStep: Vector3? = null
@@ -115,6 +116,9 @@ class GestureFeatureExtractor {
                 ?: 0f
             peakAccelerationStep = max(peakAccelerationStep, accelerationStep)
             previousAccelerationForStep = sample.accelerometerG
+            val verticalAcceleration = dot(sample.accelerometerG, initialGravity)
+            val horizontalAcceleration = (sample.accelerometerG - initialGravity * verticalAcceleration).magnitude
+            peakHorizontalAcceleration = max(peakHorizontalAcceleration, horizontalAcceleration)
 
             val dtSeconds = previousSample?.let { previous ->
                 ((sample.source.timestampNanos - previous.source.timestampNanos)
@@ -191,6 +195,7 @@ class GestureFeatureExtractor {
             add(normalizeSigned(finalGravityDelta.y, 2f))
             add(normalizeSigned(finalGravityDelta.z, 2f))
             add(normalize(peakAccelerationStep, 1.5f))
+            add(normalize(peakHorizontalAcceleration, 1.5f))
             temporalGyroscope.forEach { add(normalize(it, 500f)) }
             temporalAcceleration.forEach { add(normalize(it, 2.5f)) }
         }
@@ -412,11 +417,14 @@ class PersonalizedGestureClassifier {
         val maximumAccelerationG = values[FeatureIndex.MAXIMUM_ACCELERATION] * 3.5f
         val verticalRotationDegrees = values[FeatureIndex.VERTICAL_ROTATION] * 180f
         val maximumGravityAngleDegrees = values[FeatureIndex.MAXIMUM_GRAVITY_ANGLE] * 180f
+        val peakHorizontalAccelerationG = values[FeatureIndex.PEAK_HORIZONTAL_ACCELERATION] * 1.5f
         val reversals = values[FeatureIndex.REVERSALS] * 4f
         return when (gesture) {
-            GestureType.TILT_LEFT,
-            GestureType.TILT_RIGHT,
-            -> maximumGravityAngleDegrees >= 10f && peakGyroscopeDps >= 20f
+            GestureType.LEAN -> maximumGravityAngleDegrees >= 16f && peakGyroscopeDps >= 20f
+            GestureType.SLIDE ->
+                maximumGravityAngleDegrees <= 24f &&
+                    peakHorizontalAccelerationG >= 0.11f &&
+                    peakGyroscopeDps <= 100f
 
             GestureType.ROTATE_LEFT,
             GestureType.ROTATE_RIGHT,
@@ -425,7 +433,9 @@ class PersonalizedGestureClassifier {
             GestureType.SHAKE -> reversals >= 1f && peakGyroscopeDps >= 100f
             GestureType.DOUBLE_SHAKE -> reversals >= 2f && peakGyroscopeDps >= 120f
             GestureType.FLIP -> maximumGravityAngleDegrees >= 70f && peakGyroscopeDps >= 45f
-            GestureType.THROW_UP -> minimumAccelerationG <= 0.7f && maximumAccelerationG >= 1.35f
+            GestureType.TAP ->
+                (minimumAccelerationG <= 0.7f && maximumAccelerationG >= 1.25f) ||
+                    maximumAccelerationG >= 1.3f
         }
     }
 
@@ -443,6 +453,7 @@ class PersonalizedGestureClassifier {
         const val VERTICAL_ROTATION = 10
         const val MAXIMUM_GRAVITY_ANGLE = 13
         const val REVERSALS = 14
+        const val PEAK_HORIZONTAL_ACCELERATION = 23
     }
 
     private companion object {

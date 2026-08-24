@@ -1,17 +1,21 @@
 package pl.trikimusic.controller.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 enum class GestureType(val displayName: String) {
-    TILT_LEFT("Przechylenie w lewo"),
-    TILT_RIGHT("Przechylenie w prawo"),
+    @SerialName("TILT_LEFT")
+    LEAN("Przechylenie w dowolną stronę"),
+    @SerialName("TILT_RIGHT")
+    SLIDE("Płaskie przesunięcie"),
     SHAKE("Potrząśnięcie"),
     DOUBLE_SHAKE("Podwójne potrząśnięcie"),
     FLIP("Odwrócenie"),
     ROTATE_LEFT("Obrót w lewo"),
     ROTATE_RIGHT("Obrót w prawo"),
-    THROW_UP("Podrzucenie"),
+    @SerialName("THROW_UP")
+    TAP("Stuknięcie / odstawienie"),
 }
 
 data class GestureEvent(

@@ -15,9 +15,9 @@ enum class SensitivityLevel(val displayName: String) {
 data class GestureThresholds(
     val tiltDegrees: Float = 28f,
     val tiltReleaseDegrees: Float = 12f,
-    val rotationDps: Float = 220f,
-    val shakeDps: Float = 285f,
-    val impactG: Float = 2.4f,
+    val rotationDps: Float = 55f,
+    val shakeDps: Float = 260f,
+    val impactG: Float = 1.32f,
     val freeFallG: Float = 0.38f,
     val filterAlpha: Float = 0.28f,
     val cooldownMillis: Long = 650L,
@@ -25,7 +25,7 @@ data class GestureThresholds(
     init {
         require(tiltDegrees in 10f..80f)
         require(tiltReleaseDegrees >= 2f && tiltReleaseDegrees < tiltDegrees)
-        require(rotationDps in 50f..2_000f)
+        require(rotationDps in 20f..2_000f)
         require(shakeDps in 50f..2_000f)
         require(impactG in 1.1f..16f)
         require(freeFallG in 0.05f..0.9f)
@@ -37,18 +37,18 @@ data class GestureThresholds(
 fun SensitivityLevel.thresholds(custom: GestureThresholds): GestureThresholds = when (this) {
     SensitivityLevel.LOW -> GestureThresholds(
         tiltDegrees = 38f,
-        rotationDps = 310f,
-        shakeDps = 380f,
-        impactG = 3.1f,
+        rotationDps = 90f,
+        shakeDps = 360f,
+        impactG = 1.75f,
         filterAlpha = 0.2f,
         cooldownMillis = 850L,
     )
     SensitivityLevel.NORMAL -> GestureThresholds()
     SensitivityLevel.HIGH -> GestureThresholds(
         tiltDegrees = 22f,
-        rotationDps = 175f,
-        shakeDps = 225f,
-        impactG = 2.0f,
+        rotationDps = 42f,
+        shakeDps = 215f,
+        impactG = 1.22f,
         freeFallG = 0.45f,
         filterAlpha = 0.36f,
         cooldownMillis = 520L,
@@ -56,9 +56,9 @@ fun SensitivityLevel.thresholds(custom: GestureThresholds): GestureThresholds = 
     SensitivityLevel.VERY_HIGH -> GestureThresholds(
         tiltDegrees = 17f,
         tiltReleaseDegrees = 8f,
-        rotationDps = 130f,
-        shakeDps = 175f,
-        impactG = 1.7f,
+        rotationDps = 32f,
+        shakeDps = 170f,
+        impactG = 1.15f,
         freeFallG = 0.5f,
         filterAlpha = 0.45f,
         cooldownMillis = 420L,
@@ -121,9 +121,9 @@ fun defaultProfiles(): List<ControlProfile> = listOf(
         name = "Music",
         builtIn = true,
         mappings = listOf(
-            GestureMapping(GestureType.TILT_LEFT, MediaAction.PREVIOUS),
-            GestureMapping(GestureType.TILT_RIGHT, MediaAction.NEXT),
-            GestureMapping(GestureType.THROW_UP, MediaAction.PLAY_PAUSE),
+            GestureMapping(GestureType.LEAN, MediaAction.PREVIOUS),
+            GestureMapping(GestureType.SLIDE, MediaAction.NEXT),
+            GestureMapping(GestureType.TAP, MediaAction.PLAY_PAUSE),
             GestureMapping(GestureType.ROTATE_LEFT, MediaAction.VOLUME_DOWN),
             GestureMapping(GestureType.ROTATE_RIGHT, MediaAction.VOLUME_UP),
             GestureMapping(GestureType.SHAKE, MediaAction.MUTE),
@@ -136,9 +136,9 @@ fun defaultProfiles(): List<ControlProfile> = listOf(
         name = "Spotify",
         builtIn = true,
         mappings = listOf(
-            GestureMapping(GestureType.TILT_LEFT, MediaAction.PREVIOUS),
-            GestureMapping(GestureType.TILT_RIGHT, MediaAction.NEXT),
-            GestureMapping(GestureType.THROW_UP, MediaAction.PLAY_PAUSE),
+            GestureMapping(GestureType.LEAN, MediaAction.PREVIOUS),
+            GestureMapping(GestureType.SLIDE, MediaAction.NEXT),
+            GestureMapping(GestureType.TAP, MediaAction.PLAY_PAUSE),
             GestureMapping(GestureType.ROTATE_LEFT, MediaAction.VOLUME_DOWN),
             GestureMapping(GestureType.ROTATE_RIGHT, MediaAction.VOLUME_UP),
             GestureMapping(GestureType.SHAKE, MediaAction.PLAY_PAUSE),

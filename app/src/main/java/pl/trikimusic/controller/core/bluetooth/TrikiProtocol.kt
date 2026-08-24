@@ -29,14 +29,16 @@ object TrikiProtocol {
         0x00,
         0xD0.toByte(),
         0x07,
-        0x68,
+        0x34,
         0x00,
         0x03,
     )
 
     const val FRAME_LENGTH = 14
     const val FRAME_HEADER = 0x22
-    const val GYROSCOPE_LSB_PER_DPS = 131f
+    // Hardware captures integrated over a measured 90° turn identify the
+    // LSM6DS-family gyro as ±2000 dps (70 mdps/LSB), not ±250 dps.
+    const val GYROSCOPE_LSB_PER_DPS = 1f / 0.070f
     const val ACCELEROMETER_LSB_PER_G = 2048f
 
     private fun standardUuid(shortUuid: Int): UUID =
@@ -121,8 +123,8 @@ class TrikiProtocolDecoder(
     private fun decodeFrame(frame: ByteArray, timestampNanos: Long, index: Long): TrikiSensorData {
         require(frame.size == TrikiProtocol.FRAME_LENGTH)
         require(frame[0].toInt() and 0xFF == TrikiProtocol.FRAME_HEADER)
-        val status = frame[1].toInt() and 0xFF
-        require(status in VALID_STATUS_BYTES)
+        val packetId = frame[1].toInt() and 0xFF
+        require(packetId in VALID_PACKET_IDS)
 
         val values = ByteBuffer.wrap(frame, 2, 12)
             .order(ByteOrder.LITTLE_ENDIAN)
@@ -139,7 +141,7 @@ class TrikiProtocolDecoder(
             accelerometerG = Vector3(ax / accelerometerScale, ay / accelerometerScale, az / accelerometerScale),
             rawGyroscope = RawVector3(gx, gy, gz),
             rawAccelerometer = RawVector3(ax, ay, az),
-            status = status,
+            status = packetId,
         )
     }
 
@@ -147,7 +149,7 @@ class TrikiProtocolDecoder(
         for (index in 0 until buffer.lastIndex) {
             if (
                 buffer[index].toInt() and 0xFF == TrikiProtocol.FRAME_HEADER &&
-                buffer[index + 1].toInt() and 0xFF in VALID_STATUS_BYTES
+                buffer[index + 1].toInt() and 0xFF in VALID_PACKET_IDS
             ) {
                 return index
             }
@@ -166,9 +168,12 @@ class TrikiProtocolDecoder(
     }
 
     private companion object {
-        val VALID_STATUS_BYTES = 0..1
+        // Firmware variants use this byte either as 0/1 status or as a rolling
+        // four-bit packet id. Accepting only 0/1 silently discarded 87.5% of
+        // frames from sequence-counter devices.
+        val VALID_PACKET_IDS = 0..0x0F
         const val DEFAULT_STARTUP_DISCARD = 20
-        const val APPROXIMATE_SAMPLE_PERIOD_NANOS = 9_615_385L
+        const val APPROXIMATE_SAMPLE_PERIOD_NANOS = 19_230_769L
         const val MIN_MONOTONIC_STEP_NANOS = 1_000L
     }
 }

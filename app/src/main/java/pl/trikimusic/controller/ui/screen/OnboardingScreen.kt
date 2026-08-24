@@ -47,7 +47,7 @@ private data class OnboardingPage(
 private val pages = listOf(
     OnboardingPage("Triki Music", "Steruj muzyką ruchem. Twój kapsel staje się precyzyjnym pilotem do odtwarzacza.", Icons.Default.MusicNote),
     OnboardingPage("Połącz Triki", "Bezpieczne połączenie Bluetooth LE odbiera dane ruchu bez wysyłania ich poza telefon.", Icons.AutoMirrored.Filled.BluetoothSearching),
-    OnboardingPage("Sterowanie muzyką", "Dostęp do sesji multimedialnych pozwala sterować Spotify, YouTube Music, TIDAL, VLC i innymi odtwarzaczami.", Icons.Default.GraphicEq),
+    OnboardingPage("Sterowanie muzyką", "Play, pauza, zmiana utworu i głośność działają przez systemowe przyciski multimedialne. Opcjonalny dostęp do sesji dodaje tytuł i okładkę.", Icons.Default.GraphicEq),
     OnboardingPage("Kalibracja", "Krótka kalibracja dopasuje czujniki do Twojego egzemplarza Triki i ograniczy przypadkowe gesty.", Icons.Default.Tune),
 )
 

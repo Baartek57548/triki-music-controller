@@ -20,10 +20,10 @@ class ActionMapperTest {
         val profile = ControlProfile(
             "test",
             "Test",
-            listOf(GestureMapping(GestureType.TILT_RIGHT, MediaAction.NEXT)),
+            listOf(GestureMapping(GestureType.SLIDE, MediaAction.NEXT)),
         )
 
-        val execution = mapper.execute(GestureEvent(GestureType.TILT_RIGHT, 1L, 1f, 30f), profile)
+        val execution = mapper.execute(GestureEvent(GestureType.SLIDE, 1L, 1f, 30f), profile)
 
         assertEquals(MediaAction.NEXT, execution.action)
         assertEquals(listOf(MediaAction.NEXT), gateway.actions)

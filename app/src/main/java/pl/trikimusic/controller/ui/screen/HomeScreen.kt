@@ -113,7 +113,7 @@ fun HomeScreen(
         item { SectionTitle("Now Playing", subtitle = "Aktywna sesja multimedialna Androida") }
         item {
             when {
-                !state.media.hasPermission -> PermissionMediaCard(onOpenPermissions)
+                !state.media.hasPermission -> MediaKeyFallbackCard(onMediaAction, onOpenPermissions)
                 !state.media.hasActiveSession -> Card(shape = RoundedCornerShape(26.dp)) {
                     EmptyState("Brak aktywnego odtwarzacza", "Uruchom muzykę w dowolnej aplikacji obsługującej Android MediaSession.")
                 }
@@ -244,16 +244,32 @@ private fun DeviceMetrics(state: MainUiState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PermissionMediaCard(onOpenPermissions: () -> Unit) {
+private fun MediaKeyFallbackCard(
+    onMediaAction: (MediaAction) -> Unit,
+    onOpenPermissions: () -> Unit,
+) {
     Card(shape = RoundedCornerShape(26.dp)) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.Security, null, tint = MaterialTheme.colorScheme.primary)
-            Text("Dostęp do odtwarzacza", style = MaterialTheme.typography.titleLarge)
+            Text("Sterowanie jest aktywne", style = MaterialTheme.typography.titleLarge)
             Text(
-                "Android wymaga jednorazowego włączenia dostępu do powiadomień, aby aplikacja mogła znaleźć aktywną MediaSession.",
+                "Przyciski i gesty działają bez ograniczonego dostępu. Włącz go opcjonalnie, jeśli chcesz widzieć tytuł i okładkę utworu.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(onClick = onOpenPermissions) { Text("Skonfiguruj dostęp") }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { onMediaAction(MediaAction.VOLUME_DOWN) }) { Icon(Icons.AutoMirrored.Filled.VolumeDown, "Ciszej") }
+                IconButton(onClick = { onMediaAction(MediaAction.PREVIOUS) }) { Icon(Icons.Default.SkipPrevious, "Poprzedni") }
+                FilledIconButton(onClick = { onMediaAction(MediaAction.PLAY_PAUSE) }, modifier = Modifier.size(58.dp)) {
+                    Icon(Icons.Default.PlayArrow, "Odtwórz lub wstrzymaj")
+                }
+                IconButton(onClick = { onMediaAction(MediaAction.NEXT) }) { Icon(Icons.Default.SkipNext, "Następny") }
+                IconButton(onClick = { onMediaAction(MediaAction.VOLUME_UP) }) { Icon(Icons.AutoMirrored.Filled.VolumeUp, "Głośniej") }
+            }
+            OutlinedButton(onClick = onOpenPermissions) { Text("Opcjonalne informacje o utworze") }
         }
     }
 }

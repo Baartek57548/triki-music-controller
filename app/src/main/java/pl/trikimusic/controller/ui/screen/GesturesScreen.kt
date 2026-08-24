@@ -379,11 +379,11 @@ private fun AdvancedThresholdsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ThresholdSlider("Przechylenie", tilt, 12f..60f, "%.0f°") { tilt = it }
-                ThresholdSlider("Obrót", rotation, 80f..600f, "%.0f°/s") { rotation = it }
+                ThresholdSlider("Obrót", rotation, 20f..250f, "%.0f°/s") { rotation = it }
                 ThresholdSlider("Potrząśnięcie", shake, 100f..700f, "%.0f°/s") { shake = it }
-                ThresholdSlider("Impuls podrzucenia", impact, 1.2f..5f, "%.1f g") { impact = it }
+                ThresholdSlider("Stuknięcie / impuls", impact, 1.1f..3f, "%.2f g") { impact = it }
                 Text(
-                    "Niższy próg oznacza większą czułość. Akcja jest wykonywana dopiero po pełnym cyklu: spoczynek, ruch i ponowny spoczynek.",
+                    "Niższy próg oznacza większą czułość. Pewny obrót, przechylenie lub stuknięcie może wykonać akcję już w trakcie ruchu; blokada gestu zapobiega powtórzeniom.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

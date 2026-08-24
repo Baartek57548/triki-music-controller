@@ -86,7 +86,7 @@ class TrikiRuntime(
             it.copy(
                 history = emptyList(),
                 latestSample = null,
-                gestureActionsEnabled = settings.calibration.isValid && !gestureActionsSuspended,
+                gestureActionsEnabled = !gestureActionsSuspended,
                 gestureActionsSuspended = gestureActionsSuspended,
             )
         }
@@ -98,7 +98,7 @@ class TrikiRuntime(
         gestureEngine.reset()
         mutableState.update {
             it.copy(
-                gestureActionsEnabled = settings.calibration.isValid && !suspended,
+                gestureActionsEnabled = !suspended,
                 gestureActionsSuspended = suspended,
             )
         }
@@ -112,13 +112,14 @@ class TrikiRuntime(
             current.copy(
                 latestSample = filtered,
                 history = (current.history + filtered).takeLast(MAX_HISTORY_SAMPLES),
-                gestureActionsEnabled = settings.calibration.isValid && !gestureActionsSuspended,
+                gestureActionsEnabled = !gestureActionsSuspended,
                 gestureActionsSuspended = gestureActionsSuspended,
             )
         }
-        // An uncalibrated or explicitly suspended controller may still feed diagnostics,
-        // but it must never execute a media action.
-        if (!settings.calibration.isValid || gestureActionsSuspended) return
+        // GestureEngine establishes a fresh stable baseline after every stream
+        // reset. A saved calibration improves filtering but must not be a hard
+        // prerequisite: otherwise an interrupted tutorial disables all controls.
+        if (gestureActionsSuspended) return
         gestureEngine.process(filtered, thresholds, settings.personalizedGestureModel).forEach { event ->
             mutableEvents.tryEmit(event)
             val execution = actionMapper.execute(event, settings.activeProfile)

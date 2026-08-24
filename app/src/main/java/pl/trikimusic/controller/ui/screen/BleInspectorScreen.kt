@@ -94,6 +94,27 @@ fun BleInspectorScreen(state: MainUiState, viewModel: MainViewModel, onBack: () 
                     }
                 }
             }
+            item {
+                Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Dekoder IMU", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "${state.ble.measuredSampleRateHz?.let { "%.1f Hz".format(it) } ?: "— Hz"} · " +
+                                "ramki ${state.ble.decodedFrames} · start odrzucone ${state.ble.discardedStartupFrames}",
+                            fontFamily = FontFamily.Monospace,
+                        )
+                        Text(
+                            "ID pakietu ${state.ble.lastPacketId ?: "—"} · pominięte bajty ${state.ble.droppedProtocolBytes}",
+                            fontFamily = FontFamily.Monospace,
+                            color = if (state.ble.droppedProtocolBytes == 0L) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                        )
+                    }
+                }
+            }
             item { SectionTitle("GATT", subtitle = "${state.ble.gattServices.size} usług") }
             if (state.ble.gattServices.isEmpty()) {
                 item { EmptyState("Brak danych GATT", "Połącz Triki, aby wykonać discovery services.") }

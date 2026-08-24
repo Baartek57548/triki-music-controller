@@ -8,6 +8,8 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.os.SystemClock
+import android.view.KeyEvent
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.scale
 import java.io.File
@@ -74,23 +76,28 @@ class AndroidMediaControllerGateway(
             logger.log(LogCategory.MEDIA, "Wykonano akcję ${action.name} przez AudioManager.")
             return@runCatching
         }
-        val controller = requireNotNull(activeController) { "Brak aktywnego odtwarzacza multimedialnego." }
-        val controls = controller.transportControls
-        when (action) {
-            MediaAction.PLAY -> controls.play()
-            MediaAction.PAUSE -> controls.pause()
-            MediaAction.PLAY_PAUSE -> if (isPlaying(controller.playbackState)) controls.pause() else controls.play()
-            MediaAction.NEXT -> controls.skipToNext()
-            MediaAction.PREVIOUS -> controls.skipToPrevious()
-            MediaAction.STOP -> controls.stop()
-            MediaAction.NONE -> Unit
-            MediaAction.VOLUME_UP,
-            MediaAction.VOLUME_DOWN,
-            MediaAction.MUTE,
-            MediaAction.UNMUTE,
-            -> executeVolumeAction(action)
+        val controller = activeController
+        if (controller != null) {
+            val controls = controller.transportControls
+            when (action) {
+                MediaAction.PLAY -> controls.play()
+                MediaAction.PAUSE -> controls.pause()
+                MediaAction.PLAY_PAUSE -> if (isPlaying(controller.playbackState)) controls.pause() else controls.play()
+                MediaAction.NEXT -> controls.skipToNext()
+                MediaAction.PREVIOUS -> controls.skipToPrevious()
+                MediaAction.STOP -> controls.stop()
+                MediaAction.NONE -> Unit
+                MediaAction.VOLUME_UP,
+                MediaAction.VOLUME_DOWN,
+                MediaAction.MUTE,
+                MediaAction.UNMUTE,
+                -> executeVolumeAction(action)
+            }
+            logger.log(LogCategory.MEDIA, "Wysłano ${action.name} do ${controller.packageName}.")
+        } else {
+            dispatchMediaButton(action)
+            logger.log(LogCategory.MEDIA, "Wysłano ${action.name} jako systemowy przycisk multimedialny.")
         }
-        logger.log(LogCategory.MEDIA, "Wysłano ${action.name} do ${controller.packageName}.")
     }.onFailure { error -> logger.log(LogCategory.MEDIA, error.message ?: "Błąd sterowania multimediami.", error) }
 
     private fun selectController(controllers: List<MediaController>) {
@@ -147,6 +154,31 @@ class AndroidMediaControllerGateway(
             else -> error("Akcja $action nie jest akcją głośności.")
         }
         audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+    }
+
+    /**
+     * Public Android fallback for phones that block Notification Listener access
+     * for sideloaded applications. It controls the current media-key consumer,
+     * while metadata and artwork remain unavailable without session access.
+     */
+    private fun dispatchMediaButton(action: MediaAction) {
+        val keyCode = when (action) {
+            MediaAction.PLAY -> KeyEvent.KEYCODE_MEDIA_PLAY
+            MediaAction.PAUSE -> KeyEvent.KEYCODE_MEDIA_PAUSE
+            MediaAction.PLAY_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            MediaAction.NEXT -> KeyEvent.KEYCODE_MEDIA_NEXT
+            MediaAction.PREVIOUS -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            MediaAction.STOP -> KeyEvent.KEYCODE_MEDIA_STOP
+            MediaAction.NONE -> return
+            MediaAction.VOLUME_UP,
+            MediaAction.VOLUME_DOWN,
+            MediaAction.MUTE,
+            MediaAction.UNMUTE,
+            -> error("Akcja $action powinna zostać obsłużona przez AudioManager.adjustStreamVolume().")
+        }
+        val eventTime = SystemClock.uptimeMillis()
+        audioManager.dispatchMediaKeyEvent(KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyCode, 0))
+        audioManager.dispatchMediaKeyEvent(KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, keyCode, 0))
     }
 
     @Suppress("DEPRECATION")

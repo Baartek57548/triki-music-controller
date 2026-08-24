@@ -6,11 +6,15 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
+import kotlin.math.cos
+import kotlin.math.sin
 import pl.trikimusic.controller.BuildConfig
 import pl.trikimusic.controller.data.bluetooth.FakeTrikiDataSource
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GestureThresholds
+import pl.trikimusic.controller.domain.model.GestureFeatureVector
+import pl.trikimusic.controller.domain.model.GESTURE_FEATURE_DIMENSION
 import pl.trikimusic.controller.domain.model.LearnedGestureSample
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.OrientationData
@@ -51,11 +55,43 @@ class GestureEngineTest {
         val fixture = Fixture(thresholds)
         fixture.rest(35)
         repeat(8) { index ->
-            fixture.feed(roll = (index + 1) * 6f, gyro = Vector3(-120f, 0f, 0f))
+            val angleDegrees = (index + 1) * 6f
+            val angleRadians = Math.toRadians(angleDegrees.toDouble())
+            fixture.feed(
+                roll = angleDegrees,
+                gyro = Vector3(-120f, 0f, 0f),
+                accel = Vector3(0f, sin(angleRadians).toFloat(), cos(angleRadians).toFloat()),
+            )
         }
-        fixture.rest(80, roll = 48f)
+        val heldAngleRadians = Math.toRadians(48.0)
+        fixture.rest(
+            80,
+            roll = 48f,
+            accel = Vector3(0f, sin(heldAngleRadians).toFloat(), cos(heldAngleRadians).toFloat()),
+        )
 
-        assertEquals(listOf(GestureType.TILT_RIGHT), fixture.events)
+        assertEquals(listOf(GestureType.LEAN), fixture.events)
+    }
+
+    @Test
+    fun `flat horizontal acceleration with little rotation emits slide`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(8) {
+            fixture.feed(
+                gyro = Vector3(10f, 4f, 0f),
+                accel = Vector3(0.26f, 0f, 1f),
+            )
+        }
+        repeat(8) {
+            fixture.feed(
+                gyro = Vector3(-10f, -4f, 0f),
+                accel = Vector3(-0.26f, 0f, 1f),
+            )
+        }
+        fixture.rest(40)
+
+        assertEquals(listOf(GestureType.SLIDE), fixture.events)
     }
 
     @Test
@@ -76,6 +112,46 @@ class GestureEngineTest {
         fixture.rest(35)
 
         assertEquals(listOf(GestureType.ROTATE_LEFT), fixture.events)
+    }
+
+    @Test
+    fun `rotation is projected onto gravity and works when cap starts on its side`() {
+        val engine = GestureEngine()
+        var timestamp = 0L
+        val events = mutableListOf<GestureType>()
+        repeat(35) {
+            timestamp += PERIOD_NANOS
+            events += engine.process(
+                filtered(timestamp, 0f, Vector3(0f, 0f, 0f), Vector3(1f, 0f, 0f)),
+                thresholds,
+            ).map { it.type }
+        }
+        repeat(24) {
+            timestamp += PERIOD_NANOS
+            events += engine.process(
+                filtered(timestamp, 0f, Vector3(80f, 0f, 0f), Vector3(1f, 0f, 0f)),
+                thresholds,
+            ).map { it.type }
+        }
+        repeat(4) {
+            timestamp += PERIOD_NANOS
+            events += engine.process(
+                filtered(timestamp, 0f, Vector3(0f, 0f, 0f), Vector3(1f, 0f, 0f)),
+                thresholds,
+            ).map { it.type }
+        }
+
+        assertEquals(listOf(GestureType.ROTATE_RIGHT), events)
+    }
+
+    @Test
+    fun `clean vertical tap emits play pause gesture without a free fall`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        fixture.feed(accel = Vector3(0f, 0f, 1.65f))
+        fixture.rest(10)
+
+        assertEquals(listOf(GestureType.TAP), fixture.events)
     }
 
     @Test
@@ -127,7 +203,7 @@ class GestureEngineTest {
         fixture.feed(accel = Vector3(0f, 0f, 3.1f))
         fixture.rest(50)
 
-        assertEquals(listOf(GestureType.THROW_UP), fixture.events)
+        assertEquals(listOf(GestureType.TAP), fixture.events)
     }
 
     @Test
@@ -151,12 +227,18 @@ class GestureEngineTest {
         val fixture = Fixture(thresholds)
         fixture.rest(35)
         repeat(10) { index ->
-            fixture.feed(roll = -(index + 1) * 6f, gyro = Vector3(120f, 0f, 0f))
+            val angleDegrees = -(index + 1) * 6f
+            val angleRadians = Math.toRadians(angleDegrees.toDouble())
+            fixture.feed(
+                roll = angleDegrees,
+                gyro = Vector3(120f, 0f, 0f),
+                accel = Vector3(0f, sin(angleRadians).toFloat(), cos(angleRadians).toFloat()),
+            )
         }
 
         val result = GestureRecordingAnalyzer().analyze(fixture.samples, thresholds)
 
-        assertEquals(GestureType.TILT_LEFT, result.strongestEvent?.type)
+        assertEquals(GestureType.LEAN, result.strongestEvent?.type)
         assertTrue(result.sampleCount >= 40)
         assertTrue(result.durationMillis > 300L)
     }
@@ -224,6 +306,47 @@ class GestureEngineTest {
         assertNotNull(engine.lastCapturedFeatures)
         assertEquals(GestureType.FLIP, engine.lastPersonalizedRecognition?.gesture)
         assertEquals(listOf(GestureType.FLIP), detected)
+    }
+
+    @Test
+    fun `mislabeled learned samples cannot veto a valid base gesture`() {
+        val model = PersonalizedGestureModel(
+            samples = listOf(
+                LearnedGestureSample(
+                    GestureType.ROTATE_LEFT,
+                    GestureFeatureVector(values = List(GESTURE_FEATURE_DIMENSION) { 0f }),
+                    1L,
+                ),
+                LearnedGestureSample(
+                    GestureType.ROTATE_LEFT,
+                    GestureFeatureVector(values = List(GESTURE_FEATURE_DIMENSION) { 0f }),
+                    2L,
+                ),
+            ),
+        )
+        val engine = GestureEngine()
+        var timestamp = 0L
+        val events = mutableListOf<GestureType>()
+        repeat(35) {
+            timestamp += PERIOD_NANOS
+            events += engine.process(filtered(timestamp, 0f, Vector3(0f, 0f, 0f), Vector3(0f, 0f, 1f)), thresholds, model)
+                .map { it.type }
+        }
+        repeat(7) {
+            timestamp += PERIOD_NANOS
+            events += engine.process(filtered(timestamp, 0f, Vector3(0f, 0f, -430f), Vector3(0f, 0f, 1f)), thresholds, model)
+                .map { it.type }
+        }
+        repeat(4) {
+            timestamp += PERIOD_NANOS
+            events += engine.process(
+                filtered(timestamp, 0f, Vector3(0f, 0f, 0f), Vector3(0f, 0f, 1f)),
+                thresholds,
+                model,
+            ).map { it.type }
+        }
+
+        assertEquals(listOf(GestureType.ROTATE_LEFT), events)
     }
 
     private class Fixture(private val thresholds: GestureThresholds) {

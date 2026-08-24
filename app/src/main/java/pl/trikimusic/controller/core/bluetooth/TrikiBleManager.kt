@@ -144,6 +144,10 @@ class TrikiBleManager(
                 rssi = null,
                 measuredSampleRateHz = null,
                 lastFrameMillis = null,
+                decodedFrames = 0L,
+                discardedStartupFrames = 0L,
+                droppedProtocolBytes = 0L,
+                lastPacketId = null,
             )
         }
         logger.log(LogCategory.BLE, "Rozłączono Triki.")
@@ -372,8 +376,17 @@ class TrikiBleManager(
             fail("Komenda startowa Triki została odrzucona: $status")
             return
         }
-        mutableState.update { it.copy(connectionState = TrikiConnectionState.READY, errorMessage = null) }
-        logger.log(LogCategory.PROTOCOL, "Wysłano potwierdzoną komendę startową 20 10 00 D0 07 68 00 03.")
+        mutableState.update {
+            it.copy(
+                connectionState = TrikiConnectionState.READY,
+                errorMessage = null,
+                decodedFrames = 0L,
+                discardedStartupFrames = 0L,
+                droppedProtocolBytes = 0L,
+                lastPacketId = null,
+            )
+        }
+        logger.log(LogCategory.PROTOCOL, "Wysłano komendę stabilnego strumienia ~53 Hz: 20 10 00 D0 07 34 00 03.")
         startRssiPolling(gatt)
         scope.launch {
             delay(BATTERY_NOTIFY_DELAY_MILLIS)
@@ -406,10 +419,15 @@ class TrikiBleManager(
         }
         trimSampleRateWindow()
         val rate = measuredSampleRate()
+        val statistics = decoder.statistics
         mutableState.update {
             it.copy(
                 lastFrameMillis = nowMillis.takeIf { samples.isNotEmpty() } ?: it.lastFrameMillis,
                 measuredSampleRateHz = rate,
+                decodedFrames = statistics.decodedFrames,
+                discardedStartupFrames = statistics.discardedStartupFrames,
+                droppedProtocolBytes = statistics.droppedBytes,
+                lastPacketId = samples.lastOrNull()?.packetId ?: it.lastPacketId,
             )
         }
     }
