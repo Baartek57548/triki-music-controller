@@ -5,6 +5,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import pl.trikimusic.controller.domain.model.ControlProfile
+import pl.trikimusic.controller.domain.model.ButtonClickEvent
+import pl.trikimusic.controller.domain.model.ButtonClickType
+import pl.trikimusic.controller.domain.model.ButtonMapping
 import pl.trikimusic.controller.domain.model.GestureEvent
 import pl.trikimusic.controller.domain.model.GestureMapping
 import pl.trikimusic.controller.domain.model.GestureType
@@ -40,6 +43,24 @@ class ActionMapperTest {
 
         assertEquals(MediaAction.NONE, execution.action)
         assertTrue(gateway.actions.isEmpty())
+    }
+
+    @Test
+    fun `maps physical button click using active profile`() {
+        val gateway = FakeGateway()
+        val mapper = ActionMapper(gateway)
+        val profile = ControlProfile(
+            id = "buttons",
+            name = "Buttons",
+            mappings = emptyList(),
+            buttonMappings = listOf(ButtonMapping(ButtonClickType.DOUBLE, MediaAction.NEXT)),
+        )
+
+        val execution = mapper.execute(ButtonClickEvent(ButtonClickType.DOUBLE, 2L), profile)
+
+        assertEquals(MediaAction.NEXT, execution.action)
+        assertEquals(listOf(MediaAction.NEXT), gateway.actions)
+        assertTrue(execution.result.isSuccess)
     }
 
     private class FakeGateway : MediaControllerGateway {

@@ -14,8 +14,8 @@ Analizę wykonano na przypiętych rewizjach, aby późniejsze zmiany repozytori�
 |---|---|---|---|
 | [everything-imu](https://github.com/matiaspalmac/everything-imu/tree/b7b2e825514af398c5dde63cf3d089f4af85c99e/crates/device-hopx) | `b7b2e82` | Najmocniejsze potwierdzenie protokołu na fizycznym sprzęcie: 52 Hz, kolejność gyro/accel, `2048 LSB/g`, `0,070°/s/LSB`, brak magnetometru | Dostarcza poprawny strumień IMU i orientację, ale nie rozwiązuje mapowania gestów muzycznych |
 | [TRIKI-Control](https://github.com/koksny/TRIKI-Control/tree/8d1bdff17a419930f7a89c5244928b199d4e6ee3) | `8d1bdff` | Silnik dostrojony na rzeczywistych nagraniach; niezmienniki względem grawitacji, bootstrap medianowy, histereza, osobne bramki tilt/turn/slide/impact/flip | Progi są w surowych jednostkach i profil jest projektowany głównie pod komputer, więc nie można kopiować go 1:1 do Androida |
-| [TrikiScope](https://github.com/Maku-hub/TrikiScope/tree/8ad37643148892ca7747e1520f7327a9eb8a8239) | `8ad3764` | Przydatne wzorce dla free-fall, impact, shake, spoczynku i auto-zero | Używa innego założenia skali gyro; proste progi magnitude nie wystarczają do odpornych gestów muzycznych |
-| [TrikiAirMouse](https://github.com/kub0vvik/TrikiAirMouse/tree/321a08f837e242ec03077c984fab2708b3917472) | `321a08f` | Praktyczne bias, deadzone, low-pass i ograniczanie maksymalnego skoku | Sterowanie kursorem zależy od kalibracji osi urządzenia; nie jest odporne na dowolną pozycję okrągłego kapsla |
+| [TrikiScope](https://github.com/Maku-hub/TrikiScope/tree/8ad37643148892ca7747e1520f7327a9eb8a8239) | `8ad3764` | Przydatne wzorce dla free-fall, impact, shake, spoczynku i auto-zero; test na żywym urządzeniu identyfikuje `22 00/01` jako puszczenie/wciśnięcie | Używa innego założenia skali gyro; jego semantyka drugiego bajtu koliduje z wariantem licznika `0..15` |
+| [TrikiAirMouse](https://github.com/kub0vvik/TrikiAirMouse/tree/321a08f837e242ec03077c984fab2708b3917472) | `321a08f` | Praktyczne bias, deadzone, low-pass oraz wykrywanie zboczy i czasu przytrzymania fizycznego przycisku | Sterowanie kursorem zależy od kalibracji osi urządzenia; parser bez detekcji wariantu uznałby licznik ramek za przycisk |
 | [TrikiEmu](https://github.com/Maku-hub/TrikiEmu/tree/2a55a15874039b58085780e7185315d5f4362efb) | `2a55a15` | Emulacja urządzenia i możliwość testowania transportu bez fizycznego Triki | Nie jest źródłem modelu rozpoznawania rzeczywistych ruchów |
 
 Szczególnie istotne są udokumentowane ograniczenia 6‑osiowego kapsla w [TRIKI-Control](https://github.com/koksny/TRIKI-Control/blob/8d1bdff17a419930f7a89c5244928b199d4e6ee3/docs/how-it-works.md): grawitacja stabilizuje pitch/roll, lecz nie daje absolutnego kierunku poziomego. Projekt ten dlatego liczy skręt jako `dot(gyro − bias, unit(gravity))`, przechylenie jako zmianę kierunku grawitacji, stuknięcie jako impuls wzdłuż grawitacji, a ślizg jako ruch poprzeczny przy małym obrocie. Jego [aktualny silnik](https://github.com/koksny/TRIKI-Control/blob/8d1bdff17a419930f7a89c5244928b199d4e6ee3/src/triki_motion_engine.py) porzucił też rozróżnianie ślizgu po okręgu od linii, ponieważ okrągły kapsel bez kompasu nie daje do tego stabilnej obserwacji.
@@ -59,6 +59,12 @@ W aplikacji zastosowano lokalny model few-shot k-NN na 40 cechach całego okna, 
 
 ML personalizuje tempo i kształt ruchu, ale nie tworzy informacji, której sensor nie mierzy. Nie wolno więc uczyć osobnych gestów „przechyl w lewo/prawo” zależnych od absolutnego kierunku kapsla. Kierunek jest wiarygodny dla skrętu, bo pochodzi ze znaku chwilowej prędkości kątowej rzutowanej na grawitację.
 
+## Przycisk jako niezależny tor sterowania
+
+[TrikiScope](https://github.com/Maku-hub/TrikiScope/blob/8ad37643148892ca7747e1520f7327a9eb8a8239/trikiscope/protocol.py) opisuje eksperyment na żywo, w którym drugi bajt przechodził z `0` na `1` podczas naciskania, a [TrikiAirMouse](https://github.com/kub0vvik/TrikiAirMouse/blob/321a08f837e242ec03077c984fab2708b3917472/triki_airmouse.py) wykorzystuje oba zbocza do krótkiego i długiego kliknięcia. Jednocześnie sprzętowo zweryfikowany parser [everything-imu](https://github.com/matiaspalmac/everything-imu/blob/b7b2e825514af398c5dde63cf3d089f4af85c99e/crates/device-hopx/src/protocol.rs) przyjmuje ten sam bajt jako sekwencję `0..15`. Oznacza to warianty firmware, a nie bezpieczne uniwersalne pole przycisku.
+
+Rozwiązaniem jest konserwatywna autodetekcja przed pierwszą akcją. Wartość powyżej `1` wybiera licznik i permanentnie wyłącza kliknięcia do resetu strumienia. Flaga przycisku wymaga dłuższej serii `0/1` z powtarzającym się stanem, czego nie spełnia licznik naprzemienny. Dopiero potem debounce liczy pełne cykle wciśnięcie–puszczenie. Ten dyskretny tor jest bardziej niezawodny niż IMU i dlatego otrzymuje pierwszeństwo: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`, przy zachowaniu edytowalnego mapowania profilu.
+
 ## Mapowanie muzyczne
 
 Domyślny profil jest zgodny z sygnałami, które mają najlepszą separację fizyczną. Inspiracją dla zestawu jest [profil Music z TRIKI-Control](https://github.com/koksny/TRIKI-Control/blob/8d1bdff17a419930f7a89c5244928b199d4e6ee3/src/triki_actions.py#L573-L583), ale `Flip` celowo wykonuje `Stop` zgodnie z wymaganiem tej aplikacji.
@@ -83,7 +89,8 @@ Domyślny profil jest zgodny z sygnałami, które mają najlepszą separację fi
 | gest nauczony mimo złej fizyki | bramka accel + gyro po klasyfikacji k-NN | testy odrzucenia niezgodnej próbki |
 | pomylenie gestów | cechy niezmienne względem grawitacji i bramki osi energii | testy lean, slide, rotate, tap, flip i shake |
 | progi działają tylko na własnym generatorze | replay profili referencyjnych w skali przewodowej Triki i przy 52 Hz | `ReferenceMotionCompatibilityTest`: oba skręty, lean 14°, slide, impuls `−2600`, flip, cztery pozycje początkowe i uczenie wszystkich sześciu klas |
-| błąd w mapowaniu lub wysłaniu komendy | wspólna ścieżka runtime dla sprzętu i Fake Triki | ręczny test debug: wszystkie sześć domyślnych mapowań dotarło do gateway; głośność realnie zmieniła się w emulatorze |
+| licznik ramek udaje przycisk | tryb `UNKNOWN`, dowód powtarzalnego `0/1`, natychmiastowe wyłączenie dla `2..15` | `TrikiButtonInterpreterTest`: `0..15`, naprzemienne `0/1`, bounce, hold, luka strumienia i wieloklik |
+| błąd w mapowaniu lub wysłaniu komendy | wspólna ścieżka runtime dla sprzętu i Fake Triki | ręczny test debug: sześć gestów oraz kliknięcia `×1/×2/×3` dotarły do gateway; głośność realnie zmieniła się w emulatorze, a kliknięcia wysłały Play/Pause, Next i Previous |
 
 Ostatni punkt nie zastępuje walidacji fizycznego egzemplarza. Test akceptacyjny na Xiaomi 13 i konkretnym Triki powinien obejmować:
 
@@ -92,5 +99,6 @@ Ostatni punkt nie zastępuje walidacji fizycznego egzemplarza. Test akceptacyjny
 3. Powtórzenie skrętów, przechylenia i stuknięcia z trzech różnych początkowych obrotów kapsla.
 4. W BLE Inspectorze częstotliwość zbliżona do 52 Hz, accel magnitude w spoczynku blisko 1 g oraz widoczna reakcja wszystkich trzech osi gyro podczas obrotu.
 5. Eksport RAW dla każdego nieudanego ruchu wraz z nazwą oczekiwanego gestu; dopiero takie dane uzasadniają korektę progów albo cech modelu.
+6. Po 20 sekwencji `×1`, `×2` i `×3`; oczekiwane jest dokładnie jedno właściwe zdarzenie na sekwencję. Jeżeli Monitor pokazuje `Licznik ramek`, przyciskowe akcje mają pozostać całkowicie wyłączone dla tego firmware.
 
 Bez przejścia tego testu nie należy deklarować, że skuteczność na fizycznym kapslu jest potwierdzona. Aktualne testy dowodzą poprawności protokołu, filtrów, klasyfikatora, profili referencyjnych w jednostkach sprzętu, mapowania i syntetycznej ścieżki end-to-end, lecz ostateczna walidacja sprzętowa pozostaje osobnym etapem.

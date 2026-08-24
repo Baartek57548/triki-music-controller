@@ -122,7 +122,11 @@ fun HomeScreen(
         }
 
         item {
-            state.runtime.lastGesture?.let { gesture ->
+            val gesture = state.runtime.lastGesture
+            val buttonClick = state.runtime.lastButtonClick
+            val buttonIsLatest = buttonClick != null &&
+                (gesture == null || buttonClick.timestampNanos >= gesture.timestampNanos)
+            if (gesture != null || buttonClick != null) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)),
                     shape = RoundedCornerShape(24.dp),
@@ -132,8 +136,11 @@ fun HomeScreen(
                             Icon(Icons.Default.TouchApp, null, Modifier.padding(11.dp), tint = MaterialTheme.colorScheme.onPrimary)
                         }
                         Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-                            Text("Ostatni gest", style = MaterialTheme.typography.bodyMedium)
-                            Text(gesture.type.displayName, style = MaterialTheme.typography.titleMedium)
+                            Text("Ostatnie sterowanie", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                if (buttonIsLatest) buttonClick!!.type.displayName else gesture!!.type.displayName,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                         }
                         Text(state.runtime.lastAction?.displayName.orEmpty(), style = MaterialTheme.typography.labelLarge)
                     }
@@ -229,8 +236,8 @@ private fun DeviceMetrics(state: MainUiState, modifier: Modifier = Modifier) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             MetricCard(
                 Icons.Default.TouchApp,
-                "Ostatni gest",
-                state.runtime.lastGesture?.type?.displayName ?: "—",
+                "Sterowanie",
+                latestControlName(state),
                 Modifier.weight(1f),
             )
             MetricCard(
@@ -240,6 +247,16 @@ private fun DeviceMetrics(state: MainUiState, modifier: Modifier = Modifier) {
                 Modifier.weight(1f),
             )
         }
+    }
+}
+
+private fun latestControlName(state: MainUiState): String {
+    val gesture = state.runtime.lastGesture
+    val click = state.runtime.lastButtonClick
+    return if (click != null && (gesture == null || click.timestampNanos >= gesture.timestampNanos)) {
+        click.type.displayName
+    } else {
+        gesture?.type?.displayName ?: "—"
     }
 }
 

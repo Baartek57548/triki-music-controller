@@ -23,6 +23,7 @@ import pl.trikimusic.controller.AppContainer
 import pl.trikimusic.controller.BuildConfig
 import pl.trikimusic.controller.domain.model.AppLogEntry
 import pl.trikimusic.controller.domain.model.AppSettings
+import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GattServiceInfo
@@ -186,6 +187,10 @@ class MainViewModel(
 
     fun setMapping(gesture: GestureType, action: MediaAction) = launchHandled {
         container.settingsRepository.setGestureMapping(container.settings.value.activeProfileId, gesture, action)
+    }
+
+    fun setButtonMapping(click: ButtonClickType, action: MediaAction) = launchHandled {
+        container.settingsRepository.setButtonMapping(container.settings.value.activeProfileId, click, action)
     }
 
     fun setActiveProfile(profileId: String) = launchHandled { container.settingsRepository.setActiveProfile(profileId) }
@@ -621,6 +626,14 @@ class MainViewModel(
             return
         }
         container.runtime.injectDebugSamples(container.fakeTrikiDataSource.generate(gesture))
+    }
+
+    fun emitFakeButtonClicks(clickCount: Int) {
+        if (!BuildConfig.DEBUG || !container.settings.value.developerMode) {
+            showError(IllegalStateException("Generator przycisku wymaga buildu debug i Developer Mode."))
+            return
+        }
+        container.runtime.injectDebugSamples(container.fakeTrikiDataSource.generateButtonClicks(clickCount))
     }
 
     fun rawCaptureText(): String {

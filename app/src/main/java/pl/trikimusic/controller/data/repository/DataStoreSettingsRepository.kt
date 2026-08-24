@@ -15,6 +15,8 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.domain.model.AppSettings
+import pl.trikimusic.controller.domain.model.ButtonClickType
+import pl.trikimusic.controller.domain.model.ButtonMapping
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.ControlProfile
 import pl.trikimusic.controller.domain.model.CURRENT_GESTURE_LEARNING_VERSION
@@ -79,6 +81,22 @@ class DataStoreSettingsRepository(
                     profile.copy(
                         mappings = profile.mappings
                             .filterNot { it.gesture == gesture } + GestureMapping(gesture, action),
+                    )
+                }
+            }
+            copy(profiles = changed)
+        }
+    }
+
+    override suspend fun setButtonMapping(profileId: String, click: ButtonClickType, action: MediaAction) {
+        update {
+            val changed = profiles.map { profile ->
+                if (profile.id != profileId) {
+                    profile
+                } else {
+                    profile.copy(
+                        buttonMappings = profile.buttonMappings
+                            .filterNot { it.click == click } + ButtonMapping(click, action),
                     )
                 }
             }

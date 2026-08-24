@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pl.trikimusic.controller.domain.model.ControlProfile
+import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.MediaAction
@@ -68,6 +69,7 @@ fun GesturesScreen(
     onOpenWizard: () -> Unit,
 ) {
     var selectedGesture by remember { mutableStateOf<GestureType?>(null) }
+    var selectedButtonClick by remember { mutableStateOf<ButtonClickType?>(null) }
     var showProfileMenu by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<ProfileDialog?>(null) }
     var showAdvanced by remember { mutableStateOf(false) }
@@ -92,9 +94,9 @@ fun GesturesScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Sterowanie gestami jest zablokowane", fontWeight = FontWeight.SemiBold)
+                        Text("Kalibracja gestów nieukończona", fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Wykonaj kalibrację nieruchomego Triki w zakładce Device. Bez kalibracji aplikacja nie uruchomi żadnej akcji multimedialnej.",
+                            "Przycisk działa bez kalibracji. Dla gestów ruchowych połóż Triki nieruchomo i wykonaj kalibrację w zakładce Device.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -164,6 +166,27 @@ fun GesturesScreen(
                 }
             }
         }
+        item {
+            SectionTitle(
+                "Przycisk fizyczny",
+                subtitle = "Automatycznie tylko dla firmware z flagą 0/1; licznik ramek 0…15 jest bezpiecznie ignorowany",
+            )
+        }
+        item {
+            Card(shape = RoundedCornerShape(24.dp)) {
+                Column {
+                    ButtonClickType.entries.forEachIndexed { index, click ->
+                        ButtonMappingRow(click, profile.actionFor(click)) {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectedButtonClick = click
+                        }
+                        if (index != ButtonClickType.entries.lastIndex) {
+                            HorizontalDivider(Modifier.padding(horizontal = 18.dp))
+                        }
+                    }
+                }
+            }
+        }
         item { SectionTitle("Czułość ruchu", subtitle = "Presety zmieniają progi, filtr i cooldown jako spójny zestaw") }
         item {
             Row(
@@ -206,12 +229,23 @@ fun GesturesScreen(
 
     selectedGesture?.let { gesture ->
         ActionPickerDialog(
-            gesture = gesture,
+            title = gesture.displayName,
             current = profile.actionFor(gesture),
             onDismiss = { selectedGesture = null },
             onSelect = { action ->
                 viewModel.setMapping(gesture, action)
                 selectedGesture = null
+            },
+        )
+    }
+    selectedButtonClick?.let { click ->
+        ActionPickerDialog(
+            title = click.displayName,
+            current = profile.actionFor(click),
+            onDismiss = { selectedButtonClick = null },
+            onSelect = { action ->
+                viewModel.setButtonMapping(click, action)
+                selectedButtonClick = null
             },
         )
     }
@@ -288,15 +322,41 @@ private fun MappingRow(
 }
 
 @Composable
+private fun ButtonMappingRow(
+    click: ButtonClickType,
+    action: MediaAction,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(click.displayName, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                when (click) {
+                    ButtonClickType.SINGLE -> "Domyślnie Play / Pause"
+                    ButtonClickType.DOUBLE -> "Domyślnie następny utwór"
+                    ButtonClickType.TRIPLE -> "Domyślnie poprzedni utwór"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = onClick) { Text(action.displayName) }
+    }
+}
+
+@Composable
 private fun ActionPickerDialog(
-    gesture: GestureType,
+    title: String,
     current: MediaAction,
     onDismiss: () -> Unit,
     onSelect: (MediaAction) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(gesture.displayName) },
+        title = { Text(title) },
         text = {
             LazyColumn {
                 items(MediaAction.entries) { action ->

@@ -26,6 +26,21 @@ data class GestureEvent(
 )
 
 @Serializable
+enum class ButtonClickType(
+    val clickCount: Int,
+    val displayName: String,
+) {
+    SINGLE(1, "Jeden klik"),
+    DOUBLE(2, "Dwa kliknięcia"),
+    TRIPLE(3, "Trzy kliknięcia"),
+}
+
+data class ButtonClickEvent(
+    val type: ButtonClickType,
+    val timestampNanos: Long,
+)
+
+@Serializable
 enum class MediaAction(val displayName: String) {
     PLAY("Play"),
     PAUSE("Pause"),
@@ -47,12 +62,28 @@ data class GestureMapping(
 )
 
 @Serializable
+data class ButtonMapping(
+    val click: ButtonClickType,
+    val action: MediaAction,
+)
+
+fun defaultButtonMappings(): List<ButtonMapping> = listOf(
+    ButtonMapping(ButtonClickType.SINGLE, MediaAction.PLAY_PAUSE),
+    ButtonMapping(ButtonClickType.DOUBLE, MediaAction.NEXT),
+    ButtonMapping(ButtonClickType.TRIPLE, MediaAction.PREVIOUS),
+)
+
+@Serializable
 data class ControlProfile(
     val id: String,
     val name: String,
     val mappings: List<GestureMapping>,
     val builtIn: Boolean = false,
+    val buttonMappings: List<ButtonMapping> = defaultButtonMappings(),
 ) {
     fun actionFor(gesture: GestureType): MediaAction =
         mappings.firstOrNull { it.gesture == gesture }?.action ?: MediaAction.NONE
+
+    fun actionFor(click: ButtonClickType): MediaAction =
+        buttonMappings.firstOrNull { it.click == click }?.action ?: MediaAction.NONE
 }

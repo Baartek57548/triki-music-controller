@@ -3,6 +3,7 @@ package pl.trikimusic.controller.domain.repository
 import kotlinx.coroutines.flow.Flow
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.CalibrationProfile
+import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.ControlProfile
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureFeatureVector
@@ -19,6 +20,7 @@ interface SettingsRepository {
     suspend fun rememberDevice(address: String, name: String)
     suspend fun forgetDevice()
     suspend fun setGestureMapping(profileId: String, gesture: GestureType, action: MediaAction)
+    suspend fun setButtonMapping(profileId: String, click: ButtonClickType, action: MediaAction)
     suspend fun saveGestureTrainingSample(gesture: GestureType, features: GestureFeatureVector)
     suspend fun clearGestureTraining(gesture: GestureType)
     suspend fun createProfile(name: String): Result<ControlProfile>

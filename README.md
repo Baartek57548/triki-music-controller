@@ -13,6 +13,7 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 - wielostopniowa filtracja IMU: mediana odrzucająca pojedyncze skoki, adaptacyjna martwa strefa gyro, low-pass i filtr komplementarny;
 - opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu; lokalny stabilny spoczynek automatycznie uzbraja sterowanie;
 - lokalny model few-shot k-NN uczony z 2–5 przykładów gestu; 40 cech łączy akcelerometr i żyroskop oraz ogranicza zależność od pozycji kapsla;
+- bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa przechodzą do następnego utworu, trzy do poprzedniego; każde mapowanie można zmienić w profilu;
 - konfigurowalne mapowania oraz profile zapisywane w Preferences DataStore;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i Now Playing;
@@ -112,7 +113,7 @@ Potwierdzone minimum:
 - ramka `14 B`: `22 packetId/status + gyro XYZ + accel XYZ`;
 - sześć wartości `int16`, little-endian;
 - gyro `0,070°/s/LSB`, accel `2048 LSB/g`;
-- identyfikator pakietu `0..15`; wariant `0/1` może raportować stan przycisku;
+- drugi bajt ramki jest zależny od firmware: licznik pakietu `0..15` albo stan przycisku `0/1`; aplikacja rozpoznaje wariant przed wygenerowaniem zdarzenia;
 - `6e400004-… bit 0`: sterowanie LED.
 
 Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [TRIKI_PROTOCOL.md](docs/TRIKI_PROTOCOL.md).
@@ -120,6 +121,8 @@ Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [
 ## Gesture Engine
 
 Presety czułości zmieniają spójny zestaw progów, siłę wygładzania i cooldown. Tryb Advanced pozwala zmienić progi lean/rotate/shake/tap bez naruszania mechanizmów zapobiegających spamowi. Silnik najpierw ustala lokalny spoczynek, następnie zbiera ruch i klasyfikuje najwyżej jeden gest po ponownym uspokojeniu kontrolera. Model k-NN może skorygować wynik dla nauczonego sposobu użycia, ale nie omija fizycznych bramek bezpieczeństwa. Nieruchome Triki leżące pod kątem nie może więc samo wywołać `NEXT` lub `PREVIOUS`.
+
+Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
 
 Opis stanów, kompromisów i testowania: [GESTURE_ENGINE.md](docs/GESTURE_ENGINE.md). Porównanie publicznych implementacji, uzasadnienie odczytu accel + gyro oraz kryteria walidacji sprzętowej: [GESTURE_RESEARCH.md](docs/GESTURE_RESEARCH.md).
 
@@ -131,18 +134,19 @@ Po włączeniu **Settings → Developer Mode** dostępne są:
 - BLE Inspector z usługami, charakterystykami, properties, descriptorami i odczytanymi wartościami;
 - nagrywanie krótkiej sesji RAW i eksport do pliku tekstowego w HEX/DEC;
 - kategorie logów `BLE`, `PROTOCOL`, `IMU`, `GESTURE`, `MEDIA`, `SERVICE`, `PERMISSION`;
-- Fake Triki generujący kontrolowane sekwencje wszystkich obsługiwanych gestów.
+- Fake Triki generujący kontrolowane sekwencje wszystkich obsługiwanych gestów oraz jednego, dwóch i trzech kliknięć.
 
 ## Testy
 
 Testy JVM obejmują:
 
-- dekodowanie little-endian, skalowanie, status przycisku, startup discard i resynchronizację parsera;
+- dekodowanie little-endian, skalowanie, startup discard i resynchronizację parsera;
+- autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
 - ekstrakcję cech accel + gyro, odporność cech grawitacyjnych na obrót kapsla, uczenie k-NN, odrzucanie obcych próbek i fizyczne bramki gestów;
 - pełne cykle lean, slide, rotate, flip, tap i single/double shake, nagranie Start/Stop oraz regresje dla długiego spoczynku, szumu, uszkodzonej próbki i stałego błędu gyro;
 - profile referencyjne TRIKI-Control w skali prawdziwej ramki: spoczynek na `−Z`, krótkie skręty, lean 14°, płaski slide, stamp i flip, w tym uczenie wszystkich sześciu podstawowych klas;
-- mapowanie gest → akcja i brak wywołania dla `NONE`;
+- mapowanie gest/przycisk → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, profili, mapowań, kalibracji i stanu ukończenia kreatora, wraz z migracją danych ze starszej wersji.
 
 ## Znane ograniczenia

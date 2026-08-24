@@ -50,6 +50,9 @@ class SettingsPersistenceTest {
 
         assertEquals(original, restored)
         assertEquals(MediaAction.PLAY_PAUSE, restored.activeProfile.actionFor(GestureType.FLIP))
+        assertEquals(MediaAction.PLAY_PAUSE, restored.activeProfile.actionFor(ButtonClickType.SINGLE))
+        assertEquals(MediaAction.NEXT, restored.activeProfile.actionFor(ButtonClickType.DOUBLE))
+        assertEquals(MediaAction.PREVIOUS, restored.activeProfile.actionFor(ButtonClickType.TRIPLE))
         assertTrue(restored.gestureWizardCompleted)
         assertEquals(CURRENT_GESTURE_LEARNING_VERSION, restored.gestureLearningVersion)
         assertTrue(restored.personalizedGestureModel.isTrained(GestureType.SHAKE))
@@ -81,5 +84,29 @@ class SettingsPersistenceTest {
         assertEquals(false, restored.gestureWizardCompleted)
         assertEquals(0, restored.gestureLearningVersion)
         assertTrue(restored.personalizedGestureModel.samples.isEmpty())
+        assertEquals(MediaAction.PLAY_PAUSE, restored.activeProfile.actionFor(ButtonClickType.SINGLE))
+    }
+
+    @Test
+    fun `legacy profile without button mappings receives safe media defaults`() {
+        val legacy = """
+            {
+              "activeProfileId": "legacy",
+              "profiles": [
+                {
+                  "id": "legacy",
+                  "name": "Legacy",
+                  "mappings": [],
+                  "builtIn": false
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val restored = json.decodeFromString(AppSettings.serializer(), legacy)
+
+        assertEquals(MediaAction.PLAY_PAUSE, restored.activeProfile.actionFor(ButtonClickType.SINGLE))
+        assertEquals(MediaAction.NEXT, restored.activeProfile.actionFor(ButtonClickType.DOUBLE))
+        assertEquals(MediaAction.PREVIOUS, restored.activeProfile.actionFor(ButtonClickType.TRIPLE))
     }
 }

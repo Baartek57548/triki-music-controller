@@ -72,6 +72,11 @@ fun SensorMonitorScreen(state: MainUiState, onBack: () -> Unit, viewModel: MainV
                             AxisRow("Pitch", sample.orientation.pitch, "°")
                             AxisRow("Roll", sample.orientation.roll, "°")
                             AxisRow("Yaw", sample.orientation.yaw, "°")
+                            AxisRow("Status RAW", sample.source.status.toFloat())
+                            Text(
+                                "Interpretacja statusu: ${state.runtime.buttonProtocolMode.displayName}",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                             AxisRow("RSSI", state.ble.rssi?.toFloat(), " dBm")
                             AxisRow("Battery", state.ble.battery.percent?.toFloat(), "%")
                         }
@@ -106,6 +111,13 @@ fun SensorMonitorScreen(state: MainUiState, onBack: () -> Unit, viewModel: MainV
                             AssistChip(
                                 onClick = { viewModel.emitFakeGesture(gesture) },
                                 label = { Text(gesture.displayName) },
+                                leadingIcon = { Icon(Icons.Default.Sensors, null) },
+                            )
+                        }
+                        (1..3).forEach { clickCount ->
+                            AssistChip(
+                                onClick = { viewModel.emitFakeButtonClicks(clickCount) },
+                                label = { Text("Przycisk ×$clickCount") },
                                 leadingIcon = { Icon(Icons.Default.Sensors, null) },
                             )
                         }

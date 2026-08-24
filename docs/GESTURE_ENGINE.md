@@ -69,10 +69,18 @@ Nagranie jest ograniczone do 15 sekund i 2000 próbek. Wynik pokazuje wykryty ge
 - Akcelerometr wyznacza pion, ale bez magnetometru nie wyznacza absolutnego kierunku poziomego. Dlatego niezawodne sterowanie używa kierunku obrotu wokół grawitacji, bezkierunkowego przechylenia oraz płaskiego przesunięcia zamiast „tilt lewo/prawo”.
 - Krótkie stuknięcie jest bezpieczniejsze dla małego urządzenia niż wymagane podrzucenie; free-fall z późniejszym uderzeniem pozostaje obsługiwanym wariantem tego samego gestu.
 
+## Przycisk fizyczny
+
+Przycisk omija filtr i model IMU, ponieważ jego stan jest wejściem dyskretnym. `TrikiButtonInterpreter` najpierw odróżnia flagę `0/1` od licznika ramek, następnie debouncuje oba zbocza i emituje dokładnie jedno `ButtonClickEvent` dla sekwencji. W trakcie naciskania i 450-milisekundowego okna wielokliku `GestureEngine` jest resetowany, aby ruch palca nie uruchomił równocześnie gestu.
+
+Mapowania są częścią profilu i mogą zostać zmienione tak samo jak mapowania ruchu. Domyślny profil używa `jeden klik → Play/Pause`, `dwa → Next`, `trzy → Previous`.
+
 ## Testowanie
 
 `GestureEngineTest` podaje sztuczne `FilteredSensorData` z kontrolowanym czasem. Testy obejmują 1000 próbek nieruchomego urządzenia pod kątem, 2000 zaszumionych próbek spoczynkowych, pojedynczy uszkodzony sample, stały błąd gyro, płaskie przesunięcie, pełne cykle wszystkich gestów, obrót i flip z pozycji bocznej oraz analizę ręcznego nagrania. `SensorFilterAndCalibrationTest` pokrywa medianę, wygładzanie, bias, walidację stabilności i przejście orientacji przez granicę ±180°. `PersonalizedGestureClassifierTest` weryfikuje wymiar cech, użycie obu sensorów, niezmienność po obrocie kapsla, uczenie k-NN i fizyczne odrzucanie niezgodnej próbki.
 
 `ReferenceMotionCompatibilityTest` zaczyna od potwierdzonego spoczynku `(24, 0, −2051)`, skali `0,070°/s/LSB`, `2048 LSB/g` i okresu 19,23 ms. Odtwarza profile ruchu z publicznych testów TRIKI-Control przez produkcyjny `SensorFilter` i `GestureEngine`: oba kierunki krótkiego skrętu, łagodne przechylenie 14°, płaski ślizg, impuls `−2600` oraz odwrócenie. Sprawdza też ciszę zaszumionego `−Z`, niezmienność skrętu w czterech pozycjach kapsla oraz możliwość nauczenia modelu wszystkich sześciu podstawowych gestów.
+
+`TrikiButtonInterpreterTest` sprawdza pojedynczy, podwójny i potrójny klik, brak zdarzeń dla licznika `0..15` oraz naprzemiennego `0/1`, odbicia styku, długie przytrzymanie, zmianę wariantu i lukę w strumieniu.
 
 W buildzie debug `FakeTrikiDataSource` generuje pełne sekwencje IMU i przechodzi przez ten sam `TrikiRuntime`, `GestureEngine` i `ActionMapper` co fizyczny kontroler.
