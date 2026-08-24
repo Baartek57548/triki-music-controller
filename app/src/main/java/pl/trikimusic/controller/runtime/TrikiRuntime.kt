@@ -31,6 +31,8 @@ data class RuntimeState(
     val lastGesture: GestureEvent? = null,
     val lastAction: MediaAction? = null,
     val lastActionError: String? = null,
+    val gestureActionsEnabled: Boolean = false,
+    val gestureActionsSuspended: Boolean = false,
 )
 
 class TrikiRuntime(
@@ -47,10 +49,16 @@ class TrikiRuntime(
         extraBufferCapacity = 16,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
+    private val mutableFilteredSamples = MutableSharedFlow<FilteredSensorData>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     private var settings = AppSettings()
+    private var gestureActionsSuspended = false
 
     val state: StateFlow<RuntimeState> = mutableState.asStateFlow()
     val events: SharedFlow<GestureEvent> = mutableEvents.asSharedFlow()
+    val filteredSamples: SharedFlow<FilteredSensorData> = mutableFilteredSamples.asSharedFlow()
 
     init {
         scope.launch {
@@ -73,18 +81,43 @@ class TrikiRuntime(
     fun resetProcessing() {
         sensorFilter.reset()
         gestureEngine.reset()
-        mutableState.update { it.copy(history = emptyList(), latestSample = null) }
+        mutableState.update {
+            it.copy(
+                history = emptyList(),
+                latestSample = null,
+                gestureActionsEnabled = settings.calibration.isValid && !gestureActionsSuspended,
+                gestureActionsSuspended = gestureActionsSuspended,
+            )
+        }
+    }
+
+    fun setGestureActionsSuspended(suspended: Boolean) {
+        if (gestureActionsSuspended == suspended) return
+        gestureActionsSuspended = suspended
+        gestureEngine.reset()
+        mutableState.update {
+            it.copy(
+                gestureActionsEnabled = settings.calibration.isValid && !suspended,
+                gestureActionsSuspended = suspended,
+            )
+        }
     }
 
     private fun consume(sample: TrikiSensorData) {
         val thresholds = settings.sensitivity.thresholds(settings.advancedThresholds)
         val filtered = sensorFilter.process(sample, settings.calibration, thresholds)
+        mutableFilteredSamples.tryEmit(filtered)
         mutableState.update { current ->
             current.copy(
                 latestSample = filtered,
                 history = (current.history + filtered).takeLast(MAX_HISTORY_SAMPLES),
+                gestureActionsEnabled = settings.calibration.isValid && !gestureActionsSuspended,
+                gestureActionsSuspended = gestureActionsSuspended,
             )
         }
+        // An uncalibrated or explicitly suspended controller may still feed diagnostics,
+        // but it must never execute a media action.
+        if (!settings.calibration.isValid || gestureActionsSuspended) return
         gestureEngine.process(filtered, thresholds).forEach { event ->
             mutableEvents.tryEmit(event)
             val execution = actionMapper.execute(event, settings.activeProfile)

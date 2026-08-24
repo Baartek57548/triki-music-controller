@@ -10,22 +10,26 @@ class FakeTrikiDataSource {
     fun generate(gesture: GestureType, startNanos: Long = System.nanoTime()): List<TrikiSensorData> {
         check(BuildConfig.DEBUG) { "FakeTrikiDataSource jest dostępne tylko w buildzie debug." }
         val sequence = when (gesture) {
-            GestureType.TILT_LEFT -> ramp { index -> Vector3(0f, -0.58f * index / 35f, 1f - 0.45f * index / 35f) }
-            GestureType.TILT_RIGHT -> ramp { index -> Vector3(0f, 0.58f * index / 35f, 1f - 0.45f * index / 35f) }
+            GestureType.TILT_LEFT -> ramp(Vector3(140f, 0f, 0f)) { index ->
+                Vector3(0f, -0.58f * index / 35f, 1f - 0.45f * index / 35f)
+            }
+            GestureType.TILT_RIGHT -> ramp(Vector3(-140f, 0f, 0f)) { index ->
+                Vector3(0f, 0.58f * index / 35f, 1f - 0.45f * index / 35f)
+            }
             GestureType.ROTATE_LEFT -> pulse(gyroscope = Vector3(0f, 0f, -420f))
             GestureType.ROTATE_RIGHT -> pulse(gyroscope = Vector3(0f, 0f, 420f))
             GestureType.THROW_UP -> listOf(
-                Motion(20, accelerometer = Vector3(0f, 0f, 1f)),
+                Motion(35, accelerometer = Vector3(0f, 0f, 1f)),
                 Motion(10, accelerometer = Vector3(0f, 0f, 0.08f)),
                 Motion(8, accelerometer = Vector3(0f, 0f, 2.8f)),
-                Motion(20, accelerometer = Vector3(0f, 0f, 1f)),
+                Motion(70, accelerometer = Vector3(0f, 0f, 1f)),
             )
             GestureType.SHAKE -> shakePulses(1)
             GestureType.DOUBLE_SHAKE -> shakePulses(2)
             GestureType.FLIP -> listOf(
-                Motion(15, accelerometer = Vector3(0f, 0f, 1f)),
+                Motion(35, accelerometer = Vector3(0f, 0f, 1f)),
                 Motion(20, gyroscope = Vector3(250f, 0f, 0f), accelerometer = Vector3(0f, 0.2f, -0.98f)),
-                Motion(20, accelerometer = Vector3(0f, 0f, -1f)),
+                Motion(180, accelerometer = Vector3(0f, 0f, -1f)),
             )
         }
         var frame = 0L
@@ -45,23 +49,25 @@ class FakeTrikiDataSource {
         }
     }
 
-    private fun ramp(accelerometer: (Int) -> Vector3): List<Motion> =
-        (0 until 36).map { Motion(1, accelerometer = accelerometer(it)) } + Motion(20)
+    private fun ramp(gyroscope: Vector3, accelerometer: (Int) -> Vector3): List<Motion> =
+        listOf(Motion(35)) +
+            (0 until 36).map { Motion(1, gyroscope = gyroscope, accelerometer = accelerometer(it)) } +
+            Motion(120)
 
     private fun pulse(gyroscope: Vector3): List<Motion> = listOf(
-        Motion(15),
-        Motion(6, gyroscope = gyroscope, accelerometer = Vector3(0.2f, 0f, 1.15f)),
-        Motion(20),
+        Motion(35),
+        Motion(10, gyroscope = gyroscope, accelerometer = Vector3(0.2f, 0f, 1.15f)),
+        Motion(70),
     )
 
     private fun shakePulses(count: Int): List<Motion> = buildList {
-        add(Motion(15))
+        add(Motion(35))
         repeat(count) {
-            add(Motion(5, Vector3(360f, 300f, 120f), Vector3(0.5f, 0f, 1.2f)))
-            add(Motion(5, Vector3(-360f, -300f, -120f), Vector3(-0.5f, 0f, 0.8f)))
+            add(Motion(10, Vector3(360f, 300f, 120f), Vector3(0.5f, 0f, 1.2f)))
+            add(Motion(10, Vector3(-360f, -300f, -120f), Vector3(-0.9f, 0f, 0.8f)))
             add(Motion(18))
         }
-        add(Motion(60))
+        add(Motion(80))
     }
 
     private data class Motion(

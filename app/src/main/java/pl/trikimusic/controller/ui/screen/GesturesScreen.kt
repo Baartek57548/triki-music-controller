@@ -83,6 +83,22 @@ fun GesturesScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item { SectionTitle("Sterowanie", subtitle = "Przypisz akcje do ruchów Triki") }
+        if (!state.settings.calibration.isValid) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Sterowanie gestami jest zablokowane", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Wykonaj kalibrację nieruchomego Triki w zakładce Device. Bez kalibracji aplikacja nie uruchomi żadnej akcji multimedialnej.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            }
+        }
         item {
             Card(
                 shape = RoundedCornerShape(24.dp),
@@ -168,7 +184,7 @@ fun GesturesScreen(
             NavigationRow(
                 Icons.Default.Psychology,
                 "Naucz gest",
-                "Wykonaj ruch, obejrzyj wykres IMU i zweryfikuj klasyfikację.",
+                "Nagraj dokładny zakres przyciskami Start/Stop i zweryfikuj klasyfikację.",
                 onOpenTrainer,
             )
         }
@@ -334,7 +350,10 @@ private fun AdvancedThresholdsDialog(
                 ThresholdSlider("Obrót", rotation, 80f..600f, "%.0f°/s") { rotation = it }
                 ThresholdSlider("Potrząśnięcie", shake, 100f..700f, "%.0f°/s") { shake = it }
                 ThresholdSlider("Impuls podrzucenia", impact, 1.2f..5f, "%.1f g") { impact = it }
-                Text("Niższy próg oznacza większą czułość. Cooldown pozostaje 650 ms, aby jeden ruch nie uruchamiał wielu akcji.", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Niższy próg oznacza większą czułość. Akcja jest wykonywana dopiero po pełnym cyklu: spoczynek, ruch i ponowny spoczynek.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         },
         confirmButton = {

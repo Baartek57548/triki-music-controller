@@ -11,8 +11,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -21,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +42,17 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
     val trainer by viewModel.trainer.collectAsStateWithLifecycle()
     val detectedGesture = trainer.detectedGesture
     val history = state.runtime.history.takeLast(180)
-    Scaffold(topBar = { DetailTopBar("Naucz gest", onBack) }) { padding ->
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.cancelTrainer() }
+    }
+    Scaffold(
+        topBar = {
+            DetailTopBar("Naucz gest") {
+                viewModel.cancelTrainer()
+                onBack()
+            }
+        },
+    ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -76,13 +90,35 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
                     Icon(Icons.Default.Psychology, null, tint = MaterialTheme.colorScheme.primary)
                     Text(
                         when {
-                            trainer.recording -> "Wykonaj teraz: ${trainer.selectedGesture.displayName}"
+                            trainer.recording -> "Nagrywanie: ${trainer.selectedGesture.displayName}"
                             detectedGesture != null -> "Wykryto: ${detectedGesture.displayName}"
-                            else -> "Gotowe do nagrania"
+                            else -> "Gotowe — naciśnij Start"
                         },
                         style = MaterialTheme.typography.titleLarge,
                     )
+                    if (trainer.recording) {
+                        Text(
+                            "${trainer.sampleCount} próbek · ${"%.1f".format(trainer.durationMillis / 1_000f)} s",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                     trainer.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    if (!trainer.recording && trainer.sampleCount > 0) {
+                        val range = trainer.accelerationRangeG
+                        Text(
+                            buildString {
+                                append("Nagranie: ${trainer.sampleCount} próbek · ${"%.1f".format(trainer.durationMillis / 1_000f)} s")
+                                trainer.confidence?.let { append(" · pewność ${"%.0f".format(it * 100f)}%") }
+                                append("\nPeak gyro: ${"%.0f".format(trainer.peakGyroscopeDps)}°/s")
+                                if (range != null) {
+                                    append(" · accel ${"%.2f".format(range.start)}–${"%.2f".format(range.endInclusive)} g")
+                                }
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     if (trainer.accepted) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
@@ -91,13 +127,23 @@ fun GestureTrainerScreen(state: MainUiState, viewModel: MainViewModel, onBack: (
                     }
                 }
             }
-            if (trainer.detectedGesture == null) {
-                Button(onClick = viewModel::startTrainer, enabled = !trainer.recording, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (trainer.recording) "Nasłuchiwanie…" else "Rozpocznij")
+            if (trainer.recording) {
+                Button(
+                    onClick = viewModel::stopTrainer,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Icon(Icons.Default.Stop, contentDescription = null)
+                    Text(" Stop i analizuj")
+                }
+            } else if (trainer.detectedGesture == null) {
+                Button(onClick = viewModel::startTrainer, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Text(" Start nagrania")
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(onClick = viewModel::startTrainer, modifier = Modifier.weight(1f)) { Text("Powtórz") }
+                    TextButton(onClick = viewModel::startTrainer, modifier = Modifier.weight(1f)) { Text("Nagraj ponownie") }
                     Button(onClick = viewModel::acceptTrainerResult, modifier = Modifier.weight(1f)) { Text("Akceptuj") }
                 }
             }

@@ -6,119 +6,193 @@ import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GestureEvent
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
+import pl.trikimusic.controller.domain.model.Vector3
 
+/**
+ * Classifies a complete motion window instead of reacting to isolated samples.
+ * Requiring a stable → moving → stable cycle prevents a stationary controller,
+ * sensor bias, or a single corrupted packet from executing media actions.
+ */
 class GestureEngine {
     private val lastEmittedAt = mutableMapOf<GestureType, Long>()
-    private var tiltLatched = false
-    private var flipSamples = 0
-    private var rotationSamples = 0
-    private var rotationDirection = 0
-    private var freeFallSamples = 0
-    private var shakeSamples = 0
-    private var lastShakePulseNanos: Long? = null
-    private var pendingSingleShake: PendingShake? = null
+    private var phase = Phase.WARMING_UP
+    private var stableSinceNanos: Long? = null
+    private var lastTimestampNanos: Long? = null
+    private var baselineRoll = 0f
+    private var previousRoll = 0f
+    private var previousAccelerometer: Vector3? = null
+    private var motionWindow: MotionWindow? = null
 
     fun reset() {
         lastEmittedAt.clear()
-        tiltLatched = false
-        flipSamples = 0
-        rotationSamples = 0
-        rotationDirection = 0
-        freeFallSamples = 0
-        shakeSamples = 0
-        lastShakePulseNanos = null
-        pendingSingleShake = null
+        resetStreamState()
     }
 
     fun process(sample: FilteredSensorData, thresholds: GestureThresholds): List<GestureEvent> {
         val now = sample.source.timestampNanos
-        val events = mutableListOf<GestureEvent>()
-        flushPendingShake(now, thresholds)?.let(events::add)
-
-        detectTilt(sample, thresholds)?.let(events::add)
-        detectRotation(sample, thresholds)?.let(events::add)
-        detectThrow(sample, thresholds)?.let(events::add)
-        detectFlip(sample, thresholds)?.let(events::add)
-        detectShake(sample, thresholds)?.let(events::add)
-        return events
-    }
-
-    private fun detectTilt(sample: FilteredSensorData, thresholds: GestureThresholds): GestureEvent? {
-        val roll = sample.orientation.roll
-        if (abs(roll) < thresholds.tiltReleaseDegrees) tiltLatched = false
-        if (tiltLatched || abs(roll) < thresholds.tiltDegrees) return null
-
-        val type = if (roll < 0f) GestureType.TILT_LEFT else GestureType.TILT_RIGHT
-        tiltLatched = true
-        return emit(type, sample.source.timestampNanos, abs(roll) / 90f, abs(roll), thresholds)
-    }
-
-    private fun detectRotation(sample: FilteredSensorData, thresholds: GestureThresholds): GestureEvent? {
-        val z = sample.gyroscopeDps.z
-        val direction = when {
-            z > thresholds.rotationDps -> 1
-            z < -thresholds.rotationDps -> -1
-            else -> 0
+        val previousTimestamp = lastTimestampNanos
+        if (
+            previousTimestamp == null ||
+            now <= previousTimestamp ||
+            now - previousTimestamp > MAX_SAMPLE_GAP_NANOS
+        ) {
+            initializeStream(sample)
+            return emptyList()
         }
-        if (direction == 0) {
-            rotationSamples = 0
-            rotationDirection = 0
-            return null
+
+        val dtNanos = now - previousTimestamp
+        val dtSeconds = dtNanos / NANOS_PER_SECOND_F
+        lastTimestampNanos = now
+
+        val rollDeltaSincePrevious = angularDelta(previousRoll, sample.orientation.roll)
+        val rollRateDps = abs(rollDeltaSincePrevious) / dtSeconds
+        val accelerationDelta = previousAccelerometer
+            ?.let { previous -> (sample.accelerometerG - previous).magnitude }
+            ?: 0f
+        previousRoll = sample.orientation.roll
+        previousAccelerometer = sample.accelerometerG
+
+        val stable = isStable(sample, rollRateDps, accelerationDelta)
+        val moving = isMoving(sample, rollRateDps, accelerationDelta)
+
+        return when (phase) {
+            Phase.WARMING_UP -> {
+                warmUp(sample, now, stable)
+                emptyList()
+            }
+
+            Phase.READY -> {
+                if (moving) {
+                    motionWindow = MotionWindow(now, baselineRoll).also {
+                        it.add(sample, dtNanos, rollRateDps, thresholds)
+                    }
+                    stableSinceNanos = null
+                    phase = Phase.RECORDING
+                } else if (stable) {
+                    // Following the resting angle makes the detector independent of how Triki lies on a table.
+                    baselineRoll = interpolateAngle(baselineRoll, sample.orientation.roll, BASELINE_TRACKING_ALPHA)
+                }
+                emptyList()
+            }
+
+            Phase.RECORDING -> processMotion(sample, thresholds, now, dtNanos, rollRateDps, stable, moving)
         }
-        if (direction == rotationDirection) rotationSamples++ else rotationSamples = 1
-        rotationDirection = direction
-        if (rotationSamples < ROTATION_MIN_SAMPLES) return null
-        rotationSamples = 0
-        val type = if (direction > 0) GestureType.ROTATE_RIGHT else GestureType.ROTATE_LEFT
-        return emit(type, sample.source.timestampNanos, abs(z) / 700f, abs(z), thresholds)
     }
 
-    private fun detectThrow(sample: FilteredSensorData, thresholds: GestureThresholds): GestureEvent? {
-        val magnitude = sample.accelerationMagnitude
-        freeFallSamples = if (magnitude < thresholds.freeFallG) freeFallSamples + 1 else 0
-        val upwardImpulse = sample.accelerometerG.z > thresholds.impactG && magnitude > thresholds.impactG
-        if (freeFallSamples < FREE_FALL_MIN_SAMPLES && !upwardImpulse) return null
-        freeFallSamples = 0
-        return emit(GestureType.THROW_UP, sample.source.timestampNanos, 0.9f, magnitude, thresholds)
+    /** Finalizes a user-controlled Start/Stop capture without weakening live detection. */
+    fun finishRecording(thresholds: GestureThresholds): GestureEvent? {
+        val window = motionWindow ?: return null
+        val timestamp = lastTimestampNanos ?: return null
+        if (timestamp - window.startedAtNanos < MIN_RECORDED_MOTION_NANOS) return null
+        val event = classify(window, timestamp, thresholds)
+        resetStreamState()
+        return event
     }
 
-    private fun detectFlip(sample: FilteredSensorData, thresholds: GestureThresholds): GestureEvent? {
-        val upsideDown = sample.accelerometerG.z < FLIP_Z_THRESHOLD && sample.accelerationMagnitude in 0.65f..1.4f
-        flipSamples = if (upsideDown) flipSamples + 1 else 0
-        if (flipSamples < FLIP_MIN_SAMPLES) return null
-        flipSamples = 0
-        return emit(GestureType.FLIP, sample.source.timestampNanos, abs(sample.accelerometerG.z), abs(sample.orientation.roll), thresholds)
+    private fun warmUp(sample: FilteredSensorData, now: Long, stable: Boolean) {
+        if (!stable) {
+            stableSinceNanos = null
+            return
+        }
+        val stableSince = stableSinceNanos ?: now.also { stableSinceNanos = it }
+        baselineRoll = interpolateAngle(baselineRoll, sample.orientation.roll, BASELINE_TRACKING_ALPHA)
+        if (now - stableSince >= ARMING_STABLE_NANOS) {
+            baselineRoll = sample.orientation.roll
+            stableSinceNanos = null
+            phase = Phase.READY
+        }
     }
 
-    private fun detectShake(sample: FilteredSensorData, thresholds: GestureThresholds): GestureEvent? {
-        val gyro = sample.gyroscopeMagnitude
-        val accelDelta = abs(sample.accelerationMagnitude - 1f)
-        val active = gyro > thresholds.shakeDps && accelDelta > SHAKE_ACCEL_DELTA_G
-        shakeSamples = if (active) shakeSamples + 1 else max(0, shakeSamples - 1)
-        if (shakeSamples < SHAKE_MIN_SAMPLES) return null
-        shakeSamples = 0
+    private fun processMotion(
+        sample: FilteredSensorData,
+        thresholds: GestureThresholds,
+        now: Long,
+        dtNanos: Long,
+        rollRateDps: Float,
+        stable: Boolean,
+        moving: Boolean,
+    ): List<GestureEvent> {
+        val window = requireNotNull(motionWindow)
+        window.add(sample, dtNanos, rollRateDps, thresholds)
 
-        val now = sample.source.timestampNanos
-        val previousPulse = lastShakePulseNanos
-        lastShakePulseNanos = now
-        return if (previousPulse != null && now - previousPulse <= DOUBLE_SHAKE_WINDOW_NANOS && pendingSingleShake != null) {
-            pendingSingleShake = null
-            emit(GestureType.DOUBLE_SHAKE, now, (gyro / 700f).coerceIn(0f, 1f), gyro, thresholds)
+        if (moving) {
+            stableSinceNanos = null
+        } else if (stable) {
+            if (stableSinceNanos == null) stableSinceNanos = now
         } else {
-            pendingSingleShake = PendingShake(now, gyro)
-            null
+            stableSinceNanos = null
         }
+
+        if (now - window.startedAtNanos >= MAX_MOTION_WINDOW_NANOS) {
+            // A permanently non-neutral stream indicates bias or corrupt data, not a deliberate gesture.
+            resetAfterMotion(sample, stable)
+            return emptyList()
+        }
+
+        val stableSince = stableSinceNanos ?: return emptyList()
+        val requiredStableNanos = if (window.shakeCycles == 1) {
+            SINGLE_SHAKE_END_STABLE_NANOS
+        } else {
+            MOTION_END_STABLE_NANOS
+        }
+        if (now - stableSince < requiredStableNanos) return emptyList()
+
+        val event = classify(window, now, thresholds)
+        resetAfterMotion(sample, stable = true)
+        return listOfNotNull(event)
     }
 
-    private fun flushPendingShake(now: Long, thresholds: GestureThresholds): GestureEvent? {
-        val pending = pendingSingleShake ?: return null
-        if (now - pending.timestampNanos <= DOUBLE_SHAKE_WINDOW_NANOS) return null
-        pendingSingleShake = null
+    private fun classify(window: MotionWindow, timestampNanos: Long, thresholds: GestureThresholds): GestureEvent? {
+        val recognition = when {
+            window.freeFallNanos >= MIN_FREE_FALL_NANOS && window.impactAfterFreeFall -> Recognition(
+                GestureType.THROW_UP,
+                (window.peakAccelerationMagnitude / thresholds.impactG).coerceIn(0f, 1f),
+                window.peakAccelerationMagnitude,
+            )
+
+            window.shakeCycles >= 2 -> Recognition(
+                GestureType.DOUBLE_SHAKE,
+                (window.peakGyroscopeMagnitude / (thresholds.shakeDps * 1.6f)).coerceIn(0f, 1f),
+                window.peakGyroscopeMagnitude,
+            )
+
+            window.shakeCycles == 1 -> Recognition(
+                GestureType.SHAKE,
+                (window.peakGyroscopeMagnitude / (thresholds.shakeDps * 1.6f)).coerceIn(0f, 1f),
+                window.peakGyroscopeMagnitude,
+            )
+
+            window.longestUpsideDownNanos >= MIN_FLIP_HOLD_NANOS &&
+                window.finalAccelerationZ < FLIP_FINAL_Z_THRESHOLD &&
+                window.peakGyroscopeMagnitude >= MIN_FLIP_GYROSCOPE_DPS -> Recognition(
+                GestureType.FLIP,
+                abs(window.finalAccelerationZ).coerceIn(0f, 1f),
+                window.peakGyroscopeMagnitude,
+            )
+
+            abs(window.integratedRotationZDegrees) >= MIN_ROTATION_DEGREES &&
+                window.peakRotationDps >= thresholds.rotationDps -> Recognition(
+                if (window.integratedRotationZDegrees > 0f) GestureType.ROTATE_RIGHT else GestureType.ROTATE_LEFT,
+                (abs(window.integratedRotationZDegrees) / STRONG_ROTATION_DEGREES).coerceIn(0f, 1f),
+                abs(window.integratedRotationZDegrees),
+            )
+
+            abs(window.signedPeakRollDelta) >= thresholds.tiltDegrees &&
+                window.longestTiltThresholdNanos >= MIN_TILT_HOLD_NANOS &&
+                window.peakRollRateDps >= MIN_TILT_RATE_DPS -> Recognition(
+                if (window.signedPeakRollDelta > 0f) GestureType.TILT_RIGHT else GestureType.TILT_LEFT,
+                (abs(window.signedPeakRollDelta) / STRONG_TILT_DEGREES).coerceIn(0f, 1f),
+                abs(window.signedPeakRollDelta),
+            )
+
+            else -> null
+        } ?: return null
+
         return emit(
-            GestureType.SHAKE,
-            pending.timestampNanos,
-            (pending.magnitude / 700f).coerceIn(0f, 1f),
-            pending.magnitude,
+            recognition.type,
+            timestampNanos,
+            recognition.confidence,
+            recognition.magnitude,
             thresholds,
         )
     }
@@ -131,21 +205,230 @@ class GestureEngine {
         thresholds: GestureThresholds,
     ): GestureEvent? {
         val last = lastEmittedAt[type]
-        val cooldownNanos = thresholds.cooldownMillis * 1_000_000L
+        val cooldownNanos = thresholds.cooldownMillis * NANOS_PER_MILLISECOND
         if (last != null && timestampNanos - last < cooldownNanos) return null
         lastEmittedAt[type] = timestampNanos
         return GestureEvent(type, timestampNanos, confidence.coerceIn(0f, 1f), magnitude)
     }
 
-    private data class PendingShake(val timestampNanos: Long, val magnitude: Float)
+    private fun resetAfterMotion(sample: FilteredSensorData, stable: Boolean) {
+        motionWindow = null
+        stableSinceNanos = if (stable) sample.source.timestampNanos else null
+        baselineRoll = sample.orientation.roll
+        phase = Phase.WARMING_UP
+    }
+
+    private fun initializeStream(sample: FilteredSensorData) {
+        phase = Phase.WARMING_UP
+        stableSinceNanos = sample.source.timestampNanos
+        lastTimestampNanos = sample.source.timestampNanos
+        baselineRoll = sample.orientation.roll
+        previousRoll = sample.orientation.roll
+        previousAccelerometer = sample.accelerometerG
+        motionWindow = null
+    }
+
+    private fun resetStreamState() {
+        phase = Phase.WARMING_UP
+        stableSinceNanos = null
+        lastTimestampNanos = null
+        baselineRoll = 0f
+        previousRoll = 0f
+        previousAccelerometer = null
+        motionWindow = null
+    }
+
+    private fun isStable(sample: FilteredSensorData, rollRateDps: Float, accelerationDelta: Float): Boolean =
+        sample.gyroscopeMagnitude <= REST_GYROSCOPE_MAX_DPS &&
+            abs(sample.accelerationMagnitude - 1f) <= REST_ACCELERATION_DELTA_G &&
+            accelerationDelta <= REST_ACCELERATION_STEP_G &&
+            rollRateDps <= REST_ROLL_RATE_DPS
+
+    private fun isMoving(sample: FilteredSensorData, rollRateDps: Float, accelerationDelta: Float): Boolean =
+        sample.gyroscopeMagnitude >= MOTION_START_GYROSCOPE_DPS ||
+            abs(sample.accelerationMagnitude - 1f) >= MOTION_START_ACCELERATION_DELTA_G ||
+            accelerationDelta >= MOTION_START_ACCELERATION_STEP_G ||
+            rollRateDps >= MOTION_START_ROLL_RATE_DPS
+
+    private fun angularDelta(from: Float, to: Float): Float {
+        var delta = to - from
+        while (delta > 180f) delta -= 360f
+        while (delta < -180f) delta += 360f
+        return delta
+    }
+
+    private fun interpolateAngle(from: Float, to: Float, alpha: Float): Float =
+        normalizeDegrees(from + angularDelta(from, to) * alpha)
+
+    private fun normalizeDegrees(value: Float): Float {
+        var normalized = value
+        while (normalized > 180f) normalized -= 360f
+        while (normalized < -180f) normalized += 360f
+        return normalized
+    }
+
+    private inner class MotionWindow(
+        val startedAtNanos: Long,
+        private val initialRoll: Float,
+    ) {
+        var signedPeakRollDelta = 0f
+            private set
+        var peakRollRateDps = 0f
+            private set
+        var longestTiltThresholdNanos = 0L
+            private set
+        var integratedRotationZDegrees = 0f
+            private set
+        var peakRotationDps = 0f
+            private set
+        var peakGyroscopeMagnitude = 0f
+            private set
+        var peakAccelerationMagnitude = 0f
+            private set
+        var freeFallNanos = 0L
+            private set
+        var impactAfterFreeFall = false
+            private set
+        var longestUpsideDownNanos = 0L
+            private set
+        var finalAccelerationZ = 1f
+            private set
+        var shakeCycles = 0
+            private set
+
+        private var currentFreeFallNanos = 0L
+        private var confirmedFreeFall = false
+        private var currentTiltThresholdNanos = 0L
+        private var currentUpsideDownNanos = 0L
+        private var shakeInitialVector: Vector3? = null
+        private var shakeInitialMagnitude = 0f
+        private var shakeLatched = false
+        private var shakeInactiveNanos = 0L
+        private var shakeActiveSamples = 0
+
+        fun add(
+            sample: FilteredSensorData,
+            dtNanos: Long,
+            rollRateDps: Float,
+            thresholds: GestureThresholds,
+        ) {
+            val dtSeconds = dtNanos / NANOS_PER_SECOND_F
+            val rollDelta = angularDelta(initialRoll, sample.orientation.roll)
+            if (abs(rollDelta) > abs(signedPeakRollDelta)) signedPeakRollDelta = rollDelta
+            peakRollRateDps = max(peakRollRateDps, rollRateDps)
+            currentTiltThresholdNanos = if (abs(rollDelta) >= thresholds.tiltDegrees) {
+                currentTiltThresholdNanos + dtNanos
+            } else {
+                0L
+            }
+            longestTiltThresholdNanos = max(longestTiltThresholdNanos, currentTiltThresholdNanos)
+            integratedRotationZDegrees += sample.gyroscopeDps.z * dtSeconds
+            peakRotationDps = max(peakRotationDps, abs(sample.gyroscopeDps.z))
+            peakGyroscopeMagnitude = max(peakGyroscopeMagnitude, sample.gyroscopeMagnitude)
+            peakAccelerationMagnitude = max(peakAccelerationMagnitude, sample.accelerationMagnitude)
+            finalAccelerationZ = sample.accelerometerG.z
+
+            if (sample.accelerationMagnitude < thresholds.freeFallG) {
+                currentFreeFallNanos += dtNanos
+                freeFallNanos = max(freeFallNanos, currentFreeFallNanos)
+                if (currentFreeFallNanos >= MIN_FREE_FALL_NANOS) confirmedFreeFall = true
+            } else {
+                if (confirmedFreeFall && sample.accelerationMagnitude >= thresholds.impactG) {
+                    impactAfterFreeFall = true
+                }
+                currentFreeFallNanos = 0L
+            }
+
+            val upsideDown = sample.accelerometerG.z < FLIP_Z_THRESHOLD &&
+                sample.accelerationMagnitude in FLIP_GRAVITY_MIN_G..FLIP_GRAVITY_MAX_G
+            currentUpsideDownNanos = if (upsideDown) currentUpsideDownNanos + dtNanos else 0L
+            longestUpsideDownNanos = max(longestUpsideDownNanos, currentUpsideDownNanos)
+
+            updateShake(sample, dtNanos, thresholds)
+        }
+
+        private fun updateShake(sample: FilteredSensorData, dtNanos: Long, thresholds: GestureThresholds) {
+            val accelerationDelta = abs(sample.accelerationMagnitude - 1f)
+            val active = sample.gyroscopeMagnitude >= thresholds.shakeDps &&
+                accelerationDelta >= SHAKE_ACCELERATION_DELTA_G
+            if (!active) {
+                shakeInactiveNanos += dtNanos
+                if (shakeInactiveNanos >= SHAKE_RELEASE_NANOS) {
+                    shakeInitialVector = null
+                    shakeInitialMagnitude = 0f
+                    shakeLatched = false
+                    shakeActiveSamples = 0
+                }
+                return
+            }
+
+            shakeInactiveNanos = 0L
+            val initial = shakeInitialVector
+            if (initial == null) {
+                shakeInitialVector = sample.gyroscopeDps
+                shakeInitialMagnitude = sample.gyroscopeMagnitude
+                shakeActiveSamples = 1
+                return
+            }
+
+            shakeActiveSamples++
+            if (shakeLatched || shakeActiveSamples < SHAKE_MIN_ACTIVE_SAMPLES) return
+            val denominator = shakeInitialMagnitude * sample.gyroscopeMagnitude
+            if (denominator <= 0.0001f) return
+            val normalizedDot = dot(initial, sample.gyroscopeDps) / denominator
+            if (normalizedDot <= SHAKE_REVERSAL_DOT_THRESHOLD) {
+                shakeCycles++
+                shakeLatched = true
+            }
+        }
+
+        private fun dot(first: Vector3, second: Vector3): Float =
+            first.x * second.x + first.y * second.y + first.z * second.z
+    }
+
+    private data class Recognition(
+        val type: GestureType,
+        val confidence: Float,
+        val magnitude: Float,
+    )
+
+    private enum class Phase { WARMING_UP, READY, RECORDING }
 
     private companion object {
-        const val ROTATION_MIN_SAMPLES = 3
-        const val FREE_FALL_MIN_SAMPLES = 2
-        const val FLIP_MIN_SAMPLES = 8
+        const val NANOS_PER_SECOND_F = 1_000_000_000f
+        const val NANOS_PER_MILLISECOND = 1_000_000L
+        const val MAX_SAMPLE_GAP_NANOS = 250_000_000L
+        const val ARMING_STABLE_NANOS = 280_000_000L
+        const val MOTION_END_STABLE_NANOS = 280_000_000L
+        const val SINGLE_SHAKE_END_STABLE_NANOS = 480_000_000L
+        const val MAX_MOTION_WINDOW_NANOS = 2_200_000_000L
+        const val BASELINE_TRACKING_ALPHA = 0.08f
+
+        const val REST_GYROSCOPE_MAX_DPS = 22f
+        const val REST_ACCELERATION_DELTA_G = 0.11f
+        const val REST_ACCELERATION_STEP_G = 0.045f
+        const val REST_ROLL_RATE_DPS = 16f
+        const val MOTION_START_GYROSCOPE_DPS = 34f
+        const val MOTION_START_ACCELERATION_DELTA_G = 0.15f
+        const val MOTION_START_ACCELERATION_STEP_G = 0.075f
+        const val MOTION_START_ROLL_RATE_DPS = 28f
+
+        const val MIN_TILT_RATE_DPS = 28f
+        const val MIN_TILT_HOLD_NANOS = 40_000_000L
+        const val MIN_RECORDED_MOTION_NANOS = 80_000_000L
+        const val STRONG_TILT_DEGREES = 55f
+        const val MIN_ROTATION_DEGREES = 22f
+        const val STRONG_ROTATION_DEGREES = 70f
+        const val MIN_FREE_FALL_NANOS = 35_000_000L
+        const val MIN_FLIP_HOLD_NANOS = 80_000_000L
+        const val MIN_FLIP_GYROSCOPE_DPS = 55f
         const val FLIP_Z_THRESHOLD = -0.72f
-        const val SHAKE_MIN_SAMPLES = 4
-        const val SHAKE_ACCEL_DELTA_G = 0.18f
-        const val DOUBLE_SHAKE_WINDOW_NANOS = 480_000_000L
+        const val FLIP_FINAL_Z_THRESHOLD = -0.55f
+        const val FLIP_GRAVITY_MIN_G = 0.65f
+        const val FLIP_GRAVITY_MAX_G = 1.4f
+        const val SHAKE_ACCELERATION_DELTA_G = 0.16f
+        const val SHAKE_RELEASE_NANOS = 140_000_000L
+        const val SHAKE_MIN_ACTIVE_SAMPLES = 4
+        const val SHAKE_REVERSAL_DOT_THRESHOLD = -0.35f
     }
 }

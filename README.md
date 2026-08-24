@@ -8,13 +8,13 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 
 - pełny cykl BLE: energooszczędny skan na żądanie, GATT discovery, NUS notifications, timeout, RSSI, bateria, reconnect z exponential backoff;
 - potwierdzony dekoder ramek IMU z resynchronizacją po rozciętych i sklejonych notyfikacjach;
-- `GestureEngine` niezależny od UI: tilt, rotate, shake, double shake, flip i throw-up;
-- low-pass filter, dead zone, histereza, debounce i cooldown per gest;
-- kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
+- `GestureEngine` niezależny od UI: tilt, rotate, shake, double shake, flip i throw-up klasyfikowane po pełnym oknie ruchu;
+- dynamiczna baza neutralna, wymagany cykl spoczynek–ruch–spoczynek oraz cooldown per gest;
+- kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu; bez poprawnej kalibracji akcje są bezpiecznie blokowane;
 - konfigurowalne mapowania oraz profile zapisywane w Preferences DataStore;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i Now Playing;
-- onboarding, ekran uprawnień, Gesture Trainer, Sensor Monitor i BLE Inspector;
+- onboarding, ekran uprawnień, Gesture Trainer z nagrywaniem Start/Stop, Sensor Monitor i BLE Inspector;
 - rotujący bufor pakietów RAW z eksportem HEX/DEC oraz ograniczony bufor logów;
 - foreground service z akcją `Rozłącz` i automatycznym wygaszaniem, gdy nie ma aktywnego połączenia;
 - `FakeTrikiDataSource` dostępny wyłącznie w buildzie debug po włączeniu Developer Mode;
@@ -113,7 +113,7 @@ Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [
 
 ## Gesture Engine
 
-Presety czułości zmieniają spójny zestaw progów, siłę wygładzania i cooldown. Tryb Advanced pozwala zmienić progi tilt/rotate/shake/throw bez naruszania mechanizmów zapobiegających spamowi. Pojedynczy shake jest emitowany dopiero po zamknięciu okna double-shake, dzięki czemu jedno wykonanie nie uruchamia obu mapowań.
+Presety czułości zmieniają spójny zestaw progów, siłę wygładzania i cooldown. Tryb Advanced pozwala zmienić progi tilt/rotate/shake/throw bez naruszania mechanizmów zapobiegających spamowi. Silnik najpierw ustala lokalny spoczynek, następnie zbiera ruch i klasyfikuje najwyżej jeden gest po ponownym uspokojeniu kontrolera. Nieruchome Triki leżące pod kątem nie może więc samo wywołać `NEXT` lub `PREVIOUS`.
 
 Opis stanów, kompromisów i testowania: [GESTURE_ENGINE.md](docs/GESTURE_ENGINE.md).
 
@@ -133,7 +133,7 @@ Testy JVM obejmują:
 
 - dekodowanie little-endian, skalowanie, status przycisku, startup discard i resynchronizację parsera;
 - smoothing, korekcję biasu i walidację kalibracji;
-- histerezę tilt, rotate, throw, single/double shake oraz cooldown;
+- pełne cykle tilt, rotate, flip, throw i single/double shake, nagranie Start/Stop oraz regresje dla długiego spoczynku, szumu, uszkodzonej próbki i stałego błędu gyro;
 - mapowanie gest → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, profili, mapowań i kalibracji.
 

@@ -9,13 +9,11 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
@@ -26,6 +24,7 @@ import pl.trikimusic.controller.BuildConfig
 import pl.trikimusic.controller.domain.model.AppLogEntry
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.CalibrationProfile
+import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GattServiceInfo
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
@@ -39,7 +38,9 @@ import pl.trikimusic.controller.domain.model.TrikiConnectionState
 import pl.trikimusic.controller.domain.model.TrikiDevice
 import pl.trikimusic.controller.domain.model.TrikiSensorData
 import pl.trikimusic.controller.domain.model.defaultProfiles
+import pl.trikimusic.controller.domain.model.thresholds
 import pl.trikimusic.controller.core.gesture.CalibrationCalculator
+import pl.trikimusic.controller.core.gesture.GestureRecordingAnalyzer
 import pl.trikimusic.controller.core.permissions.PermissionState
 import pl.trikimusic.controller.runtime.RuntimeState
 import pl.trikimusic.controller.service.TrikiForegroundService
@@ -55,7 +56,12 @@ data class CalibrationUiState(
 data class TrainerUiState(
     val selectedGesture: GestureType = GestureType.TILT_LEFT,
     val recording: Boolean = false,
+    val sampleCount: Int = 0,
+    val durationMillis: Long = 0L,
     val detectedGesture: GestureType? = null,
+    val confidence: Float? = null,
+    val peakGyroscopeDps: Float = 0f,
+    val accelerationRangeG: ClosedFloatingPointRange<Float>? = null,
     val accepted: Boolean = false,
     val message: String? = null,
 )
@@ -81,6 +87,8 @@ class MainViewModel(
     private val mutableTrainer = MutableStateFlow(TrainerUiState())
     private var calibrationJob: Job? = null
     private var trainerJob: Job? = null
+    private val trainerSamples = mutableListOf<FilteredSensorData>()
+    private val trainerAnalyzer = GestureRecordingAnalyzer()
     private var autoConnectRequested = false
     private var rawRecordingStartedAtMillis: Long? = null
     private var frozenRawCapture: List<RawBlePacket>? = null
@@ -263,26 +271,74 @@ class MainViewModel(
     }
 
     fun selectTrainerGesture(gesture: GestureType) {
-        trainerJob?.cancel()
+        cancelTrainerRecording(resetState = false)
         mutableTrainer.value = TrainerUiState(selectedGesture = gesture)
     }
 
     fun startTrainer() {
-        trainerJob?.cancel()
         val selected = mutableTrainer.value.selectedGesture
-        mutableTrainer.value = TrainerUiState(selectedGesture = selected, recording = true)
+        if (container.bleManager.state.value.connectionState != TrikiConnectionState.READY) {
+            mutableTrainer.value = TrainerUiState(
+                selectedGesture = selected,
+                message = "Najpierw połącz Triki i poczekaj na dane IMU.",
+            )
+            return
+        }
+        if (!container.settings.value.calibration.isValid) {
+            mutableTrainer.value = TrainerUiState(
+                selectedGesture = selected,
+                message = "Najpierw wykonaj kalibrację nieruchomego Triki w zakładce Device.",
+            )
+            return
+        }
+
+        cancelTrainerRecording(resetState = false)
+        trainerSamples.clear()
+        // A short pre-roll gives the detector a real neutral baseline even when Start is tapped
+        // immediately before the movement.
+        trainerSamples += container.runtime.state.value.history.takeLast(TRAINER_PREROLL_SAMPLES)
+        container.runtime.setGestureActionsSuspended(true)
+        mutableTrainer.value = TrainerUiState(
+            selectedGesture = selected,
+            recording = true,
+            sampleCount = trainerSamples.size,
+            durationMillis = captureDurationMillis(),
+            message = "Nagrywanie trwa. Wykonaj jeden gest, zatrzymaj Triki i naciśnij Stop.",
+        )
         trainerJob = viewModelScope.launch {
-            val event = withTimeoutOrNull(TRAINER_TIMEOUT_MILLIS) { container.runtime.events.first() }
-            mutableTrainer.value = if (event == null) {
-                TrainerUiState(selectedGesture = selected, message = "Nie wykryto gestu. Spróbuj wykonać ruch wyraźniej.")
-            } else {
-                TrainerUiState(
-                    selectedGesture = selected,
-                    detectedGesture = event.type,
-                    message = if (event.type == selected) "Wykryto oczekiwany gest." else "Wykryto: ${event.type.displayName}",
-                )
+            withTimeoutOrNull(TRAINER_MAX_DURATION_MILLIS) {
+                container.runtime.filteredSamples.collect { sample ->
+                    if (
+                        trainerSamples.size < TRAINER_MAX_SAMPLES &&
+                        trainerSamples.lastOrNull()?.source?.timestampNanos != sample.source.timestampNanos
+                    ) {
+                        trainerSamples += sample
+                    }
+                    mutableTrainer.update {
+                        it.copy(
+                            sampleCount = trainerSamples.size,
+                            durationMillis = captureDurationMillis(),
+                        )
+                    }
+                }
+            }
+            if (mutableTrainer.value.recording) {
+                finishTrainerRecording(autoStopped = true)
             }
         }
+    }
+
+    fun stopTrainer() {
+        if (!mutableTrainer.value.recording) return
+        trainerJob?.cancel()
+        trainerJob = null
+        finishTrainerRecording(autoStopped = false)
+    }
+
+    fun cancelTrainer() {
+        val selected = mutableTrainer.value.selectedGesture
+        cancelTrainerRecording(resetState = false)
+        mutableTrainer.value = TrainerUiState(selectedGesture = selected)
     }
 
     fun acceptTrainerResult() {
@@ -290,11 +346,59 @@ class MainViewModel(
         mutableTrainer.value = current.copy(
             accepted = current.detectedGesture == current.selectedGesture,
             message = if (current.detectedGesture == current.selectedGesture) {
-                "Próbka gestu została zaakceptowana."
+                "Nagranie potwierdza poprawne rozpoznawanie tego gestu."
             } else {
                 "Wykryty ruch nie odpowiada wybranemu gestowi."
             },
         )
+    }
+
+    private fun finishTrainerRecording(autoStopped: Boolean) {
+        val selected = mutableTrainer.value.selectedGesture
+        trainerJob = null
+        container.runtime.setGestureActionsSuspended(false)
+        val thresholds = container.settings.value.sensitivity.thresholds(
+            container.settings.value.advancedThresholds,
+        )
+        val result = trainerAnalyzer.analyze(trainerSamples.toList(), thresholds)
+        val detected = result.events.firstOrNull { it.type == selected } ?: result.strongestEvent
+        val message = when {
+            result.sampleCount < MIN_TRAINER_SAMPLES || result.durationMillis < MIN_TRAINER_DURATION_MILLIS ->
+                "Nagranie jest za krótkie. Nagraj co najmniej sekundę: spoczynek, jeden ruch i ponowny spoczynek."
+
+            detected == null ->
+                "Nie wykryto pełnego gestu. Rozpocznij w spoczynku, wykonaj wyraźny ruch i zatrzymaj nagranie po uspokojeniu Triki."
+
+            detected.type == selected && autoStopped ->
+                "Wykryto oczekiwany gest. Nagranie zatrzymano automatycznie po 15 sekundach."
+
+            detected.type == selected -> "Wykryto oczekiwany gest."
+            else -> "Wykryto: ${detected.type.displayName}. Oczekiwano: ${selected.displayName}."
+        }
+        mutableTrainer.value = TrainerUiState(
+            selectedGesture = selected,
+            sampleCount = result.sampleCount,
+            durationMillis = result.durationMillis,
+            detectedGesture = detected?.type,
+            confidence = detected?.confidence,
+            peakGyroscopeDps = result.peakGyroscopeDps,
+            accelerationRangeG = result.minimumAccelerationG..result.maximumAccelerationG,
+            message = message,
+        )
+    }
+
+    private fun cancelTrainerRecording(resetState: Boolean) {
+        trainerJob?.cancel()
+        trainerJob = null
+        trainerSamples.clear()
+        container.runtime.setGestureActionsSuspended(false)
+        if (resetState) mutableTrainer.value = TrainerUiState()
+    }
+
+    private fun captureDurationMillis(): Long {
+        val first = trainerSamples.firstOrNull()?.source?.timestampNanos ?: return 0L
+        val last = trainerSamples.lastOrNull()?.source?.timestampNanos ?: return 0L
+        return ((last - first) / 1_000_000L).coerceAtLeast(0L)
     }
 
     fun emitFakeGesture(gesture: GestureType) {
@@ -361,6 +465,12 @@ class MainViewModel(
         mutableUserMessage.value = error.message ?: "Wystąpił nieoczekiwany błąd."
     }
 
+    override fun onCleared() {
+        calibrationJob?.cancel()
+        cancelTrainerRecording(resetState = true)
+        super.onCleared()
+    }
+
     class Factory(
         private val application: Application,
         private val container: AppContainer,
@@ -376,6 +486,10 @@ class MainViewModel(
         const val CALIBRATION_DURATION_NANOS = 3_000_000_000L
         const val CALIBRATION_TIMEOUT_MILLIS = 6_000L
         const val MIN_CALIBRATION_CAPTURE_NANOS = 2_500_000_000L
-        const val TRAINER_TIMEOUT_MILLIS = 5_000L
+        const val TRAINER_MAX_DURATION_MILLIS = 15_000L
+        const val TRAINER_PREROLL_SAMPLES = 45
+        const val TRAINER_MAX_SAMPLES = 2_000
+        const val MIN_TRAINER_SAMPLES = 70
+        const val MIN_TRAINER_DURATION_MILLIS = 900L
     }
 }

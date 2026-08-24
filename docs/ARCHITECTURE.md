@@ -40,7 +40,8 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie k
 - `TrikiProtocolDecoder` ma bufor streamu, resynchronizację, skalowanie i statystyki odrzuconych bajtów.
 - `TrikiBleManager` implementuje maszynę stanów `DISCONNECTED → SCANNING → FOUND → CONNECTING → CONNECTED → READY`, błędy i `RECONNECTING`.
 - `SensorFilter` stosuje bias kalibracyjny, low-pass i filtr komplementarny pitch/roll/yaw.
-- `GestureEngine` jest maszyną stanów z histerezą, licznikami próbek, oknem double-shake i cooldownem per event.
+- `GestureEngine` klasyfikuje kompletne okno `spoczynek → ruch → spoczynek`, utrzymuje lokalną bazę kąta i zwraca najwyżej jedno zdarzenie z jednego ruchu.
+- `GestureRecordingAnalyzer` uruchamia ten sam silnik na ręcznie wybranym zakresie Start/Stop i zwraca metryki jakości nagrania.
 - `AppLogger` przechowuje maksymalnie 400 skróconych wpisów; nie rośnie bez końca.
 
 ### Data
@@ -51,11 +52,11 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie k
 
 ### Runtime
 
-`TrikiRuntime` jest jedynym miejscem łączącym sensor z akcją. Utrzymuje bieżący snapshot ustawień, więc zmiana profilu lub czułości działa bez restartu połączenia. Zmiana kalibracji/progów resetuje stan filtrów, aby nie mieszać dwóch układów odniesienia.
+`TrikiRuntime` jest jedynym miejscem łączącym sensor z akcją. Utrzymuje bieżący snapshot ustawień, więc zmiana profilu lub czułości działa bez restartu połączenia. Zmiana kalibracji/progów resetuje stan filtrów, aby nie mieszać dwóch układów odniesienia. Bez ważnej kalibracji runtime publikuje dane diagnostyczne, ale blokuje akcje. Podczas nagrania treningowego akcje są czasowo zawieszone, a `SharedFlow<FilteredSensorData>` nadal zasila analizator i wykres.
 
 ### Presentation
 
-`MainViewModel` orkiestruje intencje użytkownika, ale nie ma logiki protokołu. Compose renderuje stan, obsługuje Activity Result API dla uprawnień/eksportu i zapewnia nawigację. Ekrany szczegółowe są oddzielnymi composables.
+`MainViewModel` orkiestruje intencje użytkownika, ale nie ma logiki protokołu. Odpowiada również za ograniczony czasowo cykl Start/Stop rejestratora i zawsze przywraca wykonywanie akcji przy Stop, wyjściu z ekranu lub zniszczeniu ViewModelu. Compose renderuje stan, obsługuje Activity Result API dla uprawnień/eksportu i zapewnia nawigację. Ekrany szczegółowe są oddzielnymi composables.
 
 ## BLE lifecycle
 

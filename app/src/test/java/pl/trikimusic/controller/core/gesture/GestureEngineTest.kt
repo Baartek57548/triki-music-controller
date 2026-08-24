@@ -1,8 +1,13 @@
 package pl.trikimusic.controller.core.gesture
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
+import pl.trikimusic.controller.BuildConfig
+import pl.trikimusic.controller.data.bluetooth.FakeTrikiDataSource
+import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.GestureType
@@ -15,103 +20,234 @@ class GestureEngineTest {
     private val thresholds = GestureThresholds()
 
     @Test
-    fun `tilt uses hysteresis and cooldown to prevent repeated actions`() {
-        val engine = GestureEngine()
-        val events = mutableListOf<GestureType>()
-        var time = 0L
-        repeat(30) {
-            time += PERIOD
-            events += engine.process(filtered(time, roll = 36f), thresholds).map { it.type }
-        }
-        repeat(20) {
-            time += PERIOD
-            engine.process(filtered(time, roll = 0f), thresholds)
-        }
-        time += 700_000_000L
-        events += engine.process(filtered(time, roll = 36f), thresholds).map { it.type }
+    fun `stationary tilted controller never emits a tilt`() {
+        val fixture = Fixture(thresholds)
 
-        assertEquals(listOf(GestureType.TILT_RIGHT, GestureType.TILT_RIGHT), events)
+        fixture.rest(count = 1_000, roll = 42f)
+
+        assertTrue(fixture.events.isEmpty())
     }
 
     @Test
-    fun `rotation requires sustained samples`() {
-        val engine = GestureEngine()
-        val events = mutableListOf<GestureType>()
-        repeat(5) { index ->
-            events += engine.process(filtered(index * PERIOD, gyro = Vector3(0f, 0f, -430f)), thresholds).map { it.type }
+    fun `small stationary sensor noise never emits an event`() {
+        val fixture = Fixture(thresholds)
+        repeat(2_000) { index ->
+            val sign = if (index % 2 == 0) 1f else -1f
+            fixture.feed(
+                roll = 18f + sign * 0.04f,
+                gyro = Vector3(sign * 2.5f, -sign * 1.5f, sign),
+                accel = Vector3(sign * 0.006f, -sign * 0.004f, 1f),
+            )
         }
-        assertEquals(listOf(GestureType.ROTATE_LEFT), events)
+
+        assertTrue(fixture.events.isEmpty())
     }
 
     @Test
-    fun `single shake is delayed until double shake window expires`() {
-        val engine = GestureEngine()
-        val events = mutableListOf<GestureType>()
-        var time = 0L
-        repeat(4) {
-            time += PERIOD
-            events += engine.process(shake(time), thresholds).map { it.type }
+    fun `tilt requires rest movement and rest and emits only once`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(8) { index ->
+            fixture.feed(roll = (index + 1) * 6f, gyro = Vector3(-120f, 0f, 0f))
         }
-        assertTrue(events.isEmpty())
-        time += 500_000_000L
-        events += engine.process(filtered(time), thresholds).map { it.type }
-        assertEquals(listOf(GestureType.SHAKE), events)
+        fixture.rest(80, roll = 48f)
+
+        assertEquals(listOf(GestureType.TILT_RIGHT), fixture.events)
     }
 
     @Test
-    fun `two shake pulses emit only double shake`() {
-        val engine = GestureEngine()
-        val events = mutableListOf<GestureType>()
-        var time = 0L
-        repeat(4) {
-            time += PERIOD
-            events += engine.process(shake(time), thresholds).map { it.type }
-        }
-        repeat(4) {
-            time += PERIOD
-            engine.process(filtered(time), thresholds)
-        }
-        repeat(4) {
-            time += PERIOD
-            events += engine.process(shake(time), thresholds).map { it.type }
-        }
-        assertEquals(listOf(GestureType.DOUBLE_SHAKE), events)
+    fun `single corrupted orientation sample is rejected`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        fixture.feed(roll = 75f, gyro = Vector3(-500f, 0f, 0f))
+        fixture.rest(40)
+
+        assertTrue(fixture.events.isEmpty())
     }
 
     @Test
-    fun `free fall emits throw up once`() {
-        val engine = GestureEngine()
-        val events = (0 until 6).flatMap { index ->
-            engine.process(filtered(index * PERIOD, accel = Vector3(0f, 0f, 0.08f)), thresholds)
-        }
-        assertEquals(1, events.count { it.type == GestureType.THROW_UP })
+    fun `rotation requires meaningful integrated angle`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(7) { fixture.feed(gyro = Vector3(0f, 0f, -430f)) }
+        fixture.rest(35)
+
+        assertEquals(listOf(GestureType.ROTATE_LEFT), fixture.events)
     }
 
-    private fun shake(time: Long): FilteredSensorData = filtered(
-        time,
-        gyro = Vector3(340f, 280f, 90f),
-        accel = Vector3(0.45f, 0f, 1.15f),
-    )
+    @Test
+    fun `constant gyroscope fault cannot repeat media actions`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(600) { fixture.feed(gyro = Vector3(0f, 0f, 260f)) }
 
-    private fun filtered(
-        time: Long,
-        roll: Float = 0f,
-        gyro: Vector3 = Vector3(0f, 0f, 0f),
-        accel: Vector3 = Vector3(0f, 0f, 1f),
-    ): FilteredSensorData {
-        val source = TrikiSensorData(
-            0,
-            time,
-            gyro,
-            accel,
-            RawVector3(0, 0, 0),
-            RawVector3(0, 0, 0),
-            0,
-        )
-        return FilteredSensorData(source, gyro, accel, OrientationData(roll = roll))
+        assertTrue(fixture.events.isEmpty())
+    }
+
+    @Test
+    fun `one back and forth motion emits one shake`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        fixture.shakeCycle()
+        fixture.rest(60)
+
+        assertEquals(listOf(GestureType.SHAKE), fixture.events)
+    }
+
+    @Test
+    fun `two separated back and forth motions emit one double shake`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        fixture.shakeCycle()
+        fixture.rest(18)
+        fixture.shakeCycle()
+        fixture.rest(40)
+
+        assertEquals(listOf(GestureType.DOUBLE_SHAKE), fixture.events)
+    }
+
+    @Test
+    fun `free fall without impact is rejected`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(6) { fixture.feed(accel = Vector3(0f, 0f, 0.08f)) }
+        fixture.rest(35)
+
+        assertTrue(fixture.events.isEmpty())
+    }
+
+    @Test
+    fun `free fall followed by impact emits throw up once`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(6) { fixture.feed(accel = Vector3(0f, 0f, 0.08f)) }
+        fixture.feed(accel = Vector3(0f, 0f, 3.1f))
+        fixture.rest(50)
+
+        assertEquals(listOf(GestureType.THROW_UP), fixture.events)
+    }
+
+    @Test
+    fun `flip requires rotation and a stable upside down finish`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(10) {
+            fixture.feed(
+                roll = 180f,
+                gyro = Vector3(250f, 0f, 0f),
+                accel = Vector3(0f, 0f, -1f),
+            )
+        }
+        fixture.rest(35, roll = 180f, accel = Vector3(0f, 0f, -1f))
+
+        assertEquals(listOf(GestureType.FLIP), fixture.events)
+    }
+
+    @Test
+    fun `manual recording analyzer finalizes motion at stop`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(10) { index ->
+            fixture.feed(roll = -(index + 1) * 6f, gyro = Vector3(120f, 0f, 0f))
+        }
+
+        val result = GestureRecordingAnalyzer().analyze(fixture.samples, thresholds)
+
+        assertEquals(GestureType.TILT_LEFT, result.strongestEvent?.type)
+        assertTrue(result.sampleCount >= 40)
+        assertTrue(result.durationMillis > 300L)
+    }
+
+    @Test
+    fun `manual recording analyzer reports no event for rest`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(150, roll = 30f)
+
+        val result = GestureRecordingAnalyzer().analyze(fixture.samples, thresholds)
+
+        assertNull(result.strongestEvent)
+    }
+
+    @Test
+    fun `all fake device sequences survive filtering and classify as requested`() {
+        assumeTrue("FakeTrikiDataSource exists only in debug builds", BuildConfig.DEBUG)
+        val source = FakeTrikiDataSource()
+        val calibration = CalibrationProfile(sampleCount = 100, calibratedAtMillis = 1L)
+
+        GestureType.entries.forEach { expected ->
+            val filter = SensorFilter()
+            val engine = GestureEngine()
+            val detected = source.generate(expected, startNanos = PERIOD_NANOS)
+                .flatMap { sample ->
+                    val filtered = filter.process(sample, calibration, thresholds)
+                    engine.process(filtered, thresholds)
+                }
+                .map { it.type }
+
+            assertTrue("Expected $expected, detected $detected", expected in detected)
+        }
+    }
+
+    private class Fixture(private val thresholds: GestureThresholds) {
+        private val engine = GestureEngine()
+        private var timeNanos = 0L
+        val events = mutableListOf<GestureType>()
+        val samples = mutableListOf<FilteredSensorData>()
+
+        fun rest(
+            count: Int,
+            roll: Float = 0f,
+            accel: Vector3 = Vector3(0f, 0f, 1f),
+        ) {
+            repeat(count) { feed(roll = roll, accel = accel) }
+        }
+
+        fun shakeCycle() {
+            repeat(5) {
+                feed(
+                    gyro = Vector3(360f, 300f, 120f),
+                    accel = Vector3(0.5f, 0f, 1.2f),
+                )
+            }
+            repeat(5) {
+                feed(
+                    gyro = Vector3(-360f, -300f, -120f),
+                    accel = Vector3(-0.9f, 0f, 0.8f),
+                )
+            }
+        }
+
+        fun feed(
+            roll: Float = 0f,
+            gyro: Vector3 = Vector3(0f, 0f, 0f),
+            accel: Vector3 = Vector3(0f, 0f, 1f),
+        ) {
+            timeNanos += PERIOD_NANOS
+            val sample = filtered(timeNanos, roll, gyro, accel)
+            samples += sample
+            events += engine.process(sample, thresholds).map { it.type }
+        }
     }
 
     private companion object {
-        const val PERIOD = 10_000_000L
+        const val PERIOD_NANOS = 10_000_000L
+
+        fun filtered(
+            time: Long,
+            roll: Float,
+            gyro: Vector3,
+            accel: Vector3,
+        ): FilteredSensorData {
+            val source = TrikiSensorData(
+                frameIndex = time / PERIOD_NANOS,
+                timestampNanos = time,
+                gyroscopeDps = gyro,
+                accelerometerG = accel,
+                rawGyroscope = RawVector3(0, 0, 0),
+                rawAccelerometer = RawVector3(0, 0, 0),
+                status = 0,
+            )
+            return FilteredSensorData(source, gyro, accel, OrientationData(roll = roll))
+        }
     }
 }

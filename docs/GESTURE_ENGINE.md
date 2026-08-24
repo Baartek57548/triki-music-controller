@@ -9,19 +9,21 @@ Gesture engine otrzymuje dane już zdekodowane i skalibrowane. Nie zna Bluetooth
 1. Bias żyroskopu i akcelerometru jest odejmowany zgodnie z profilem kalibracji.
 2. Low-pass filter wygładza każdą oś: `filtered += alpha × (current − filtered)`.
 3. Filtr komplementarny łączy tilt z grawitacji z całkowaniem gyro. Korekcja accel działa tylko dla magnitude 0,72–1,28 g, aby dynamiczny ruch nie przechylał sztucznie orientacji.
-4. Detektory analizują orientation, magnitude i krótkie sekwencje próbek.
-5. Histereza i cooldown blokują wielokrotne wyzwolenie jednego ruchu.
+4. Silnik czeka na co najmniej 280 ms stabilnego spoczynku i zapamiętuje bieżący kąt jako lokalną bazę neutralną.
+5. Po wykryciu faktycznego ruchu zbierane jest jedno ograniczone okno `spoczynek → ruch → spoczynek`.
+6. Klasyfikator analizuje całe okno, zwraca najwyżej jeden gest, a potem ponownie wymaga stabilnego uzbrojenia.
+7. Cooldown pozostaje dodatkową ochroną między dwoma świadomymi gestami tego samego typu.
 
 ## Gesty
 
 | Gest | Warunek bazowy (preset Normal) | Stabilizacja |
 |---|---|---|
-| Tilt left/right | `abs(roll) ≥ 28°` | latch do powrotu poniżej 12° + cooldown |
-| Rotate left/right | `abs(gyro Z) ≥ 220°/s` | minimum 3 kolejne próbki + cooldown |
-| Throw up | minimum 2 próbki poniżej 0,38 g albo silny impuls Z | cooldown |
-| Flip | `accel Z < -0,72 g`, magnitude 0,65–1,4 g | minimum 8 próbek + cooldown |
-| Shake | gyro magnitude ≥ 285°/s i odchylenie accel magnitude ≥ 0,18 g | minimum 4 próbki, opóźniona emisja |
-| Double shake | drugi pulse shake w ciągu 480 ms | anuluje pending single-shake |
+| Tilt left/right | zmiana `roll` względem ostatniego spoczynku ≥ 28° | ≥ 40 ms ponad progiem i peak prędkości roll ≥ 28°/s |
+| Rotate left/right | peak `abs(gyro Z) ≥ 220°/s` | całka obrotu Z ≥ 22° w jednym oknie ruchu |
+| Throw up | free-fall poniżej 0,38 g przez ≥ 35 ms | wymagany późniejszy impact ≥ 2,4 g; sam impuls nie wystarcza |
+| Flip | `accel Z < -0,72 g`, magnitude 0,65–1,4 g | ≥ 80 ms do góry nogami, ruch gyro i stabilny koniec z ujemnym Z |
+| Shake | gyro magnitude ≥ 285°/s i odchylenie accel magnitude ≥ 0,16 g | wymagana rzeczywista zmiana kierunku wektora gyro |
+| Double shake | dwa pełne cykle zmiany kierunku w jednym oknie ruchu | zwraca tylko `DOUBLE_SHAKE` |
 
 Progi nie opisują „prawdy sprzętowej”; są jawną polityką UX i można je stroić. Wartości bazowe zaczynają od zakresów wykorzystanych w publicznych doświadczeniach TrikiScope, ale mechanizm aplikacji jest własną maszyną stanów i ma testy przeciw spamowi.
 
@@ -37,22 +39,30 @@ Progi nie opisują „prawdy sprzętowej”; są jawną polityką UX i można je
 
 Kreator zbiera trzy sekundy próbek. Wymagane jest co najmniej 50 ramek. Średni wektor przyspieszenia jest normalizowany do 1 g, dzięki czemu bias nie usuwa grawitacji. Średnia gyro staje się biasem osi. RMS magnitude określa poziom szumu.
 
+Do czasu zapisania poprawnej kalibracji `TrikiRuntime` aktualizuje monitor i diagnostykę, ale nie uruchamia żadnej akcji multimedialnej. Chroni to przed interpretacją fizycznego kąta leżącego urządzenia albo stałego biasu jako gestu.
+
 Kalibracja jest odrzucana, jeśli:
 
 - magnitude średniej grawitacji nie mieści się w 0,75–1,25 g;
 - RMS żyroskopu przekracza 25°/s;
 - dotarło mniej niż 50 próbek.
 
+## Nagrywanie Start/Stop
+
+Ekran **Naucz gest** rejestruje dokładny przedział wybrany przez użytkownika. Start dodaje krótki pre-roll z historii, Stop kończy okno i uruchamia ten sam klasyfikator co tryb live. Podczas nagrania wykonywanie akcji multimedialnych jest zawieszone, ale filtrowane próbki nadal trafiają na wykres i do analizatora.
+
+Nagranie jest ograniczone do 15 sekund i 2000 próbek. Wynik pokazuje wykryty gest, pewność, peak gyro oraz zakres magnitude akcelerometru. Akceptacja potwierdza jakość nagrania; nie obniża automatycznie progów bezpieczeństwa.
+
 ## Kompromisy
 
 - Mocniejsze smoothing ogranicza jitter, ale zwiększa opóźnienie.
 - Dłuższy cooldown eliminuje przypadkowe podwójne akcje, ale ogranicza tempo świadomych powtórzeń.
-- Rozróżnienie single/double shake wymaga opóźnienia pojedynczego shake do 480 ms. Bez tego ten sam ruch uruchamiałby dwie akcje.
+- Oczekiwanie na końcowy spoczynek dodaje około 280 ms opóźnienia, ale eliminuje akcje od statycznego kąta i ogranicza jeden ruch do jednego zdarzenia.
 - Yaw jest gyro-only, więc długoterminowo dryfuje. Gesty rotate bazują na chwilowej prędkości Z, a nie absolutnym yaw.
 - Throw bazujący na free-fall jest bezpieczniejszy niż integracja przyspieszenia do pozycji, która szybko akumuluje błąd bez dodatkowych sensorów.
 
 ## Testowanie
 
-`GestureEngineTest` podaje sztuczne `FilteredSensorData` z kontrolowanym czasem. Testy weryfikują latch/release tilt, sustained rotation, delayed single shake, double-shake bez duplikatu, free-fall/throw i cooldown. `SensorFilterAndCalibrationTest` pokrywa wygładzanie, bias oraz walidację stabilności.
+`GestureEngineTest` podaje sztuczne `FilteredSensorData` z kontrolowanym czasem. Testy obejmują 1000 próbek nieruchomego urządzenia pod kątem, 2000 zaszumionych próbek spoczynkowych, pojedynczy uszkodzony sample, stały błąd gyro, pełne cykle wszystkich gestów oraz analizę ręcznego nagrania. `SensorFilterAndCalibrationTest` pokrywa wygładzanie, bias oraz walidację stabilności.
 
 W buildzie debug `FakeTrikiDataSource` generuje pełne sekwencje IMU i przechodzi przez ten sam `TrikiRuntime`, `GestureEngine` i `ActionMapper` co fizyczny kontroler.
