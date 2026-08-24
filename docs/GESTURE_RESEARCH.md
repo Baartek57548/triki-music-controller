@@ -88,7 +88,7 @@ Domyślny profil jest zgodny z sygnałami, które mają najlepszą separację fi
 | jeden ruch daje wiele komend | jedna klasyfikacja na okno, cooldown, ponowne uzbrojenie | testy pełnych cykli i powtórzeń |
 | gest nauczony mimo złej fizyki | bramka accel + gyro po klasyfikacji k-NN | testy odrzucenia niezgodnej próbki |
 | pomylenie gestów | cechy niezmienne względem grawitacji i bramki osi energii | testy lean, slide, rotate, tap, flip i shake |
-| progi działają tylko na własnym generatorze | replay profili referencyjnych w skali przewodowej Triki i przy 52 Hz | `ReferenceMotionCompatibilityTest`: oba skręty, lean 14°, slide, impuls `−2600`, flip, cztery pozycje początkowe i uczenie wszystkich sześciu klas |
+| progi działają tylko na własnym generatorze | replay profili referencyjnych w skali przewodowej Triki | `ReferenceMotionCompatibilityTest`: sześć klas, pięć obrotów 3D, szum accel + gyro, 40/52/65 Hz, jitter timestampów i uczenie wszystkich klas |
 | licznik ramek udaje przycisk | tryb `UNKNOWN`, dowód powtarzalnego `0/1`, natychmiastowe wyłączenie dla `2..15` | `TrikiButtonInterpreterTest`: `0..15`, naprzemienne `0/1`, bounce, hold, luka strumienia i wieloklik |
 | błąd w mapowaniu lub wysłaniu komendy | wspólna ścieżka runtime dla sprzętu i Fake Triki | ręczny test debug: sześć gestów oraz kliknięcia `×1/×2/×3` dotarły do gateway; głośność realnie zmieniła się w emulatorze, a kliknięcia wysłały Play/Pause, Next i Previous |
 
