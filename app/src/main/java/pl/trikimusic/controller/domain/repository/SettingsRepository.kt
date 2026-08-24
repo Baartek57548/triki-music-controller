@@ -14,6 +14,7 @@ interface SettingsRepository {
     val settings: Flow<AppSettings>
 
     suspend fun completeOnboarding()
+    suspend fun completeGestureWizard()
     suspend fun rememberDevice(address: String, name: String)
     suspend fun forgetDevice()
     suspend fun setGestureMapping(profileId: String, gesture: GestureType, action: MediaAction)

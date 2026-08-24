@@ -51,6 +51,8 @@ Kalibracja jest odrzucana, jeśli:
 
 Ekran **Naucz gest** rejestruje dokładny przedział wybrany przez użytkownika. Start dodaje krótki pre-roll z historii, Stop kończy okno i uruchamia ten sam klasyfikator co tryb live. Podczas nagrania wykonywanie akcji multimedialnych jest zawieszone, ale filtrowane próbki nadal trafiają na wykres i do analizatora.
 
+Ten sam mechanizm zasila kreator pierwszej konfiguracji. Użytkownik otrzymuje instrukcję właściwą dla każdego z ośmiu gestów, może potwierdzić rozpoznanie, powtórzyć próbę, pominąć ją oraz przypisać inną akcję lub `Brak akcji`. Kreator nie zapisuje pojedynczego nagrania jako wzorca biometrycznego i nie zmienia deterministycznego klasyfikatora; dzięki temu pojedyncza nietypowa próba nie obniża bezpieczeństwa działania w tle.
+
 Nagranie jest ograniczone do 15 sekund i 2000 próbek. Wynik pokazuje wykryty gest, pewność, peak gyro oraz zakres magnitude akcelerometru. Akceptacja potwierdza jakość nagrania; nie obniża automatycznie progów bezpieczeństwa.
 
 ## Kompromisy

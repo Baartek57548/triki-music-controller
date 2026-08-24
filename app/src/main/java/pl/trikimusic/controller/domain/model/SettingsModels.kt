@@ -95,6 +95,7 @@ enum class ThemePreference(val displayName: String) {
 @Serializable
 data class AppSettings(
     val onboardingComplete: Boolean = false,
+    val gestureWizardCompleted: Boolean = false,
     val knownDeviceAddress: String? = null,
     val knownDeviceName: String? = null,
     val activeProfileId: String = DEFAULT_PROFILE_ID,

@@ -17,6 +17,7 @@ class SettingsPersistenceTest {
         )
         val original = AppSettings(
             onboardingComplete = true,
+            gestureWizardCompleted = true,
             knownDeviceAddress = "AA:BB:CC:DD:EE:FF",
             knownDeviceName = "Triki 42",
             activeProfileId = custom.id,
@@ -33,6 +34,7 @@ class SettingsPersistenceTest {
 
         assertEquals(original, restored)
         assertEquals(MediaAction.PLAY_PAUSE, restored.activeProfile.actionFor(GestureType.FLIP))
+        assertTrue(restored.gestureWizardCompleted)
         assertTrue(restored.calibration.isValid)
     }
 
@@ -44,5 +46,20 @@ class SettingsPersistenceTest {
         val restored = json.decodeFromString(AppSettings.serializer(), encoded)
 
         assertEquals(DEFAULT_PROFILE_ID, restored.activeProfileId)
+    }
+
+    @Test
+    fun `settings saved by an older version require the gesture wizard`() {
+        val encodedWithoutWizardFlag = """
+            {
+              "onboardingComplete": true,
+              "activeProfileId": "$DEFAULT_PROFILE_ID",
+              "profiles": ${json.encodeToString(defaultProfiles())}
+            }
+        """.trimIndent()
+
+        val restored = json.decodeFromString(AppSettings.serializer(), encodedWithoutWizardFlag)
+
+        assertEquals(false, restored.gestureWizardCompleted)
     }
 }

@@ -52,7 +52,9 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie k
 
 ### Runtime
 
-`TrikiRuntime` jest jedynym miejscem łączącym sensor z akcją. Utrzymuje bieżący snapshot ustawień, więc zmiana profilu lub czułości działa bez restartu połączenia. Zmiana kalibracji/progów resetuje stan filtrów, aby nie mieszać dwóch układów odniesienia. Bez ważnej kalibracji runtime publikuje dane diagnostyczne, ale blokuje akcje. Podczas nagrania treningowego akcje są czasowo zawieszone, a `SharedFlow<FilteredSensorData>` nadal zasila analizator i wykres.
+`TrikiRuntime` jest jedynym miejscem łączącym sensor z akcją. Utrzymuje bieżący snapshot ustawień, więc zmiana profilu lub czułości działa bez restartu połączenia. Zmiana kalibracji/progów resetuje stan filtrów, aby nie mieszać dwóch układów odniesienia. Bez ważnej kalibracji runtime publikuje dane diagnostyczne, ale blokuje akcje. Podczas nagrania treningowego lub kroku kreatora akcje są czasowo zawieszone, a `SharedFlow<FilteredSensorData>` nadal zasila analizator i wykres.
+
+Po pierwszej poprawnej kalibracji nawigacja otwiera `GestureWizardScreen`. `GestureWizardUiState` utrzymuje bieżący krok, akcje, zweryfikowane i pominięte próby oraz stan atomowego zapisu. Każde mapowanie trafia od razu do DataStore; osobna flaga ukończenia jest zapisywana dopiero na ekranie podsumowania, więc przerwanego kreatora nie uznaje się za zakończony. Brak flagi w danych z wcześniejszej wersji bezpiecznie oznacza, że kreator należy uruchomić.
 
 ### Presentation
 

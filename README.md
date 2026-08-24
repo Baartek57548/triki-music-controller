@@ -14,7 +14,8 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 - konfigurowalne mapowania oraz profile zapisywane w Preferences DataStore;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i Now Playing;
-- onboarding, ekran uprawnień, Gesture Trainer z nagrywaniem Start/Stop, Sensor Monitor i BLE Inspector;
+- onboarding, uruchamiany po kalibracji kreator wszystkich ośmiu gestów, Gesture Trainer z nagrywaniem Start/Stop, Sensor Monitor i BLE Inspector;
+- instrukcje wykonania każdego ruchu, bezpieczna próba rozpoznawania oraz wybór własnej akcji lub wyłączenie gestu;
 - rotujący bufor pakietów RAW z eksportem HEX/DEC oraz ograniczony bufor logów;
 - foreground service z akcją `Rozłącz` i automatycznym wygaszaniem, gdy nie ma aktywnego połączenia;
 - `FakeTrikiDataSource` dostępny wyłącznie w buildzie debug po włączeniu Developer Mode;
@@ -38,7 +39,8 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 5. Nadaj dostęp do urządzeń w pobliżu. Na Androidzie 8–11 system wymaga podczas skanowania BLE uprawnienia lokalizacji, mimo że aplikacja nie odczytuje GPS.
 6. Włącz dostęp listenera powiadomień. Android wiąże z nim prawo do wywołania `MediaSessionManager.getActiveSessions()`.
 7. Naciśnij przycisk Triki, wybierz **Device → Skanuj urządzenia**, a następnie **Połącz**.
-8. Po stanie **Gotowe** uruchom muzykę i wykonaj kalibrację.
+8. Po stanie **Gotowe** wykonaj kalibrację. Aplikacja automatycznie otworzy kreator, w którym przejdziesz przez wszystkie gesty, przetestujesz ich rozpoznawanie i wybierzesz akcje.
+9. Uruchom muzykę. Kreator można później powtórzyć z ekranu **Gestures → Kreator gestów**.
 
 Build z linii poleceń na Windows:
 
@@ -89,7 +91,7 @@ AndroidMediaControllerGateway
 - `data/repository` — atomowy zapis ustawień w DataStore;
 - `domain` — modele, kontrakty repozytoriów i use cases niezależne od UI;
 - `runtime` — jednokierunkowe spięcie strumienia IMU z mapowaniem akcji;
-- `ui` — Compose, nawigacja i pojedynczy ViewModel orkiestrujący interakcje;
+- `ui` — Compose, nawigacja, kreator gestów i pojedynczy ViewModel orkiestrujący interakcje;
 - `service` — foreground service i wymagany komponent Notification Listener.
 
 Szczegóły: [ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -135,7 +137,7 @@ Testy JVM obejmują:
 - smoothing, korekcję biasu i walidację kalibracji;
 - pełne cykle tilt, rotate, flip, throw i single/double shake, nagranie Start/Stop oraz regresje dla długiego spoczynku, szumu, uszkodzonej próbki i stałego błędu gyro;
 - mapowanie gest → akcja i brak wywołania dla `NONE`;
-- round-trip serializacji ustawień, profili, mapowań i kalibracji.
+- round-trip serializacji ustawień, profili, mapowań, kalibracji i stanu ukończenia kreatora, wraz z migracją danych ze starszej wersji.
 
 ## Znane ograniczenia
 

@@ -66,6 +66,25 @@ data class TrainerUiState(
     val message: String? = null,
 )
 
+data class GestureWizardUiState(
+    val active: Boolean = false,
+    val currentIndex: Int = 0,
+    val selectedAction: MediaAction = MediaAction.NONE,
+    val configuredActions: Map<GestureType, MediaAction> = emptyMap(),
+    val verifiedGestures: Set<GestureType> = emptySet(),
+    val skippedGestures: Set<GestureType> = emptySet(),
+    val saving: Boolean = false,
+    val summaryVisible: Boolean = false,
+    val finishing: Boolean = false,
+    val completionSaved: Boolean = false,
+) {
+    val currentGesture: GestureType
+        get() = GestureType.entries[currentIndex.coerceIn(0, GestureType.entries.lastIndex)]
+
+    val isLastGesture: Boolean
+        get() = currentIndex == GestureType.entries.lastIndex
+}
+
 data class MainUiState(
     val settings: AppSettings = AppSettings(),
     val ble: TrikiBleState = TrikiBleState(),
@@ -85,6 +104,7 @@ class MainViewModel(
     private val mutableUserMessage = MutableStateFlow<String?>(null)
     private val mutableCalibration = MutableStateFlow(CalibrationUiState())
     private val mutableTrainer = MutableStateFlow(TrainerUiState())
+    private val mutableGestureWizard = MutableStateFlow(GestureWizardUiState())
     private var calibrationJob: Job? = null
     private var trainerJob: Job? = null
     private val trainerSamples = mutableListOf<FilteredSensorData>()
@@ -95,6 +115,7 @@ class MainViewModel(
 
     val calibration: StateFlow<CalibrationUiState> = mutableCalibration
     val trainer: StateFlow<TrainerUiState> = mutableTrainer
+    val gestureWizard: StateFlow<GestureWizardUiState> = mutableGestureWizard
 
     private val coreState = combine(
         container.settings,
@@ -351,6 +372,125 @@ class MainViewModel(
                 "Wykryty ruch nie odpowiada wybranemu gestowi."
             },
         )
+    }
+
+    fun beginGestureWizard() {
+        if (mutableGestureWizard.value.active) return
+        cancelTrainerRecording(resetState = false)
+        val firstGesture = GestureType.entries.first()
+        val activeProfile = container.settings.value.activeProfile
+        mutableGestureWizard.value = GestureWizardUiState(
+            active = true,
+            selectedAction = activeProfile.actionFor(firstGesture),
+            configuredActions = GestureType.entries.associateWith(activeProfile::actionFor),
+        )
+        mutableTrainer.value = TrainerUiState(selectedGesture = firstGesture)
+    }
+
+    fun selectGestureWizardAction(action: MediaAction) {
+        mutableGestureWizard.update { current ->
+            if (current.active && !current.saving && !current.finishing) {
+                current.copy(selectedAction = action)
+            } else {
+                current
+            }
+        }
+    }
+
+    fun saveGestureWizardStep(verified: Boolean) {
+        val wizard = mutableGestureWizard.value
+        if (!wizard.active || wizard.saving || wizard.finishing || wizard.summaryVisible) return
+        val gesture = wizard.currentGesture
+        val action = wizard.selectedAction
+        mutableGestureWizard.value = wizard.copy(saving = true)
+        viewModelScope.launch {
+            runCatching {
+                container.settingsRepository.setGestureMapping(
+                    container.settings.value.activeProfileId,
+                    gesture,
+                    action,
+                )
+            }.onSuccess {
+                val completed = if (verified) {
+                    wizard.verifiedGestures + gesture
+                } else {
+                    wizard.verifiedGestures - gesture
+                }
+                val skipped = if (verified) {
+                    wizard.skippedGestures - gesture
+                } else {
+                    wizard.skippedGestures + gesture
+                }
+                val configuredActions = wizard.configuredActions + (gesture to action)
+                if (wizard.isLastGesture) {
+                    mutableGestureWizard.value = wizard.copy(
+                        configuredActions = configuredActions,
+                        verifiedGestures = completed,
+                        skippedGestures = skipped,
+                        saving = false,
+                        summaryVisible = true,
+                    )
+                } else {
+                    val nextIndex = wizard.currentIndex + 1
+                    val nextGesture = GestureType.entries[nextIndex]
+                    mutableGestureWizard.value = wizard.copy(
+                        currentIndex = nextIndex,
+                        selectedAction = configuredActions.getValue(nextGesture),
+                        configuredActions = configuredActions,
+                        verifiedGestures = completed,
+                        skippedGestures = skipped,
+                        saving = false,
+                    )
+                    selectTrainerGesture(nextGesture)
+                }
+            }.onFailure { error ->
+                mutableGestureWizard.update { it.copy(saving = false) }
+                showError(error)
+            }
+        }
+    }
+
+    fun previousGestureWizardStep() {
+        val wizard = mutableGestureWizard.value
+        if (!wizard.active || wizard.saving || wizard.finishing) return
+        if (wizard.summaryVisible) {
+            val gesture = GestureType.entries.last()
+            mutableGestureWizard.value = wizard.copy(
+                currentIndex = GestureType.entries.lastIndex,
+                selectedAction = wizard.configuredActions.getValue(gesture),
+                summaryVisible = false,
+            )
+            selectTrainerGesture(gesture)
+            return
+        }
+        if (wizard.currentIndex == 0) return
+        val previousIndex = wizard.currentIndex - 1
+        val gesture = GestureType.entries[previousIndex]
+        mutableGestureWizard.value = wizard.copy(
+            currentIndex = previousIndex,
+            selectedAction = wizard.configuredActions.getValue(gesture),
+        )
+        selectTrainerGesture(gesture)
+    }
+
+    fun finishGestureWizard() {
+        val wizard = mutableGestureWizard.value
+        if (!wizard.active || !wizard.summaryVisible || wizard.finishing) return
+        mutableGestureWizard.value = wizard.copy(finishing = true)
+        viewModelScope.launch {
+            runCatching { container.settingsRepository.completeGestureWizard() }
+                .onSuccess { mutableGestureWizard.update { it.copy(completionSaved = true) } }
+                .onFailure { error ->
+                    mutableGestureWizard.update { it.copy(finishing = false) }
+                    showError(error)
+                }
+        }
+    }
+
+    fun endGestureWizard() {
+        cancelTrainerRecording(resetState = false)
+        mutableTrainer.value = TrainerUiState()
+        mutableGestureWizard.value = GestureWizardUiState()
     }
 
     private fun finishTrainerRecording(autoStopped: Boolean) {

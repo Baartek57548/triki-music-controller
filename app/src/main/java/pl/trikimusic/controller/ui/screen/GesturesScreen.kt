@@ -64,6 +64,7 @@ fun GesturesScreen(
     contentPadding: PaddingValues,
     viewModel: MainViewModel,
     onOpenTrainer: () -> Unit,
+    onOpenWizard: () -> Unit,
 ) {
     var selectedGesture by remember { mutableStateOf<GestureType?>(null) }
     var showProfileMenu by remember { mutableStateOf(false) }
@@ -178,6 +179,14 @@ fun GesturesScreen(
                 onClick = { showAdvanced = true },
                 label = { Text("Advanced: konkretne progi") },
                 leadingIcon = { Icon(Icons.Default.Tune, null) },
+            )
+        }
+        item {
+            NavigationRow(
+                Icons.Default.Tune,
+                "Kreator gestów",
+                "Przejdź przez wszystkie gesty, sprawdź ruchy i ustaw własne akcje.",
+                onOpenWizard,
             )
         }
         item {

@@ -52,6 +52,8 @@ class DataStoreSettingsRepository(
 
     override suspend fun completeOnboarding() = update { copy(onboardingComplete = true) }
 
+    override suspend fun completeGestureWizard() = update { copy(gestureWizardCompleted = true) }
+
     override suspend fun rememberDevice(address: String, name: String) {
         require(address.isNotBlank())
         require(name.isNotBlank())
