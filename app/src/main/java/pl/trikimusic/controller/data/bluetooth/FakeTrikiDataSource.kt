@@ -14,7 +14,7 @@ class FakeTrikiDataSource {
                 Vector3(0f, -0.58f * index / 15f, 1f - 0.45f * index / 15f)
             }
             GestureType.SLIDE -> listOf(
-                Motion(18),
+                Motion(ARMING_REST_SAMPLES),
                 Motion(6, gyroscope = Vector3(12f, 5f, 0f), accelerometer = Vector3(0.28f, 0f, 1f)),
                 Motion(6, gyroscope = Vector3(-12f, -5f, 0f), accelerometer = Vector3(-0.28f, 0f, 1f)),
                 Motion(24),
@@ -22,14 +22,14 @@ class FakeTrikiDataSource {
             GestureType.ROTATE_LEFT -> pulse(gyroscope = Vector3(0f, 0f, -420f))
             GestureType.ROTATE_RIGHT -> pulse(gyroscope = Vector3(0f, 0f, 420f))
             GestureType.TAP -> listOf(
-                Motion(18),
+                Motion(ARMING_REST_SAMPLES),
                 Motion(1, accelerometer = Vector3(0f, 0f, 1.7f)),
                 Motion(24),
             )
             GestureType.SHAKE -> shakePulses(1)
             GestureType.DOUBLE_SHAKE -> shakePulses(2)
             GestureType.FLIP -> listOf(
-                Motion(18),
+                Motion(ARMING_REST_SAMPLES),
                 Motion(6, gyroscope = Vector3(250f, 0f, 0f), accelerometer = Vector3(0f, 0.2f, -0.98f)),
                 Motion(100, accelerometer = Vector3(0f, 0f, -1f)),
             )
@@ -52,18 +52,18 @@ class FakeTrikiDataSource {
     }
 
     private fun ramp(gyroscope: Vector3, accelerometer: (Int) -> Vector3): List<Motion> =
-        listOf(Motion(18)) +
+        listOf(Motion(ARMING_REST_SAMPLES)) +
             (0 until 16).map { Motion(1, gyroscope = gyroscope, accelerometer = accelerometer(it)) } +
             Motion(70)
 
     private fun pulse(gyroscope: Vector3): List<Motion> = listOf(
-        Motion(18),
+        Motion(ARMING_REST_SAMPLES),
         Motion(8, gyroscope = gyroscope, accelerometer = Vector3(0.12f, 0f, 1.08f)),
         Motion(24),
     )
 
     private fun shakePulses(count: Int): List<Motion> = buildList {
-        add(Motion(18))
+        add(Motion(ARMING_REST_SAMPLES))
         repeat(count) {
             add(Motion(8, Vector3(420f, 350f, 140f), Vector3(0.2f, 0f, 1.25f)))
             add(Motion(8, Vector3(-420f, -350f, -140f), Vector3(-0.2f, 0f, 0.75f)))
@@ -80,5 +80,6 @@ class FakeTrikiDataSource {
 
     private companion object {
         const val SAMPLE_PERIOD_NANOS = 19_230_769L
+        const val ARMING_REST_SAMPLES = 35
     }
 }

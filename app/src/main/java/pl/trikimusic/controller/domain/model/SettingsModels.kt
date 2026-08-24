@@ -13,17 +13,17 @@ enum class SensitivityLevel(val displayName: String) {
 
 @Serializable
 data class GestureThresholds(
-    val tiltDegrees: Float = 28f,
-    val tiltReleaseDegrees: Float = 12f,
-    val rotationDps: Float = 55f,
+    val tiltDegrees: Float = 12f,
+    val tiltReleaseDegrees: Float = 7f,
+    val rotationDps: Float = 42f,
     val shakeDps: Float = 260f,
-    val impactG: Float = 1.32f,
+    val impactG: Float = 1.24f,
     val freeFallG: Float = 0.38f,
-    val filterAlpha: Float = 0.28f,
+    val filterAlpha: Float = 0.32f,
     val cooldownMillis: Long = 650L,
 ) {
     init {
-        require(tiltDegrees in 10f..80f)
+        require(tiltDegrees in 6f..80f)
         require(tiltReleaseDegrees >= 2f && tiltReleaseDegrees < tiltDegrees)
         require(rotationDps in 20f..2_000f)
         require(shakeDps in 50f..2_000f)
@@ -36,29 +36,31 @@ data class GestureThresholds(
 
 fun SensitivityLevel.thresholds(custom: GestureThresholds): GestureThresholds = when (this) {
     SensitivityLevel.LOW -> GestureThresholds(
-        tiltDegrees = 38f,
-        rotationDps = 90f,
+        tiltDegrees = 22f,
+        tiltReleaseDegrees = 11f,
+        rotationDps = 70f,
         shakeDps = 360f,
-        impactG = 1.75f,
-        filterAlpha = 0.2f,
+        impactG = 1.45f,
+        filterAlpha = 0.24f,
         cooldownMillis = 850L,
     )
     SensitivityLevel.NORMAL -> GestureThresholds()
     SensitivityLevel.HIGH -> GestureThresholds(
-        tiltDegrees = 22f,
-        rotationDps = 42f,
+        tiltDegrees = 9f,
+        tiltReleaseDegrees = 5f,
+        rotationDps = 34f,
         shakeDps = 215f,
-        impactG = 1.22f,
+        impactG = 1.18f,
         freeFallG = 0.45f,
         filterAlpha = 0.36f,
         cooldownMillis = 520L,
     )
     SensitivityLevel.VERY_HIGH -> GestureThresholds(
-        tiltDegrees = 17f,
-        tiltReleaseDegrees = 8f,
-        rotationDps = 32f,
+        tiltDegrees = 7f,
+        tiltReleaseDegrees = 4f,
+        rotationDps = 26f,
         shakeDps = 170f,
-        impactG = 1.15f,
+        impactG = 1.12f,
         freeFallG = 0.5f,
         filterAlpha = 0.45f,
         cooldownMillis = 420L,

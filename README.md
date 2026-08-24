@@ -141,6 +141,7 @@ Testy JVM obejmują:
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
 - ekstrakcję cech accel + gyro, odporność cech grawitacyjnych na obrót kapsla, uczenie k-NN, odrzucanie obcych próbek i fizyczne bramki gestów;
 - pełne cykle lean, slide, rotate, flip, tap i single/double shake, nagranie Start/Stop oraz regresje dla długiego spoczynku, szumu, uszkodzonej próbki i stałego błędu gyro;
+- profile referencyjne TRIKI-Control w skali prawdziwej ramki: spoczynek na `−Z`, krótkie skręty, lean 14°, płaski slide, stamp i flip, w tym uczenie wszystkich sześciu podstawowych klas;
 - mapowanie gest → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, profili, mapowań, kalibracji i stanu ukończenia kreatora, wraz z migracją danych ze starszej wersji.
 

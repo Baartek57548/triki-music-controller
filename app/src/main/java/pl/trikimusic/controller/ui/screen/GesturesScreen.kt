@@ -378,7 +378,7 @@ private fun AdvancedThresholdsDialog(
         title = { Text("Zaawansowana czułość") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ThresholdSlider("Przechylenie", tilt, 12f..60f, "%.0f°") { tilt = it }
+                ThresholdSlider("Przechylenie", tilt, 7f..60f, "%.0f°") { tilt = it }
                 ThresholdSlider("Obrót", rotation, 20f..250f, "%.0f°/s") { rotation = it }
                 ThresholdSlider("Potrząśnięcie", shake, 100f..700f, "%.0f°/s") { shake = it }
                 ThresholdSlider("Stuknięcie / impuls", impact, 1.1f..3f, "%.2f g") { impact = it }

@@ -1,5 +1,8 @@
 package pl.trikimusic.controller.core.gesture
 
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -57,6 +60,36 @@ class SensorFilterAndCalibrationTest {
         assertEquals(0f, spike.accelerometerG.x, 0.0001f)
         assertEquals(0f, spike.accelerometerG.y, 0.0001f)
         assertEquals(1f, spike.accelerometerG.z, 0.0001f)
+    }
+
+    @Test
+    fun `complementary orientation crosses angle wrap without a false jump`() {
+        val filter = SensorFilter()
+        val thresholds = GestureThresholds(filterAlpha = 1f)
+        val positiveRadians = Math.toRadians(179.0)
+        val negativeRadians = Math.toRadians(-179.0)
+        var timestamp = 0L
+        var result = filter.process(
+            sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), cos(positiveRadians).toFloat())),
+            CalibrationProfile(),
+            thresholds,
+        )
+        repeat(180) {
+            timestamp += 19_230_769L
+            result = filter.process(
+                sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), cos(positiveRadians).toFloat())),
+                CalibrationProfile(),
+                thresholds,
+            )
+        }
+        timestamp += 19_230_769L
+        result = filter.process(
+            sample(timestamp, accel = Vector3(0f, sin(negativeRadians).toFloat(), cos(negativeRadians).toFloat())),
+            CalibrationProfile(),
+            thresholds,
+        )
+
+        assertTrue("Roll should stay near the ±180° boundary, got ${result.orientation.roll}", abs(abs(result.orientation.roll) - 180f) < 5f)
     }
 
     @Test

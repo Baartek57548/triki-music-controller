@@ -223,6 +223,32 @@ class GestureEngineTest {
     }
 
     @Test
+    fun `return after flip is consumed before the next gesture`() {
+        val fixture = Fixture(thresholds)
+        fixture.rest(35)
+        repeat(10) {
+            fixture.feed(
+                roll = 180f,
+                gyro = Vector3(250f, 0f, 0f),
+                accel = Vector3(0f, 0f, -1f),
+            )
+        }
+        fixture.rest(35, roll = 180f, accel = Vector3(0f, 0f, -1f))
+        repeat(10) {
+            fixture.feed(
+                roll = 0f,
+                gyro = Vector3(-250f, 0f, 0f),
+                accel = Vector3(0f, 0f, 1f),
+            )
+        }
+        fixture.rest(40)
+        repeat(7) { fixture.feed(gyro = Vector3(0f, 0f, -430f)) }
+        fixture.rest(35)
+
+        assertEquals(listOf(GestureType.FLIP, GestureType.ROTATE_LEFT), fixture.events)
+    }
+
+    @Test
     fun `manual recording analyzer finalizes motion at stop`() {
         val fixture = Fixture(thresholds)
         fixture.rest(35)

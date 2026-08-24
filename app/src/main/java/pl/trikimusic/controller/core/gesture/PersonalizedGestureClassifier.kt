@@ -45,13 +45,14 @@ class GestureFeatureExtractor {
         }
 
         val active = BooleanArray(ordered.size)
-        var previousAcceleration = ordered.first().accelerometerG
+        var previousAcceleration = ordered.first().source.accelerometerG
         ordered.forEachIndexed { index, sample ->
-            val accelerationStep = (sample.accelerometerG - previousAcceleration).magnitude
+            val rawAcceleration = sample.source.accelerometerG
+            val accelerationStep = (rawAcceleration - previousAcceleration).magnitude
             active[index] = sample.gyroscopeMagnitude >= ACTIVE_GYROSCOPE_DPS ||
-                abs(sample.accelerationMagnitude - 1f) >= ACTIVE_ACCELERATION_DELTA_G ||
+                abs(rawAcceleration.magnitude - 1f) >= ACTIVE_ACCELERATION_DELTA_G ||
                 accelerationStep >= ACTIVE_ACCELERATION_STEP_G
-            previousAcceleration = sample.accelerometerG
+            previousAcceleration = rawAcceleration
         }
         val firstActive = active.indexOfFirst { it }
         val lastActive = active.indexOfLast { it }
@@ -99,7 +100,11 @@ class GestureFeatureExtractor {
 
         segment.forEach { sample ->
             val gyroscopeMagnitude = sample.gyroscopeMagnitude
-            val accelerationMagnitude = sample.accelerationMagnitude
+            // The median stage intentionally rejects a one-frame spike. Dynamic features use
+            // calibrated RAW accel so a real stamp remains learnable; gravity/orientation
+            // features below still use the filtered vector to reject corrupt samples.
+            val dynamicAcceleration = sample.source.accelerometerG
+            val accelerationMagnitude = dynamicAcceleration.magnitude
             val accelerationDeviation = abs(accelerationMagnitude - 1f)
             peakGyroscope = max(peakGyroscope, gyroscopeMagnitude)
             gyroscopeSquareSum += gyroscopeMagnitude * gyroscopeMagnitude
@@ -112,12 +117,12 @@ class GestureFeatureExtractor {
             if (accelerationMagnitude < FREE_FALL_FEATURE_G) freeFallSamples++
 
             val accelerationStep = previousAccelerationForStep
-                ?.let { (sample.accelerometerG - it).magnitude }
+                ?.let { (dynamicAcceleration - it).magnitude }
                 ?: 0f
             peakAccelerationStep = max(peakAccelerationStep, accelerationStep)
-            previousAccelerationForStep = sample.accelerometerG
-            val verticalAcceleration = dot(sample.accelerometerG, initialGravity)
-            val horizontalAcceleration = (sample.accelerometerG - initialGravity * verticalAcceleration).magnitude
+            previousAccelerationForStep = dynamicAcceleration
+            val verticalAcceleration = dot(dynamicAcceleration, initialGravity)
+            val horizontalAcceleration = (dynamicAcceleration - initialGravity * verticalAcceleration).magnitude
             peakHorizontalAcceleration = max(peakHorizontalAcceleration, horizontalAcceleration)
 
             val dtSeconds = previousSample?.let { previous ->
@@ -208,7 +213,8 @@ class GestureFeatureExtractor {
         val durationAccepted = recordingDurationMillis >= MIN_TRAINING_DURATION_MILLIS
         val meaningfulMotion = peakGyroscope >= MIN_MEANINGFUL_GYROSCOPE_DPS ||
             peakAccelerationDeviation >= MIN_MEANINGFUL_ACCELERATION_DELTA_G ||
-            maximumGravityAngleDegrees >= MIN_MEANINGFUL_GRAVITY_ANGLE_DEGREES
+            maximumGravityAngleDegrees >= MIN_MEANINGFUL_GRAVITY_ANGLE_DEGREES ||
+            peakHorizontalAcceleration >= MIN_MEANINGFUL_HORIZONTAL_ACCELERATION_G
         val qualityScore = (
             (if (meaningfulMotion) 0.35f else 0f) +
                 (if (durationAccepted) 0.2f else 0f) +
@@ -318,6 +324,7 @@ class GestureFeatureExtractor {
         const val MIN_MEANINGFUL_GYROSCOPE_DPS = 30f
         const val MIN_MEANINGFUL_ACCELERATION_DELTA_G = 0.13f
         const val MIN_MEANINGFUL_GRAVITY_ANGLE_DEGREES = 10f
+        const val MIN_MEANINGFUL_HORIZONTAL_ACCELERATION_G = 0.1f
         const val RELIABLE_GRAVITY_MIN_G = 0.68f
         const val RELIABLE_GRAVITY_MAX_G = 1.32f
         const val FREE_FALL_FEATURE_G = 0.5f
@@ -420,7 +427,7 @@ class PersonalizedGestureClassifier {
         val peakHorizontalAccelerationG = values[FeatureIndex.PEAK_HORIZONTAL_ACCELERATION] * 1.5f
         val reversals = values[FeatureIndex.REVERSALS] * 4f
         return when (gesture) {
-            GestureType.LEAN -> maximumGravityAngleDegrees >= 16f && peakGyroscopeDps >= 20f
+            GestureType.LEAN -> maximumGravityAngleDegrees >= 8f && peakGyroscopeDps >= 12f
             GestureType.SLIDE ->
                 maximumGravityAngleDegrees <= 24f &&
                     peakHorizontalAccelerationG >= 0.11f &&
@@ -428,14 +435,14 @@ class PersonalizedGestureClassifier {
 
             GestureType.ROTATE_LEFT,
             GestureType.ROTATE_RIGHT,
-            -> abs(verticalRotationDegrees) >= 14f && peakGyroscopeDps >= 45f
+            -> abs(verticalRotationDegrees) >= 6f && peakGyroscopeDps >= 32f
 
             GestureType.SHAKE -> reversals >= 1f && peakGyroscopeDps >= 100f
             GestureType.DOUBLE_SHAKE -> reversals >= 2f && peakGyroscopeDps >= 120f
             GestureType.FLIP -> maximumGravityAngleDegrees >= 70f && peakGyroscopeDps >= 45f
             GestureType.TAP ->
-                (minimumAccelerationG <= 0.7f && maximumAccelerationG >= 1.25f) ||
-                    maximumAccelerationG >= 1.3f
+                (minimumAccelerationG <= 0.7f && maximumAccelerationG >= 1.12f) ||
+                    maximumAccelerationG >= 1.18f
         }
     }
 

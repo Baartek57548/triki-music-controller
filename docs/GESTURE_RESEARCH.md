@@ -82,6 +82,7 @@ Domyślny profil jest zgodny z sygnałami, które mają najlepszą separację fi
 | jeden ruch daje wiele komend | jedna klasyfikacja na okno, cooldown, ponowne uzbrojenie | testy pełnych cykli i powtórzeń |
 | gest nauczony mimo złej fizyki | bramka accel + gyro po klasyfikacji k-NN | testy odrzucenia niezgodnej próbki |
 | pomylenie gestów | cechy niezmienne względem grawitacji i bramki osi energii | testy lean, slide, rotate, tap, flip i shake |
+| progi działają tylko na własnym generatorze | replay profili referencyjnych w skali przewodowej Triki i przy 52 Hz | `ReferenceMotionCompatibilityTest`: oba skręty, lean 14°, slide, impuls `−2600`, flip, cztery pozycje początkowe i uczenie wszystkich sześciu klas |
 | błąd w mapowaniu lub wysłaniu komendy | wspólna ścieżka runtime dla sprzętu i Fake Triki | ręczny test debug: wszystkie sześć domyślnych mapowań dotarło do gateway; głośność realnie zmieniła się w emulatorze |
 
 Ostatni punkt nie zastępuje walidacji fizycznego egzemplarza. Test akceptacyjny na Xiaomi 13 i konkretnym Triki powinien obejmować:
@@ -92,4 +93,4 @@ Ostatni punkt nie zastępuje walidacji fizycznego egzemplarza. Test akceptacyjny
 4. W BLE Inspectorze częstotliwość zbliżona do 52 Hz, accel magnitude w spoczynku blisko 1 g oraz widoczna reakcja wszystkich trzech osi gyro podczas obrotu.
 5. Eksport RAW dla każdego nieudanego ruchu wraz z nazwą oczekiwanego gestu; dopiero takie dane uzasadniają korektę progów albo cech modelu.
 
-Bez przejścia tego testu nie należy deklarować, że skuteczność na fizycznym kapslu jest potwierdzona. Aktualne testy dowodzą poprawności protokołu, filtrów, klasyfikatora, mapowania i syntetycznej ścieżki end-to-end, lecz ostateczna walidacja sprzętowa pozostaje osobnym etapem.
+Bez przejścia tego testu nie należy deklarować, że skuteczność na fizycznym kapslu jest potwierdzona. Aktualne testy dowodzą poprawności protokołu, filtrów, klasyfikatora, profili referencyjnych w jednostkach sprzętu, mapowania i syntetycznej ścieżki end-to-end, lecz ostateczna walidacja sprzętowa pozostaje osobnym etapem.

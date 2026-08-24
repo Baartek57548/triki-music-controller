@@ -2,8 +2,8 @@ package pl.trikimusic.controller.domain.model
 
 import kotlinx.serialization.Serializable
 
-const val GESTURE_FEATURE_SCHEMA_VERSION = 3
-const val CURRENT_GESTURE_LEARNING_VERSION = 3
+const val GESTURE_FEATURE_SCHEMA_VERSION = 4
+const val CURRENT_GESTURE_LEARNING_VERSION = 4
 const val GESTURE_FEATURE_DIMENSION = 40
 const val MIN_PERSONALIZED_SAMPLES_PER_GESTURE = 2
 const val MAX_PERSONALIZED_SAMPLES_PER_GESTURE = 5

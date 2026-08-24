@@ -24,9 +24,10 @@ class GestureEngine {
     private var phase = Phase.WARMING_UP
     private var stableSinceNanos: Long? = null
     private var lastTimestampNanos: Long? = null
-    private var baselineRoll = 0f
-    private var previousRoll = 0f
     private var previousAccelerometer: Vector3? = null
+    private var armedGravityReference = Vector3(0f, 0f, 1f)
+    private var awaitingFlipReturn = false
+    private var flipReturnReference: Vector3? = null
     private val stableHistory = ArrayDeque<FilteredSensorData>(STABLE_HISTORY_SAMPLES)
     private var motionWindow: MotionWindow? = null
     internal var lastCapturedFeatures: GestureFeatureVector? = null
@@ -59,16 +60,17 @@ class GestureEngine {
         val dtSeconds = dtNanos / NANOS_PER_SECOND_F
         lastTimestampNanos = now
 
-        val rollDeltaSincePrevious = angularDelta(previousRoll, sample.orientation.roll)
-        val rollRateDps = abs(rollDeltaSincePrevious) / dtSeconds
         val accelerationDelta = previousAccelerometer
             ?.let { previous -> (sample.accelerometerG - previous).magnitude }
             ?: 0f
-        previousRoll = sample.orientation.roll
+        val gravityDirectionRateDps = previousAccelerometer
+            ?.let { previous -> gravityDirectionRate(previous, sample.accelerometerG, dtSeconds) }
+            ?: 0f
         previousAccelerometer = sample.accelerometerG
 
-        val stable = isStable(sample, rollRateDps, accelerationDelta)
-        val moving = isMoving(sample, rollRateDps, accelerationDelta)
+        val stable = isStable(sample, gravityDirectionRateDps, accelerationDelta)
+        val moving = isMoving(sample, gravityDirectionRateDps, accelerationDelta)
+        if (awaitingFlipReturn) return processFlipReturn(sample, now, stable)
 
         return when (phase) {
             Phase.WARMING_UP -> {
@@ -77,15 +79,13 @@ class GestureEngine {
             }
 
             Phase.READY -> {
-                if (moving) {
-                    motionWindow = MotionWindow(now, stableHistory.toList()).also {
+                if (moving || hasGravityRelativeMotion(sample)) {
+                    motionWindow = MotionWindow(now, stableHistory.toList(), armedGravityReference).also {
                         it.add(sample, dtNanos, thresholds)
                     }
                     stableSinceNanos = null
                     phase = Phase.RECORDING
                 } else if (stable) {
-                    // Following the resting angle makes the detector independent of how Triki lies on a table.
-                    baselineRoll = interpolateAngle(baselineRoll, sample.orientation.roll, BASELINE_TRACKING_ALPHA)
                     rememberStableSample(sample)
                 }
                 emptyList()
@@ -126,10 +126,9 @@ class GestureEngine {
             return
         }
         val stableSince = stableSinceNanos ?: now.also { stableSinceNanos = it }
-        baselineRoll = interpolateAngle(baselineRoll, sample.orientation.roll, BASELINE_TRACKING_ALPHA)
         rememberStableSample(sample)
         if (now - stableSince >= ARMING_STABLE_NANOS) {
-            baselineRoll = sample.orientation.roll
+            armedGravityReference = averageGravity(stableHistory.toList())
             stableSinceNanos = null
             phase = Phase.READY
         }
@@ -255,13 +254,20 @@ class GestureEngine {
         lastPersonalizedRecognition = personalized
         val recognition = resolveRecognition(deterministic, personalized, personalizedModel) ?: return null
 
-        return emit(
+        val event = emit(
             recognition.type,
             timestampNanos,
             recognition.confidence,
             recognition.magnitude,
             thresholds,
         )
+        if (recognition.type == GestureType.FLIP) {
+            // Flip is a state-changing STOP gesture. Consume the physical return to the
+            // original side instead of interpreting it as another flip or a 180° lean.
+            awaitingFlipReturn = true
+            flipReturnReference = armedGravityReference
+        }
+        return event
     }
 
     private fun resolveRecognition(
@@ -314,19 +320,44 @@ class GestureEngine {
     private fun resetAfterMotion(sample: FilteredSensorData, stable: Boolean) {
         motionWindow = null
         stableSinceNanos = if (stable) sample.source.timestampNanos else null
-        baselineRoll = sample.orientation.roll
         stableHistory.clear()
         if (stable) rememberStableSample(sample)
         phase = Phase.WARMING_UP
+    }
+
+    private fun processFlipReturn(
+        sample: FilteredSensorData,
+        now: Long,
+        stable: Boolean,
+    ): List<GestureEvent> {
+        val reference = flipReturnReference ?: armedGravityReference
+        val returned = vectorAngleDegrees(sample.accelerometerG, reference) <= FLIP_RETURN_ANGLE_DEGREES
+        if (stable && returned) {
+            rememberStableSample(sample)
+            val stableSince = stableSinceNanos ?: now.also { stableSinceNanos = it }
+            if (now - stableSince >= ARMING_STABLE_NANOS) {
+                armedGravityReference = averageGravity(stableHistory.toList())
+                awaitingFlipReturn = false
+                flipReturnReference = null
+                stableSinceNanos = null
+                motionWindow = null
+                phase = Phase.READY
+            }
+        } else {
+            stableSinceNanos = null
+            stableHistory.clear()
+        }
+        return emptyList()
     }
 
     private fun initializeStream(sample: FilteredSensorData) {
         phase = Phase.WARMING_UP
         stableSinceNanos = sample.source.timestampNanos
         lastTimestampNanos = sample.source.timestampNanos
-        baselineRoll = sample.orientation.roll
-        previousRoll = sample.orientation.roll
         previousAccelerometer = sample.accelerometerG
+        armedGravityReference = normalizedOrDefault(sample.accelerometerG)
+        awaitingFlipReturn = false
+        flipReturnReference = null
         stableHistory.clear()
         rememberStableSample(sample)
         motionWindow = null
@@ -336,9 +367,10 @@ class GestureEngine {
         phase = Phase.WARMING_UP
         stableSinceNanos = null
         lastTimestampNanos = null
-        baselineRoll = 0f
-        previousRoll = 0f
         previousAccelerometer = null
+        armedGravityReference = Vector3(0f, 0f, 1f)
+        awaitingFlipReturn = false
+        flipReturnReference = null
         stableHistory.clear()
         motionWindow = null
     }
@@ -349,42 +381,81 @@ class GestureEngine {
         stableHistory.addLast(sample)
     }
 
-    private fun isStable(sample: FilteredSensorData, rollRateDps: Float, accelerationDelta: Float): Boolean =
+    private fun isStable(sample: FilteredSensorData, gravityDirectionRateDps: Float, accelerationDelta: Float): Boolean =
         sample.gyroscopeMagnitude <= REST_GYROSCOPE_MAX_DPS &&
             abs(sample.accelerationMagnitude - 1f) <= REST_ACCELERATION_DELTA_G &&
             accelerationDelta <= REST_ACCELERATION_STEP_G &&
-            rollRateDps <= REST_ROLL_RATE_DPS
+            gravityDirectionRateDps <= REST_GRAVITY_DIRECTION_RATE_DPS
 
-    private fun isMoving(sample: FilteredSensorData, rollRateDps: Float, accelerationDelta: Float): Boolean =
+    private fun isMoving(sample: FilteredSensorData, gravityDirectionRateDps: Float, accelerationDelta: Float): Boolean =
         sample.gyroscopeMagnitude >= MOTION_START_GYROSCOPE_DPS ||
             abs(sample.accelerationMagnitude - 1f) >= MOTION_START_ACCELERATION_DELTA_G ||
             abs(sample.source.accelerometerG.magnitude - 1f) >= MOTION_START_RAW_ACCELERATION_DELTA_G ||
             accelerationDelta >= MOTION_START_ACCELERATION_STEP_G ||
-            rollRateDps >= MOTION_START_ROLL_RATE_DPS
+            gravityDirectionRateDps >= MOTION_START_GRAVITY_DIRECTION_RATE_DPS
 
-    private fun angularDelta(from: Float, to: Float): Float {
-        var delta = to - from
-        while (delta > 180f) delta -= 360f
-        while (delta < -180f) delta += 360f
-        return delta
+    private fun hasGravityRelativeMotion(sample: FilteredSensorData): Boolean {
+        val filteredGravityAngle = vectorAngleDegrees(sample.accelerometerG, armedGravityReference)
+        val rawAcceleration = sample.source.accelerometerG
+        val rawProjection = dot(rawAcceleration, armedGravityReference)
+        val projectedGravity = Vector3(
+            armedGravityReference.x * rawProjection,
+            armedGravityReference.y * rawProjection,
+            armedGravityReference.z * rawProjection,
+        )
+        val horizontalAcceleration = (rawAcceleration - projectedGravity).magnitude
+        return filteredGravityAngle >= MOTION_START_GRAVITY_ANGLE_DEGREES ||
+            horizontalAcceleration >= MOTION_START_HORIZONTAL_ACCELERATION_G
     }
 
-    private fun interpolateAngle(from: Float, to: Float, alpha: Float): Float =
-        normalizeDegrees(from + angularDelta(from, to) * alpha)
+    private fun gravityDirectionRate(previous: Vector3, current: Vector3, dtSeconds: Float): Float =
+        vectorAngleDegrees(previous, current) / dtSeconds.coerceAtLeast(0.001f)
 
-    private fun normalizeDegrees(value: Float): Float {
-        var normalized = value
-        while (normalized > 180f) normalized -= 360f
-        while (normalized < -180f) normalized += 360f
-        return normalized
+    private fun vectorAngleDegrees(first: Vector3, second: Vector3): Float {
+        val firstMagnitude = first.magnitude
+        val secondMagnitude = second.magnitude
+        if (
+            firstMagnitude !in RELIABLE_GRAVITY_MIN_G..RELIABLE_GRAVITY_MAX_G ||
+            secondMagnitude !in RELIABLE_GRAVITY_MIN_G..RELIABLE_GRAVITY_MAX_G
+        ) {
+            return 0f
+        }
+        val cosine = (dot(first, second) / (firstMagnitude * secondMagnitude)).coerceIn(-1f, 1f)
+        return Math.toDegrees(acos(cosine).toDouble()).toFloat()
     }
+
+    private fun averageGravity(samples: List<FilteredSensorData>): Vector3 {
+        val reliable = samples.mapNotNull { sample ->
+            sample.accelerometerG.takeIf { it.magnitude in RELIABLE_GRAVITY_MIN_G..RELIABLE_GRAVITY_MAX_G }
+        }
+        if (reliable.isEmpty()) return armedGravityReference
+        val average = Vector3(
+            reliable.sumOf { it.x.toDouble() }.toFloat() / reliable.size,
+            reliable.sumOf { it.y.toDouble() }.toFloat() / reliable.size,
+            reliable.sumOf { it.z.toDouble() }.toFloat() / reliable.size,
+        )
+        return normalizedOrDefault(average)
+    }
+
+    private fun normalizedOrDefault(vector: Vector3): Vector3 {
+        val magnitude = vector.magnitude
+        return if (magnitude > 0.1f) {
+            Vector3(vector.x / magnitude, vector.y / magnitude, vector.z / magnitude)
+        } else {
+            Vector3(0f, 0f, 1f)
+        }
+    }
+
+    private fun dot(first: Vector3, second: Vector3): Float =
+        first.x * second.x + first.y * second.y + first.z * second.z
 
     private inner class MotionWindow(
         val startedAtNanos: Long,
         baselineSamples: List<FilteredSensorData>,
+        gravityReferenceSnapshot: Vector3,
     ) {
         val capturedSamples = ArrayList<FilteredSensorData>(256)
-        private val gravityReference = averageGravity(baselineSamples)
+        private val gravityReference = normalizedOrDefault(gravityReferenceSnapshot)
         var peakGravityAngleDegrees = 0f
             private set
         var longestLeanThresholdNanos = 0L
@@ -575,22 +646,6 @@ class GestureEngine {
             return Math.toDegrees(acos(normalizedDot).toDouble()).toFloat()
         }
 
-        private fun averageGravity(samples: List<FilteredSensorData>): Vector3 {
-            if (samples.isEmpty()) return Vector3(0f, 0f, 1f)
-            val selected = samples.takeLast(STABLE_HISTORY_SAMPLES)
-            val average = Vector3(
-                selected.sumOf { it.accelerometerG.x.toDouble() }.toFloat() / selected.size,
-                selected.sumOf { it.accelerometerG.y.toDouble() }.toFloat() / selected.size,
-                selected.sumOf { it.accelerometerG.z.toDouble() }.toFloat() / selected.size,
-            )
-            val magnitude = average.magnitude
-            return if (magnitude > 0.1f) {
-                Vector3(average.x / magnitude, average.y / magnitude, average.z / magnitude)
-            } else {
-                Vector3(0f, 0f, 1f)
-            }
-        }
-
         private fun updateShake(sample: FilteredSensorData, dtNanos: Long, thresholds: GestureThresholds) {
             val accelerationDelta = abs(sample.accelerationMagnitude - 1f)
             val active = sample.gyroscopeMagnitude >= thresholds.shakeDps &&
@@ -646,24 +701,24 @@ class GestureEngine {
         const val MOTION_END_STABLE_NANOS = 280_000_000L
         const val SINGLE_SHAKE_END_STABLE_NANOS = 480_000_000L
         const val MAX_MOTION_WINDOW_NANOS = 4_000_000_000L
-        const val BASELINE_TRACKING_ALPHA = 0.08f
-
         const val REST_GYROSCOPE_MAX_DPS = 22f
         const val REST_ACCELERATION_DELTA_G = 0.11f
         const val REST_ACCELERATION_STEP_G = 0.045f
-        const val REST_ROLL_RATE_DPS = 16f
-        const val MOTION_START_GYROSCOPE_DPS = 34f
+        const val REST_GRAVITY_DIRECTION_RATE_DPS = 16f
+        const val MOTION_START_GYROSCOPE_DPS = 28f
         const val MOTION_START_ACCELERATION_DELTA_G = 0.15f
         const val MOTION_START_RAW_ACCELERATION_DELTA_G = 0.2f
         const val MOTION_START_ACCELERATION_STEP_G = 0.075f
-        const val MOTION_START_ROLL_RATE_DPS = 28f
+        const val MOTION_START_GRAVITY_DIRECTION_RATE_DPS = 28f
+        const val MOTION_START_GRAVITY_ANGLE_DEGREES = 4f
+        const val MOTION_START_HORIZONTAL_ACCELERATION_G = 0.1f
 
         const val MIN_LEAN_GYROSCOPE_DPS = 28f
         const val MIN_LEAN_HOLD_NANOS = 40_000_000L
         const val MIN_RECORDED_MOTION_NANOS = 80_000_000L
         const val STRONG_LEAN_DEGREES = 55f
-        const val MIN_ROTATION_DEGREES = 16f
-        const val LIVE_ROTATION_DEGREES = 12f
+        const val MIN_ROTATION_DEGREES = 7f
+        const val LIVE_ROTATION_DEGREES = 7f
         const val STRONG_ROTATION_DEGREES = 70f
         const val MIN_TWIST_DOMINANCE = 0.48f
         const val MIN_ROTATION_RELEASE_DPS = 18f
@@ -675,6 +730,7 @@ class GestureEngine {
         const val FLIP_FINAL_Z_THRESHOLD = -0.55f
         const val FLIP_GRAVITY_MIN_G = 0.65f
         const val FLIP_GRAVITY_MAX_G = 1.4f
+        const val FLIP_RETURN_ANGLE_DEGREES = 20f
         const val MIN_TAP_VERTICAL_DELTA_G = 0.18f
         const val MAX_TAP_GYROSCOPE_DPS = 95f
         const val MAX_TAP_TILT_DEGREES = 20f

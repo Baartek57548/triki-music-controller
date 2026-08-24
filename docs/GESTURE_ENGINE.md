@@ -7,23 +7,23 @@ Gesture engine otrzymuje dane już zdekodowane i skalibrowane. Nie zna Bluetooth
 ## Pipeline
 
 1. Bias żyroskopu i akcelerometru jest odejmowany zgodnie z profilem kalibracji.
-2. Mediana z trzech kolejnych wartości każdej osi odrzuca pojedynczy skok pakietu, zanim zostanie rozciągnięty przez wygładzanie.
+2. Mediana z trzech kolejnych wartości każdej osi odrzuca pojedynczy skok pakietu, zanim zostanie rozciągnięty przez wygładzanie. Surowy, skalibrowany accel pozostaje równoległym wejściem tylko dla krótkiego impulsu, rozpoczęcia ruchu i jego cech dynamicznych, dzięki czemu prawdziwe pojedyncze stuknięcie nie znika z treningu.
 3. Składowe gyro mniejsze od `max(2,5°/s, 2,8 × szum kalibracji)` są zerowane jako drgania spoczynkowe.
 4. Low-pass filter wygładza każdą oś: `filtered += alpha × (current − filtered)`.
 5. Filtr komplementarny łączy tilt z grawitacji z całkowaniem gyro. Korekcja accel działa tylko dla magnitude 0,72–1,28 g, aby dynamiczny ruch nie przechylał sztucznie orientacji.
-6. Silnik czeka na co najmniej 280 ms stabilnego spoczynku i zapamiętuje 12 ostatnich próbek jako lokalny wektor grawitacji oraz bazę neutralną.
+6. Silnik czeka na co najmniej 280 ms stabilnego spoczynku i zamraża lokalny wektor grawitacji z 12 ostatnich próbek. Segmentacja używa zmiany kierunku całego wektora grawitacji, a nie jednej osi roll, więc działa także dla spoczynku na `−Z` i na boku.
 7. Po wykryciu faktycznego ruchu zbierane jest jedno ograniczone okno `spoczynek → ruch → spoczynek`.
 8. Reguły fizyczne i lokalny model k-NN analizują całe okno. Wynik musi przejść limit odległości, margines między klasami oraz bramkę właściwą dla danego typu ruchu.
-9. Silnik zwraca najwyżej jeden gest, ponownie wymaga stabilnego uzbrojenia, a cooldown chroni przed szybkim powtórzeniem.
+9. Silnik zwraca najwyżej jeden gest, ponownie wymaga stabilnego uzbrojenia, a cooldown chroni przed szybkim powtórzeniem. Po `Flip` ruch powrotny do poprzedniej strony jest konsumowany bez akcji; następne sterowanie działa dopiero po stabilnym powrocie.
 
 ## Gesty
 
 | Gest | Warunek bazowy (preset Normal) | Stabilizacja |
 |---|---|---|
-| Lean | kąt między początkową i bieżącą grawitacją ≥ 28° | ≥ 40 ms ponad progiem i peak żyroskopu ≥ 28°/s |
+| Lean | kąt między początkową i bieżącą grawitacją ≥ 12° | ≥ 40 ms ponad progiem i peak żyroskopu ≥ 28°/s |
 | Slide | pozioma składowa accel ≥ 0,14 g | mała zmiana grawitacji, gyro ≤ 80°/s i mały impuls pionowy |
-| Rotate left/right | rzut gyro na lokalny wektor grawitacji ≥ 55°/s | całka rzutu ≥ 16° i dominacja osi obrotu ≥ 48% |
-| Tap | surowy impuls accel ≥ 1,32 g wzdłuż grawitacji | gyro ≤ 95°/s; alternatywnie free-fall ≥ 35 ms zakończony uderzeniem |
+| Rotate left/right | rzut gyro na lokalny wektor grawitacji ≥ 42°/s | całka rzutu ≥ 7° i dominacja osi obrotu ≥ 48% |
+| Tap | surowy impuls accel ≥ 1,24 g wzdłuż grawitacji | gyro ≤ 95°/s; alternatywnie free-fall ≥ 35 ms zakończony uderzeniem |
 | Flip | projekcja accel na początkową grawitację < −0,72 | ≥ 80 ms do góry nogami, ruch gyro i stabilny odwrócony koniec |
 | Shake | gyro magnitude ≥ 260°/s i odchylenie accel magnitude ≥ 0,16 g | wymagana rzeczywista zmiana kierunku wektora gyro |
 | Double shake | dwa pełne cykle zmiany kierunku w jednym oknie ruchu | zwraca tylko `DOUBLE_SHAKE` |
@@ -71,6 +71,8 @@ Nagranie jest ograniczone do 15 sekund i 2000 próbek. Wynik pokazuje wykryty ge
 
 ## Testowanie
 
-`GestureEngineTest` podaje sztuczne `FilteredSensorData` z kontrolowanym czasem. Testy obejmują 1000 próbek nieruchomego urządzenia pod kątem, 2000 zaszumionych próbek spoczynkowych, pojedynczy uszkodzony sample, stały błąd gyro, płaskie przesunięcie, pełne cykle wszystkich gestów, obrót i flip z pozycji bocznej oraz analizę ręcznego nagrania. `SensorFilterAndCalibrationTest` pokrywa medianę, wygładzanie, bias oraz walidację stabilności. `PersonalizedGestureClassifierTest` weryfikuje wymiar cech, użycie obu sensorów, niezmienność po obrocie kapsla, uczenie k-NN i fizyczne odrzucanie niezgodnej próbki.
+`GestureEngineTest` podaje sztuczne `FilteredSensorData` z kontrolowanym czasem. Testy obejmują 1000 próbek nieruchomego urządzenia pod kątem, 2000 zaszumionych próbek spoczynkowych, pojedynczy uszkodzony sample, stały błąd gyro, płaskie przesunięcie, pełne cykle wszystkich gestów, obrót i flip z pozycji bocznej oraz analizę ręcznego nagrania. `SensorFilterAndCalibrationTest` pokrywa medianę, wygładzanie, bias, walidację stabilności i przejście orientacji przez granicę ±180°. `PersonalizedGestureClassifierTest` weryfikuje wymiar cech, użycie obu sensorów, niezmienność po obrocie kapsla, uczenie k-NN i fizyczne odrzucanie niezgodnej próbki.
+
+`ReferenceMotionCompatibilityTest` zaczyna od potwierdzonego spoczynku `(24, 0, −2051)`, skali `0,070°/s/LSB`, `2048 LSB/g` i okresu 19,23 ms. Odtwarza profile ruchu z publicznych testów TRIKI-Control przez produkcyjny `SensorFilter` i `GestureEngine`: oba kierunki krótkiego skrętu, łagodne przechylenie 14°, płaski ślizg, impuls `−2600` oraz odwrócenie. Sprawdza też ciszę zaszumionego `−Z`, niezmienność skrętu w czterech pozycjach kapsla oraz możliwość nauczenia modelu wszystkich sześciu podstawowych gestów.
 
 W buildzie debug `FakeTrikiDataSource` generuje pełne sekwencje IMU i przechodzi przez ten sam `TrikiRuntime`, `GestureEngine` i `ActionMapper` co fizyczny kontroler.

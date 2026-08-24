@@ -97,18 +97,22 @@ class SensorFilter {
         dt: Float,
     ): OrientationData {
         val accelNorm = maxOf(accelerometer.magnitude, 0.0001f)
-        val accelPitch = Math.toDegrees(
+        val accelPitch = normalizeDegrees(Math.toDegrees(
             atan2(
                 -accelerometer.x.toDouble(),
                 sqrt((accelerometer.y * accelerometer.y + accelerometer.z * accelerometer.z).toDouble()),
             ),
-        ).toFloat() - calibration.neutralPitch
-        val accelRoll = Math.toDegrees(atan2(accelerometer.y.toDouble(), accelerometer.z.toDouble())).toFloat() - calibration.neutralRoll
+        ).toFloat() - calibration.neutralPitch)
+        val accelRoll = normalizeDegrees(
+            Math.toDegrees(atan2(accelerometer.y.toDouble(), accelerometer.z.toDouble())).toFloat() - calibration.neutralRoll,
+        )
         val accelReliable = accelNorm in RELIABLE_ACCEL_MIN..RELIABLE_ACCEL_MAX
-        val gyroPitch = previous.pitch + gyroscope.y * dt
-        val gyroRoll = previous.roll - gyroscope.x * dt
-        val pitch = if (accelReliable) COMPLEMENTARY_ALPHA * gyroPitch + (1f - COMPLEMENTARY_ALPHA) * accelPitch else gyroPitch
-        val roll = if (accelReliable) COMPLEMENTARY_ALPHA * gyroRoll + (1f - COMPLEMENTARY_ALPHA) * accelRoll else gyroRoll
+        val gyroPitch = normalizeDegrees(previous.pitch + gyroscope.y * dt)
+        val gyroRoll = normalizeDegrees(previous.roll - gyroscope.x * dt)
+        // Angles wrap at ±180°. A linear average would turn 179° and -179° into 0°,
+        // causing a stationary, face-down Triki to look like a violent movement.
+        val pitch = if (accelReliable) complementaryAngle(gyroPitch, accelPitch) else gyroPitch
+        val roll = if (accelReliable) complementaryAngle(gyroRoll, accelRoll) else gyroRoll
         val yaw = normalizeDegrees(previous.yaw - gyroscope.z * dt)
         return OrientationData(
             pitch = normalizeDegrees(pitch),
@@ -123,6 +127,13 @@ class SensorFilter {
         while (normalized < -180f) normalized += 360f
         return normalized
     }
+
+    private fun complementaryAngle(gyroscopeAngle: Float, accelerometerAngle: Float): Float {
+        val correction = shortestAngularDelta(gyroscopeAngle, accelerometerAngle)
+        return normalizeDegrees(gyroscopeAngle + (1f - COMPLEMENTARY_ALPHA) * correction)
+    }
+
+    private fun shortestAngularDelta(from: Float, to: Float): Float = normalizeDegrees(to - from)
 
     private companion object {
         const val COMPLEMENTARY_ALPHA = 0.96f
