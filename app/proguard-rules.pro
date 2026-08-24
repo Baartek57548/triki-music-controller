@@ -1,0 +1,3 @@
+-keepattributes *Annotation*
+-keepclassmembers class **$$serializer { *; }
+-keep,includedescriptorclasses class pl.trikimusic.controller.domain.model.**$$serializer { *; }

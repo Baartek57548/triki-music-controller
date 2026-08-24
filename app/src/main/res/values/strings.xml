@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Triki Music</string>
+    <string name="notification_channel_name">Połączenie Triki</string>
+    <string name="notification_channel_description">Aktywne sterowanie muzyką kontrolerem Triki</string>
+    <string name="notification_connected">Triki połączone</string>
+    <string name="notification_reconnecting">Ponowne łączenie z Triki…</string>
+    <string name="notification_disconnect">Rozłącz</string>
+</resources>
