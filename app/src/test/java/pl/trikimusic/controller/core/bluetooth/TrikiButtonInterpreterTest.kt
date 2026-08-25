@@ -83,6 +83,20 @@ class TrikiButtonInterpreterTest {
     }
 
     @Test
+    fun `consumed hold cannot become a single click after release`() {
+        val fixture = Fixture().apply { identifyButtonFirmware() }
+
+        fixture.feed(1, frames = 30)
+        assertTrue(fixture.interpreter.isPressed)
+        assertTrue(fixture.interpreter.consumeCurrentHold())
+        fixture.feed(0, frames = 3)
+        fixture.feed(0, frames = 25)
+
+        assertTrue(fixture.events.isEmpty())
+        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
+    }
+
+    @Test
     fun `unexpected status cancels a pending click and selects counter mode`() {
         val fixture = Fixture().apply { identifyButtonFirmware() }
 

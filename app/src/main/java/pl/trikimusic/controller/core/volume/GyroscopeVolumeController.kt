@@ -9,6 +9,8 @@ data class VolumeControlResult(
     val action: MediaAction? = null,
     val sensorValid: Boolean,
     val withinTiltRange: Boolean,
+    val tiltStable: Boolean,
+    val stabilizationProgress: Float,
     val active: Boolean,
     val tiltDegrees: Float,
     val gyroscopeZDps: Float,
@@ -17,35 +19,44 @@ data class VolumeControlResult(
 /**
  * Turns rotation around the local Z axis into discrete Android volume steps.
  *
- * The controller is active immediately while the cap remains top-side up within 0–25 degrees
- * from level. There is deliberately no stationary, acceleration-magnitude or off-axis gate, so
- * the user can control volume while holding the cap in the air. Leaving the permitted tilt range
- * clears accumulated rotation before another volume step can be produced.
+ * The controller becomes active after the cap remains top-side up within 0–25 degrees for two
+ * continuous seconds. This stabilization concerns only tilt: there is deliberately no stationary,
+ * acceleration-magnitude or off-axis gate, so the user can hold and move the cap in the air.
  */
 class GyroscopeVolumeController(
     private val configuration: Configuration = Configuration(),
 ) {
     data class Configuration(
         val maximumTiltDegrees: Float = 25f,
+        val tiltStabilizationMillis: Long = 2_000L,
         val activationGyroscopeDps: Float = 18f,
         val releaseGyroscopeDps: Float = 10f,
         val degreesPerVolumeStep: Float = 15f,
+        val gyroscopeSmoothingAlpha: Float = 0.22f,
+        val minimumStepIntervalMillis: Long = 100L,
     ) {
         init {
             require(maximumTiltDegrees.isFinite() && maximumTiltDegrees in 0f..90f)
+            require(tiltStabilizationMillis in 0L..10_000L)
             require(activationGyroscopeDps.isFinite() && activationGyroscopeDps > 0f)
             require(releaseGyroscopeDps.isFinite() && releaseGyroscopeDps in 0f..activationGyroscopeDps)
             require(degreesPerVolumeStep.isFinite() && degreesPerVolumeStep > 0f)
+            require(gyroscopeSmoothingAlpha.isFinite() && gyroscopeSmoothingAlpha in 0.01f..1f)
+            require(minimumStepIntervalMillis in 0L..1_000L)
         }
     }
 
     private var previousTimestampNanos: Long? = null
+    private var tiltRangeSinceNanos: Long? = null
     private var accumulatedRotationDegrees = 0f
     private var activeDirection = 0
+    private var smoothedGyroscopeZ: Float? = null
+    private var lastVolumeStepNanos: Long? = null
+    private var tiltStable = false
 
     fun reset() {
         previousTimestampNanos = null
-        resetRotation()
+        resetStabilization()
     }
 
     fun process(sample: FilteredSensorData): VolumeControlResult {
@@ -55,7 +66,7 @@ class GyroscopeVolumeController(
             previousTimestamp != null &&
             (timestampNanos <= previousTimestamp || timestampNanos - previousTimestamp > MAX_STREAM_GAP_NANOS)
         ) {
-            resetRotation()
+            resetStabilization()
             previousTimestampNanos = null
         }
 
@@ -74,27 +85,51 @@ class GyroscopeVolumeController(
         val deltaSeconds = calculateDeltaSeconds(timestampNanos)
 
         if (!withinTiltRange) {
-            resetRotation()
+            resetStabilization()
             return result(
                 sensorValid = sensorValid,
                 withinTiltRange = false,
+                stabilizationProgress = 0f,
                 tiltDegrees = tiltDegrees,
                 gyroscopeZ = gyroscopeZ,
             )
         }
 
-        val absoluteGyroscopeZ = abs(gyroscopeZ)
-        if (absoluteGyroscopeZ <= configuration.releaseGyroscopeDps) {
-            resetRotation()
+        val stabilizationStart = tiltRangeSinceNanos ?: timestampNanos.also { tiltRangeSinceNanos = it }
+        val requiredStabilizationNanos = configuration.tiltStabilizationMillis * NANOS_PER_MILLISECOND
+        val stabilizationElapsedNanos = (timestampNanos - stabilizationStart).coerceAtLeast(0L)
+        val stabilizationProgress = if (requiredStabilizationNanos == 0L) {
+            1f
+        } else {
+            (stabilizationElapsedNanos.toDouble() / requiredStabilizationNanos).toFloat().coerceIn(0f, 1f)
+        }
+        val wasTiltStable = tiltStable
+        tiltStable = stabilizationElapsedNanos >= requiredStabilizationNanos
+        val filteredGyroscopeZ = smoothGyroscopeZ(gyroscopeZ)
+        if (!tiltStable || !wasTiltStable) {
+            resetRotation(preserveSmoothing = true)
             return result(
                 sensorValid = true,
                 withinTiltRange = true,
+                stabilizationProgress = stabilizationProgress,
                 tiltDegrees = tiltDegrees,
-                gyroscopeZ = gyroscopeZ,
+                gyroscopeZ = filteredGyroscopeZ,
             )
         }
 
-        val direction = if (gyroscopeZ > 0f) 1 else -1
+        val absoluteGyroscopeZ = abs(filteredGyroscopeZ)
+        if (absoluteGyroscopeZ <= configuration.releaseGyroscopeDps) {
+            resetRotation(preserveSmoothing = true)
+            return result(
+                sensorValid = true,
+                withinTiltRange = true,
+                stabilizationProgress = 1f,
+                tiltDegrees = tiltDegrees,
+                gyroscopeZ = filteredGyroscopeZ,
+            )
+        }
+
+        val direction = if (filteredGyroscopeZ > 0f) 1 else -1
         if (activeDirection != 0 && activeDirection != direction) {
             accumulatedRotationDegrees = 0f
         }
@@ -102,20 +137,28 @@ class GyroscopeVolumeController(
             return result(
                 sensorValid = true,
                 withinTiltRange = true,
+                stabilizationProgress = 1f,
                 tiltDegrees = tiltDegrees,
-                gyroscopeZ = gyroscopeZ,
+                gyroscopeZ = filteredGyroscopeZ,
             )
         }
 
         activeDirection = direction
-        accumulatedRotationDegrees += gyroscopeZ * deltaSeconds
+        accumulatedRotationDegrees = (accumulatedRotationDegrees + filteredGyroscopeZ * deltaSeconds).coerceIn(
+            -configuration.degreesPerVolumeStep * MAX_PENDING_VOLUME_STEPS,
+            configuration.degreesPerVolumeStep * MAX_PENDING_VOLUME_STEPS,
+        )
+        val minimumStepIntervalNanos = configuration.minimumStepIntervalMillis * NANOS_PER_MILLISECOND
+        val mayEmitStep = lastVolumeStepNanos?.let { timestampNanos - it >= minimumStepIntervalNanos } ?: true
         val action = when {
-            accumulatedRotationDegrees >= configuration.degreesPerVolumeStep -> {
+            mayEmitStep && accumulatedRotationDegrees >= configuration.degreesPerVolumeStep -> {
                 accumulatedRotationDegrees -= configuration.degreesPerVolumeStep
+                lastVolumeStepNanos = timestampNanos
                 MediaAction.VOLUME_UP
             }
-            accumulatedRotationDegrees <= -configuration.degreesPerVolumeStep -> {
+            mayEmitStep && accumulatedRotationDegrees <= -configuration.degreesPerVolumeStep -> {
                 accumulatedRotationDegrees += configuration.degreesPerVolumeStep
+                lastVolumeStepNanos = timestampNanos
                 MediaAction.VOLUME_DOWN
             }
             else -> null
@@ -124,8 +167,9 @@ class GyroscopeVolumeController(
             action = action,
             sensorValid = true,
             withinTiltRange = true,
+            stabilizationProgress = 1f,
             tiltDegrees = tiltDegrees,
-            gyroscopeZ = gyroscopeZ,
+            gyroscopeZ = filteredGyroscopeZ,
         )
     }
 
@@ -133,13 +177,16 @@ class GyroscopeVolumeController(
         action: MediaAction? = null,
         sensorValid: Boolean,
         withinTiltRange: Boolean,
+        stabilizationProgress: Float,
         tiltDegrees: Float,
         gyroscopeZ: Float,
     ) = VolumeControlResult(
         action = action,
         sensorValid = sensorValid,
         withinTiltRange = withinTiltRange,
-        active = sensorValid && withinTiltRange,
+        tiltStable = tiltStable,
+        stabilizationProgress = stabilizationProgress,
+        active = sensorValid && withinTiltRange && tiltStable,
         tiltDegrees = tiltDegrees.takeIf(Float::isFinite) ?: 180f,
         gyroscopeZDps = gyroscopeZ.takeIf(Float::isFinite) ?: 0f,
     )
@@ -160,16 +207,35 @@ class GyroscopeVolumeController(
         return (timestampNanos - previous).coerceAtMost(MAX_SAMPLE_INTERVAL_NANOS) / NANOS_PER_SECOND
     }
 
-    private fun resetRotation() {
+    private fun smoothGyroscopeZ(value: Float): Float {
+        val previous = smoothedGyroscopeZ
+        val smoothed = if (previous == null) value else {
+            previous + configuration.gyroscopeSmoothingAlpha * (value - previous)
+        }
+        smoothedGyroscopeZ = smoothed
+        return smoothed
+    }
+
+    private fun resetRotation(preserveSmoothing: Boolean = false) {
         accumulatedRotationDegrees = 0f
         activeDirection = 0
+        lastVolumeStepNanos = null
+        if (!preserveSmoothing) smoothedGyroscopeZ = null
+    }
+
+    private fun resetStabilization() {
+        tiltRangeSinceNanos = null
+        tiltStable = false
+        resetRotation()
     }
 
     private companion object {
+        const val NANOS_PER_MILLISECOND = 1_000_000L
         const val NANOS_PER_SECOND = 1_000_000_000f
         const val MAX_SAMPLE_INTERVAL_NANOS = 100_000_000L
         const val MAX_STREAM_GAP_NANOS = 250_000_000L
         const val MIN_VECTOR_MAGNITUDE = 0.001f
         const val TILT_COMPARISON_EPSILON_DEGREES = 0.001f
+        const val MAX_PENDING_VOLUME_STEPS = 2f
     }
 }

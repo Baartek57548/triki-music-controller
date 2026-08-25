@@ -16,60 +16,84 @@ import pl.trikimusic.controller.domain.model.Vector3
 
 class GyroscopeVolumeControllerTest {
     @Test
-    fun `controller is active immediately inside zero to twenty five degree range`() {
-        val controller = controller()
+    fun `default controller requires two continuous seconds inside tilt range`() {
+        val controller = GyroscopeVolumeController()
+        val outputs = List(41) { index ->
+            sample(index * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 0f), gravityAtTilt(25f))
+        }.map(controller::process)
 
-        val output = controller.process(sample(0L, Vector3(0f, 0f, 0f), gravityAtTilt(25f)))
-
-        assertTrue(output.sensorValid)
-        assertTrue(output.withinTiltRange)
-        assertTrue(output.active)
+        assertTrue(outputs.take(40).none { it.active })
+        assertEquals(0.975f, outputs[39].stabilizationProgress, 0.001f)
+        assertTrue(outputs.last().tiltStable)
+        assertTrue(outputs.last().active)
+        assertEquals(1f, outputs.last().stabilizationProgress, 0f)
     }
 
     @Test
-    fun `positive Z rotation raises volume without stationary arming`() {
-        val controller = controller()
+    fun `angle stabilization does not require stillness`() {
+        val controller = GyroscopeVolumeController()
+        val outputs = List(41) { index ->
+            sample(
+                index * SAMPLE_PERIOD_NANOS,
+                Vector3(500f, -400f, 80f),
+                FACE_UP_GRAVITY,
+            )
+        }.map(controller::process)
 
-        val actions = rotationSamples(5, 100f, FACE_UP_GRAVITY)
-            .mapNotNull { controller.process(it).action }
-
-        assertEquals(listOf(MediaAction.VOLUME_UP, MediaAction.VOLUME_UP), actions)
+        assertTrue(outputs.last().active)
+        assertTrue(outputs.last().withinTiltRange)
     }
 
     @Test
-    fun `negative Z rotation lowers volume without stationary arming`() {
-        val controller = controller()
+    fun `positive and negative Z rotation change volume after stabilization`() {
+        val positive = controller()
+        val negative = controller()
+        val positiveStart = stabilize(positive, FACE_UP_GRAVITY)
+        val negativeStart = stabilize(negative, FACE_UP_GRAVITY)
 
-        val actions = rotationSamples(5, -100f, FACE_UP_GRAVITY)
-            .mapNotNull { controller.process(it).action }
+        val positiveActions = rotationSamples(4, 100f, FACE_UP_GRAVITY, positiveStart)
+            .mapNotNull { positive.process(it).action }
+        val negativeActions = rotationSamples(4, -100f, FACE_UP_GRAVITY, negativeStart)
+            .mapNotNull { negative.process(it).action }
 
-        assertEquals(listOf(MediaAction.VOLUME_DOWN, MediaAction.VOLUME_DOWN), actions)
+        assertEquals(listOf(MediaAction.VOLUME_UP, MediaAction.VOLUME_UP), positiveActions)
+        assertEquals(listOf(MediaAction.VOLUME_DOWN, MediaAction.VOLUME_DOWN), negativeActions)
     }
 
     @Test
     fun `acceleration magnitude does not gate control when tilt is in range`() {
-        val lowMagnitudeController = controller()
-        val highMagnitudeController = controller()
+        val low = controller()
+        val high = controller()
+        val lowGravity = Vector3(0f, 0f, -0.4f)
+        val highGravity = Vector3(0f, 0f, -1.8f)
+        val lowStart = stabilize(low, lowGravity)
+        val highStart = stabilize(high, highGravity)
 
-        val lowActions = rotationSamples(5, 100f, Vector3(0f, 0f, -0.4f))
-            .mapNotNull { lowMagnitudeController.process(it).action }
-        val highActions = rotationSamples(5, -100f, Vector3(0f, 0f, -1.8f))
-            .mapNotNull { highMagnitudeController.process(it).action }
+        val lowActions = rotationSamples(4, 100f, lowGravity, lowStart).mapNotNull { low.process(it).action }
+        val highActions = rotationSamples(4, -100f, highGravity, highStart).mapNotNull { high.process(it).action }
 
         assertTrue(lowActions.isNotEmpty())
         assertTrue(highActions.isNotEmpty())
     }
 
     @Test
-    fun `tilt above twenty five degrees blocks volume`() {
+    fun `tilt above twenty five degrees blocks and resets stabilization`() {
         val controller = controller()
+        stabilize(controller, FACE_UP_GRAVITY)
 
-        val outputs = rotationSamples(6, 200f, gravityAtTilt(25.1f)).map(controller::process)
+        val blocked = controller.process(
+            sample(200_000_000L, Vector3(0f, 0f, 100f), gravityAtTilt(25.1f)),
+        )
+        val returned = controller.process(
+            sample(250_000_000L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY),
+        )
 
-        assertTrue(outputs.all { it.sensorValid })
-        assertTrue(outputs.none { it.withinTiltRange })
-        assertTrue(outputs.none { it.active })
-        assertTrue(outputs.none { it.action != null })
+        assertFalse(blocked.withinTiltRange)
+        assertFalse(blocked.active)
+        assertEquals(0f, blocked.stabilizationProgress, 0f)
+        assertTrue(returned.withinTiltRange)
+        assertFalse(returned.active)
+        assertEquals(0f, returned.stabilizationProgress, 0f)
     }
 
     @Test
@@ -77,55 +101,47 @@ class GyroscopeVolumeControllerTest {
         val verticalController = controller()
         val upsideDownController = controller()
 
-        val vertical = rotationSamples(6, 200f, Vector3(1f, 0f, 0f)).map(verticalController::process)
-        val upsideDown = rotationSamples(6, -200f, FACE_DOWN_GRAVITY).map(upsideDownController::process)
+        val vertical = rotationSamples(8, 200f, Vector3(1f, 0f, 0f)).map(verticalController::process)
+        val upsideDown = rotationSamples(8, -200f, FACE_DOWN_GRAVITY).map(upsideDownController::process)
 
         assertTrue(vertical.none { it.withinTiltRange || it.action != null })
         assertTrue(upsideDown.none { it.withinTiltRange || it.action != null })
     }
 
     @Test
-    fun `off axis movement does not block Z control inside tilt range`() {
-        val controller = controller()
-        val outputs = List(5) { index ->
-            sample(
-                index * SAMPLE_PERIOD_NANOS,
-                Vector3(500f, -400f, 100f),
-                FACE_UP_GRAVITY,
-            )
-        }.map(controller::process)
+    fun `gyroscope smoothing softens abrupt Z change`() {
+        val controller = GyroscopeVolumeController(
+            GyroscopeVolumeController.Configuration(
+                tiltStabilizationMillis = 100L,
+                gyroscopeSmoothingAlpha = 0.2f,
+                minimumStepIntervalMillis = 100L,
+            ),
+        )
+        val start = stabilize(controller, FACE_UP_GRAVITY)
 
-        assertTrue(outputs.all { it.active })
-        assertEquals(listOf(MediaAction.VOLUME_UP, MediaAction.VOLUME_UP), outputs.mapNotNull { it.action })
+        val output = controller.process(sample(start, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
+
+        assertTrue(output.gyroscopeZDps in 19.9f..20.1f)
+        assertNull(output.action)
     }
 
     @Test
-    fun `leaving tilt range clears accumulated rotation`() {
+    fun `step rate is limited during very fast rotation`() {
         val controller = controller()
-        controller.process(sample(0L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
-        controller.process(sample(SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
+        val start = stabilize(controller, FACE_UP_GRAVITY)
+        val outputs = rotationSamples(12, 600f, FACE_UP_GRAVITY, start).map(controller::process)
+        val actionIndexes = outputs.mapIndexedNotNull { index, output -> index.takeIf { output.action != null } }
 
-        val blocked = controller.process(
-            sample(2 * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 100f), gravityAtTilt(25.1f)),
-        )
-        val firstAfterReturn = controller.process(
-            sample(3 * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY),
-        )
-        val secondAfterReturn = controller.process(
-            sample(4 * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY),
-        )
-
-        assertFalse(blocked.active)
-        assertNull(blocked.action)
-        assertNull(firstAfterReturn.action)
-        assertEquals(MediaAction.VOLUME_UP, secondAfterReturn.action)
+        assertTrue(actionIndexes.size >= 3)
+        assertTrue(actionIndexes.zipWithNext().all { (first, second) -> second - first >= 2 })
     }
 
     @Test
     fun `gyro noise and direction reversal do not create accidental step`() {
         val controller = controller()
+        val start = stabilize(controller, FACE_UP_GRAVITY)
         val jitter = listOf(12f, -12f, 17f, -17f, 9f).mapIndexed { index, z ->
-            sample(index * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, z), FACE_UP_GRAVITY)
+            sample(start + index * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, z), FACE_UP_GRAVITY)
         }
 
         val outputs = jitter.map(controller::process)
@@ -135,19 +151,18 @@ class GyroscopeVolumeControllerTest {
     }
 
     @Test
-    fun `stream gap clears partial rotation without requiring stationary rearming`() {
+    fun `stream gap requires angle stabilization again`() {
         val controller = controller()
-        controller.process(sample(0L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
-        controller.process(sample(SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
+        stabilize(controller, FACE_UP_GRAVITY)
 
         val afterGap = controller.process(sample(2_000_000_000L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
-        val next = controller.process(sample(2_050_000_000L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
-        val action = controller.process(sample(2_100_000_000L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
+        val halfway = controller.process(sample(2_050_000_000L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
+        val stableAgain = controller.process(sample(2_100_000_000L, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
 
-        assertTrue(afterGap.active)
-        assertNull(afterGap.action)
-        assertNull(next.action)
-        assertEquals(MediaAction.VOLUME_UP, action.action)
+        assertFalse(afterGap.active)
+        assertFalse(halfway.active)
+        assertTrue(stableAgain.active)
+        assertTrue(stableAgain.action == null)
     }
 
     @Test
@@ -167,11 +182,22 @@ class GyroscopeVolumeControllerTest {
 
     private fun controller() = GyroscopeVolumeController(
         GyroscopeVolumeController.Configuration(
+            tiltStabilizationMillis = 100L,
             activationGyroscopeDps = 18f,
             releaseGyroscopeDps = 10f,
             degreesPerVolumeStep = 10f,
+            gyroscopeSmoothingAlpha = 1f,
+            minimumStepIntervalMillis = 100L,
         ),
     )
+
+    private fun stabilize(controller: GyroscopeVolumeController, acceleration: Vector3): Long {
+        controller.process(sample(0L, Vector3(0f, 0f, 0f), acceleration))
+        controller.process(sample(SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 0f), acceleration))
+        val stable = controller.process(sample(2 * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 0f), acceleration))
+        assertTrue(stable.active)
+        return 3 * SAMPLE_PERIOD_NANOS
+    }
 
     private fun rotationSamples(
         count: Int,

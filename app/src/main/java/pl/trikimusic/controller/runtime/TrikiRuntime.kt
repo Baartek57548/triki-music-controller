@@ -15,7 +15,11 @@ import pl.trikimusic.controller.core.bluetooth.TrikiButtonInterpreter
 import pl.trikimusic.controller.core.bluetooth.TrikiButtonProtocolMode
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.core.sensor.SensorFilter
+import pl.trikimusic.controller.core.gesture.HoldGesturePhase
+import pl.trikimusic.controller.core.gesture.HoldVerticalGestureDetector
+import pl.trikimusic.controller.core.gesture.RatingGestureAction
 import pl.trikimusic.controller.core.volume.GyroscopeVolumeController
+import pl.trikimusic.controller.data.media.RatingFeedbackPlayer
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.ButtonClickEvent
 import pl.trikimusic.controller.domain.model.FilteredSensorData
@@ -31,12 +35,18 @@ data class RuntimeState(
     val history: List<FilteredSensorData> = emptyList(),
     val lastButtonClick: ButtonClickEvent? = null,
     val lastVolumeChangeTimestampNanos: Long? = null,
+    val lastRatingGestureTimestampNanos: Long? = null,
     val lastAction: MediaAction? = null,
     val lastActionError: String? = null,
     val volumeSensorValid: Boolean = false,
     val volumeWithinTiltRange: Boolean = false,
+    val volumeTiltStable: Boolean = false,
+    val volumeStabilizationProgress: Float = 0f,
     val volumeTiltDegrees: Float = 180f,
     val volumeGyroscopeZDps: Float = 0f,
+    val ratingGesturePhase: HoldGesturePhase = HoldGesturePhase.IDLE,
+    val ratingGestureHoldProgress: Float = 0f,
+    val ratingGestureDisplacementCentimeters: Float = 0f,
     val buttonProtocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
 )
 
@@ -45,10 +55,12 @@ class TrikiRuntime(
     private val bleManager: TrikiBleManager,
     settingsRepository: SettingsRepository,
     private val actionMapper: ActionMapper,
+    private val ratingFeedbackPlayer: RatingFeedbackPlayer,
     private val logger: AppLogger,
 ) {
     private val sensorFilter = SensorFilter()
     private val volumeController = GyroscopeVolumeController()
+    private val ratingGestureDetector = HoldVerticalGestureDetector()
     private val buttonInterpreter = TrikiButtonInterpreter()
     private val mutableState = MutableStateFlow(RuntimeState())
     private val mutableButtonEvents = MutableSharedFlow<ButtonClickEvent>(
@@ -96,6 +108,7 @@ class TrikiRuntime(
     fun resetProcessing() {
         sensorFilter.reset()
         volumeController.reset()
+        ratingGestureDetector.reset()
         buttonInterpreter.reset()
         reportedButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN
         mutableState.update {
@@ -104,8 +117,13 @@ class TrikiRuntime(
                 latestSample = null,
                 volumeSensorValid = false,
                 volumeWithinTiltRange = false,
+                volumeTiltStable = false,
+                volumeStabilizationProgress = 0f,
                 volumeTiltDegrees = 180f,
                 volumeGyroscopeZDps = 0f,
+                ratingGesturePhase = HoldGesturePhase.IDLE,
+                ratingGestureHoldProgress = 0f,
+                ratingGestureDisplacementCentimeters = 0f,
                 buttonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
             )
         }
@@ -114,6 +132,7 @@ class TrikiRuntime(
     private fun consume(sample: TrikiSensorData) {
         val filtered = sensorFilter.process(sample, settings.calibration)
         val buttonEvent = buttonInterpreter.process(sample)
+        val ratingGestureResult = ratingGestureDetector.process(filtered, buttonInterpreter.isPressed)
         val buttonMode = buttonInterpreter.protocolMode
         if (buttonMode != reportedButtonProtocolMode) {
             reportedButtonProtocolMode = buttonMode
@@ -127,11 +146,38 @@ class TrikiRuntime(
                 latestSample = filtered,
                 history = (current.history + filtered).takeLast(MAX_HISTORY_SAMPLES),
                 buttonProtocolMode = buttonMode,
+                ratingGesturePhase = ratingGestureResult.phase,
+                ratingGestureHoldProgress = ratingGestureResult.holdProgress,
+                ratingGestureDisplacementCentimeters = ratingGestureResult.estimatedDisplacementMeters * 100f,
             )
         }
+        ratingGestureResult.action?.let { gestureAction ->
+            buttonInterpreter.consumeCurrentHold()
+            volumeController.reset()
+            val mediaAction = when (gestureAction) {
+                RatingGestureAction.LIKE -> MediaAction.LIKE
+                RatingGestureAction.DISLIKE -> MediaAction.DISLIKE
+            }
+            val execution = actionMapper.execute(mediaAction)
+            val succeeded = execution.result.isSuccess
+            ratingFeedbackPlayer.play(gestureAction, succeeded)
+            logger.log(
+                LogCategory.CONTROL,
+                "HOLD_${gestureAction.name}: ${execution.action.name}",
+                execution.result.exceptionOrNull(),
+            )
+            mutableState.update {
+                it.copy(
+                    lastRatingGestureTimestampNanos = filtered.source.timestampNanos,
+                    lastAction = execution.action,
+                    lastActionError = execution.result.exceptionOrNull()?.message,
+                )
+            }
+            return
+        }
         if (buttonEvent != null || buttonInterpreter.shouldSuppressMotionControl) {
-            // A physical press also moves the IMU. The complete click sequence owns the input
-            // window; tilt-based volume control becomes active again on the next eligible sample.
+            // A physical press also moves the IMU. The complete click/hold sequence owns the input
+            // window; angle stabilization restarts after the interaction has fully ended.
             volumeController.reset()
         }
         if (buttonEvent != null) {
@@ -156,6 +202,8 @@ class TrikiRuntime(
                 it.copy(
                     volumeSensorValid = false,
                     volumeWithinTiltRange = false,
+                    volumeTiltStable = false,
+                    volumeStabilizationProgress = 0f,
                     volumeTiltDegrees = 180f,
                     volumeGyroscopeZDps = filtered.gyroscopeDps.z,
                 )
@@ -168,6 +216,8 @@ class TrikiRuntime(
             it.copy(
                 volumeSensorValid = volumeResult.sensorValid,
                 volumeWithinTiltRange = volumeResult.withinTiltRange,
+                volumeTiltStable = volumeResult.tiltStable,
+                volumeStabilizationProgress = volumeResult.stabilizationProgress,
                 volumeTiltDegrees = volumeResult.tiltDegrees,
                 volumeGyroscopeZDps = volumeResult.gyroscopeZDps,
             )

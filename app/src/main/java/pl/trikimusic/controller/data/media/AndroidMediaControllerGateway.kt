@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.graphics.Bitmap
 import android.media.MediaMetadata
+import android.media.Rating
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
@@ -76,6 +77,12 @@ class AndroidMediaControllerGateway(
             logger.log(LogCategory.MEDIA, "Wykonano akcję ${action.name} przez AudioManager.")
             return@runCatching
         }
+        if (action in RATING_ACTIONS) {
+            executeRatingAction(action)
+            publishState()
+            logger.log(LogCategory.MEDIA, "Wysłano ocenę ${action.name} do aktywnej sesji.")
+            return@runCatching
+        }
         val controller = activeController
         if (controller != null) {
             val controls = controller.transportControls
@@ -87,6 +94,9 @@ class AndroidMediaControllerGateway(
                 MediaAction.PREVIOUS -> controls.skipToPrevious()
                 MediaAction.STOP -> controls.stop()
                 MediaAction.NONE -> Unit
+                MediaAction.LIKE,
+                MediaAction.DISLIKE,
+                -> executeRatingAction(action)
                 MediaAction.VOLUME_UP,
                 MediaAction.VOLUME_DOWN,
                 MediaAction.MUTE,
@@ -135,6 +145,8 @@ class AndroidMediaControllerGateway(
                 artworkUri = resolveArtworkUri(metadata),
                 packageName = packageName,
                 appName = appName,
+                canLike = supportsRatingAction(controller, MediaAction.LIKE),
+                canDislike = supportsRatingAction(controller, MediaAction.DISLIKE),
             ),
         )
     }
@@ -156,6 +168,61 @@ class AndroidMediaControllerGateway(
         audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
     }
 
+    @Suppress("DEPRECATION")
+    private fun executeRatingAction(action: MediaAction) {
+        require(action in RATING_ACTIONS) { "Akcja $action nie jest oceną utworu." }
+        val controller = activeController
+            ?: throw UnsupportedOperationException("Brak aktywnej sesji multimedialnej obsługującej ocenę utworu.")
+        val customAction = findCustomRatingAction(controller, action)
+        if (customAction != null) {
+            controller.transportControls.sendCustomAction(customAction, customAction.extras)
+            return
+        }
+
+        val playbackState = controller.playbackState
+        val supportsSetRating = playbackState != null &&
+            playbackState.actions and PlaybackState.ACTION_SET_RATING != 0L
+        if (supportsSetRating) {
+            val rating = when (controller.ratingType) {
+                Rating.RATING_THUMB_UP_DOWN -> Rating.newThumbRating(action == MediaAction.LIKE)
+                Rating.RATING_HEART -> if (action == MediaAction.LIKE) Rating.newHeartRating(true) else null
+                else -> null
+            }
+            if (rating != null) {
+                controller.transportControls.setRating(rating)
+                return
+            }
+        }
+        throw UnsupportedOperationException(
+            "${mutableState.value.appName ?: controller.packageName} nie udostępnia akcji ${action.displayName.lowercase()}.",
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun supportsRatingAction(controller: MediaController, action: MediaAction): Boolean {
+        if (findCustomRatingAction(controller, action) != null) return true
+        val playbackState = controller.playbackState ?: return false
+        if (playbackState.actions and PlaybackState.ACTION_SET_RATING == 0L) return false
+        return when (controller.ratingType) {
+            Rating.RATING_THUMB_UP_DOWN -> true
+            Rating.RATING_HEART -> action == MediaAction.LIKE
+            else -> false
+        }
+    }
+
+    private fun findCustomRatingAction(
+        controller: MediaController,
+        action: MediaAction,
+    ): PlaybackState.CustomAction? = controller.playbackState
+        ?.customActions
+        .orEmpty()
+        .map { customAction ->
+            customAction to RatingActionMatcher.score(customAction.action, customAction.name, action)
+        }
+        .filter { (_, score) -> score > 0 }
+        .maxByOrNull { (_, score) -> score }
+        ?.first
+
     /**
      * Public Android fallback for phones that block Notification Listener access
      * for sideloaded applications. It controls the current media-key consumer,
@@ -170,6 +237,9 @@ class AndroidMediaControllerGateway(
             MediaAction.PREVIOUS -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
             MediaAction.STOP -> KeyEvent.KEYCODE_MEDIA_STOP
             MediaAction.NONE -> return
+            MediaAction.LIKE,
+            MediaAction.DISLIKE,
+            -> error("Ocena utworu wymaga aktywnej sesji MediaSession z obsługą ratingu.")
             MediaAction.VOLUME_UP,
             MediaAction.VOLUME_DOWN,
             MediaAction.MUTE,
@@ -245,5 +315,6 @@ class AndroidMediaControllerGateway(
             MediaAction.MUTE,
             MediaAction.UNMUTE,
         )
+        val RATING_ACTIONS = setOf(MediaAction.LIKE, MediaAction.DISLIKE)
     }
 }

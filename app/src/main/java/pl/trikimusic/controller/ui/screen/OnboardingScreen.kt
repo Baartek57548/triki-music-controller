@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -47,7 +48,8 @@ private data class OnboardingPage(
 private val pages = listOf(
     OnboardingPage("Triki Music", "Bezpiecznie reguluj głośność obrotem kapsla i steruj odtwarzaniem jego fizycznym przyciskiem.", Icons.Default.MusicNote),
     OnboardingPage("Połącz i zapamiętaj", "Pierwsze połączenie wybierzesz w aplikacji. Później wystarczy nacisnąć przycisk uśpionego Triki, a telefon połączy się z nim automatycznie.", Icons.AutoMirrored.Filled.BluetoothSearching),
-    OnboardingPage("Bezpieczna głośność", "Połóż kapsel górą do góry na płaskiej powierzchni i nie dotykaj go przez około sekundę. Dopiero wtedy obrót wokół osi Z zmieni głośność.", Icons.Default.GraphicEq),
+    OnboardingPage("Płynna głośność", "Utrzymuj kapsel górą do góry w zakresie 0–25° przez 2 sekundy. Nie musi być nieruchomy — po stabilizacji obrót wokół osi Z płynnie zmieni głośność.", Icons.Default.GraphicEq),
+    OnboardingPage("Oceń utwór ruchem", "Przytrzymaj przycisk około pół sekundy. Podniesienie kapsla o 20–30 cm polubi utwór, a opuszczenie go odrzuci — jeśli odtwarzacz udostępnia ocenianie.", Icons.Default.Favorite),
     OnboardingPage("Kalibracja", "Kalibracja na równej powierzchni dopasuje czujniki do Twojego egzemplarza Triki i dodatkowo ograniczy przypadkowe zmiany głośności.", Icons.Default.Tune),
 )
 

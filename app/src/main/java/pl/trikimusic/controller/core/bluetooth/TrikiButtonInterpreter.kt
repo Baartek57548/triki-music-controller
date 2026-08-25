@@ -18,6 +18,9 @@ class TrikiButtonInterpreter {
         get() = protocolMode == TrikiButtonProtocolMode.BUTTON_FLAG &&
             (stablePressed || candidatePressed || pendingClickCount > 0)
 
+    val isPressed: Boolean
+        get() = protocolMode == TrikiButtonProtocolMode.BUTTON_FLAG && stablePressed
+
     private var lastTimestampNanos: Long? = null
     private var observedStatus: Int? = null
     private var observedRunLength = 0
@@ -30,6 +33,15 @@ class TrikiButtonInterpreter {
     private var pressedAtNanos: Long? = null
     private var pendingClickCount = 0
     private var clickDeadlineNanos: Long? = null
+    private var currentHoldConsumed = false
+
+    fun consumeCurrentHold(): Boolean {
+        if (!isPressed) return false
+        currentHoldConsumed = true
+        pendingClickCount = 0
+        clickDeadlineNanos = null
+        return true
+    }
 
     fun reset() {
         protocolMode = TrikiButtonProtocolMode.UNKNOWN
@@ -91,9 +103,10 @@ class TrikiButtonInterpreter {
             stablePressed = status == PRESSED_STATUS
             candidatePressed = stablePressed
             candidateSinceNanos = now
-            pressedAtNanos = null
+            pressedAtNanos = now.takeIf { stablePressed }
             pendingClickCount = 0
             clickDeadlineNanos = null
+            currentHoldConsumed = false
         }
     }
 
@@ -112,6 +125,7 @@ class TrikiButtonInterpreter {
             stablePressed = candidatePressed
             if (stablePressed) {
                 pressedAtNanos = now
+                currentHoldConsumed = false
             } else {
                 val releasedEvent = registerRelease(now)
                 if (completed == null) completed = releasedEvent
@@ -131,6 +145,13 @@ class TrikiButtonInterpreter {
         val pressedAt = pressedAtNanos
         pressedAtNanos = null
         if (pressedAt == null) return null
+
+        if (currentHoldConsumed) {
+            currentHoldConsumed = false
+            pendingClickCount = 0
+            clickDeadlineNanos = null
+            return null
+        }
 
         val duration = now - pressedAt
         if (duration !in MIN_CLICK_PRESS_NANOS..MAX_CLICK_PRESS_NANOS) {
@@ -156,6 +177,7 @@ class TrikiButtonInterpreter {
         }
         pendingClickCount = 0
         clickDeadlineNanos = null
+        currentHoldConsumed = false
         return type?.let { ButtonClickEvent(it, timestampNanos) }
     }
 
@@ -166,6 +188,7 @@ class TrikiButtonInterpreter {
         pressedAtNanos = null
         pendingClickCount = 0
         clickDeadlineNanos = null
+        currentHoldConsumed = false
     }
 
     private companion object {

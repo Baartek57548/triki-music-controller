@@ -10,6 +10,8 @@ data class MediaSessionState(
     val artworkUri: String? = null,
     val packageName: String? = null,
     val appName: String? = null,
+    val canLike: Boolean = false,
+    val canDislike: Boolean = false,
     val volume: Int = 0,
     val maxVolume: Int = 0,
     val isMuted: Boolean = false,

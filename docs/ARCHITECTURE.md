@@ -40,21 +40,22 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie p
 - `TrikiProtocolDecoder` ma bufor streamu, resynchronizację, skalowanie i statystyki odrzuconych bajtów.
 - `TrikiBleManager` implementuje maszynę stanów `DISCONNECTED → SCANNING → FOUND → CONNECTING → CONNECTED → READY`. Pierwsze połączenie jest bezpośrednie; po jego powodzeniu zapamiętany adres przechodzi przez `RECONNECTING` z systemowym GATT `autoConnect=true`, które pasywnie czeka na wybudzenie urządzenia.
 - `SensorFilter` stosuje bias kalibracyjny, medianę z trzech próbek, adaptacyjną martwą strefę żyroskopu, low-pass i filtr komplementarny pitch/roll/yaw.
-- `GyroscopeVolumeController` działa natychmiast przy przechyle 0–25° górą do góry. Nie ma bramki bezruchu, wartości 0,8–1,2 g ani ruchu poza osią, dlatego kapslem można sterować w powietrzu. Przekroczenie 25° zeruje całkę; histereza Z 18/10°/s ogranicza szum, a całkowanie żyroskopu Z generuje kroki co 15°.
+- `GyroscopeVolumeController` wymaga 2 sekund ciągłego przechyłu 0–25° górą do góry, ale nie ma bramki bezruchu, wartości 0,8–1,2 g ani ruchu poza osią. Przekroczenie 25° zeruje stabilizację i całkę; dodatkowy EMA Z, histereza 18/10°/s oraz limit kroku do 100 ms wygładzają regulację co 15°.
 - `TrikiButtonInterpreter` rozpoznaje wariant pola statusu, eliminuje odbicia styku i liczy od jednego do trzech kliknięć bez fałszywej interpretacji licznika pakietów.
+- `HoldVerticalGestureDetector` po 500 ms przytrzymania estymuje krótkie pionowe przemieszczenie przez odjęcie lokalnej grawitacji i ograniczone podwójne całkowanie. +20 cm daje Like, −20 cm Dislike, maksymalnie raz do puszczenia przycisku.
 - `AppLogger` przechowuje maksymalnie 400 skróconych wpisów; nie rośnie bez końca.
 
 ### Data
 
 `DataStoreSettingsRepository` zapisuje cały snapshot ustawień jako wersjonowalny JSON w atomowym Preferences DataStore. Decoder toleruje nieznane przyszłe pola i normalizuje brak profili. Pola poprzedniego systemu sterowania są ignorowane podczas odczytu, a profile kalibracji ze starszą konwencją osi są migrowane do sprzętowo potwierdzonego położenia górą do góry (`Z ≈ −1 g`). Aktualizacja nie uszkadza więc zachowanych ustawień przycisku, urządzenia ani kalibracji.
 
-`AndroidMediaControllerGateway` wybiera najpierw sesję w stanie playing/buffering/connecting, a w drugiej kolejności ostatnio aktualizowaną. Gdy Xiaomi lub inny system blokuje dostęp Notification Listener, publiczne `AudioManager.dispatchMediaKeyEvent()` wysyła pełną parę DOWN/UP dla Play/Pause, Next, Previous i Stop. Dostęp do sesji pozostaje potrzebny tylko do metadanych i precyzyjnego stanu odtwarzacza. `AudioManager` obsługuje też globalną głośność strumienia muzyki.
+`AndroidMediaControllerGateway` wybiera najpierw sesję w stanie playing/buffering/connecting, a w drugiej kolejności ostatnio aktualizowaną. Gdy Xiaomi lub inny system blokuje dostęp Notification Listener, publiczne `AudioManager.dispatchMediaKeyEvent()` wysyła pełną parę DOWN/UP dla Play/Pause, Next, Previous i Stop. Like/Dislike wymaga aktywnej sesji: adapter preferuje jej zadeklarowaną akcję niestandardową, a następnie standardowe `ACTION_SET_RATING` dla serca lub kciuka. `AudioManager` obsługuje globalną głośność, a `RatingFeedbackPlayer` generuje rozróżnialne krótkie tony sukcesu i błędu.
 
 `GitHubUpdateManager` sprawdza wyłącznie najnowsze stabilne wydanie wskazanego repozytorium. Akceptuje pojedynczy APK release z zaufanej ścieżki HTTPS, ogranicza metadane i plik do stałych rozmiarów, a po pobraniu sprawdza rozmiar, opcjonalny digest SHA-256 z GitHub, identyfikator pakietu, rosnący `versionCode` i certyfikat podpisujący. Dopiero zweryfikowany plik z prywatnego cache jest udostępniany systemowemu instalatorowi przez `FileProvider`.
 
 ### Runtime
 
-`TrikiRuntime` jest jedynym miejscem łączącym sensor lub przycisk z akcją. Zmiana kalibracji lub parametrów filtru resetuje cały pipeline, aby nie mieszać dwóch układów odniesienia. `TrikiButtonInterpreter` ma pierwszeństwo podczas kliknięcia, ponieważ nacisk również porusza IMU. W czasie sekwencji kliknięć regulator Z jest zerowany, a na następnej próbce po zakończeniu przycisku działa od razu, jeśli przechył mieści się w 0–25°. Przerwa strumienia dłuższa niż 250 ms, utrata połączenia, odwrócenie lub przekroczenie 25° zerują nagromadzony obrót.
+`TrikiRuntime` jest jedynym miejscem łączącym sensor lub przycisk z akcją. Podczas przytrzymania wyłącza regulator Z, przekazuje próbki do detektora ruchu, konsumuje klik po rozpoznaniu ratingu i odtwarza sygnał zgodny z wynikiem `ActionMapper`. Po każdej interakcji przyciskiem 2-sekundowa stabilizacja kąta rozpoczyna się od nowa. Przerwa strumienia dłuższa niż 250 ms, utrata połączenia, odwrócenie lub przekroczenie 25° także zerują stabilizację i obrót.
 
 ### Presentation
 

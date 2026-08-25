@@ -8,6 +8,7 @@ enum class VolumeGateState {
     SENSOR_INVALID,
     UPSIDE_DOWN,
     OUTSIDE_TILT_RANGE,
+    STABILIZING,
     READY,
 }
 
@@ -47,6 +48,13 @@ fun MainUiState.volumeControlPresentation(): VolumeControlPresentation = when {
         false,
     )
 
+    !runtime.volumeTiltStable -> VolumeControlPresentation(
+        VolumeGateState.STABILIZING,
+        "Stabilizacja kąta ${runtime.volumeStabilizationProgress.percent()}%",
+        "Utrzymuj przechył 0–25° przez 2 sekundy. Kapsel może być w ruchu.",
+        false,
+    )
+
     else -> VolumeControlPresentation(
         VolumeGateState.READY,
         "Regulator gotowy",
@@ -56,5 +64,7 @@ fun MainUiState.volumeControlPresentation(): VolumeControlPresentation = when {
 }
 
 private fun Float.rounded(): Int = if (isFinite()) Math.round(this) else 180
+
+private fun Float.percent(): Int = (coerceIn(0f, 1f) * 100f).toInt().coerceIn(0, 100)
 
 private const val UPSIDE_DOWN_TILT_DEGREES = 135f

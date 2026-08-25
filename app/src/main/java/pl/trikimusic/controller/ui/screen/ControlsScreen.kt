@@ -14,6 +14,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.AlertDialog
@@ -21,6 +23,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,9 +38,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.MediaAction
+import pl.trikimusic.controller.core.gesture.HoldGesturePhase
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
 import pl.trikimusic.controller.ui.components.SectionTitle
+import pl.trikimusic.controller.ui.components.VolumeGateState
 import pl.trikimusic.controller.ui.components.volumeControlPresentation
 
 @Composable
@@ -101,6 +106,12 @@ fun ControlsScreen(
                             },
                         )
                     }
+                    if (volumePresentation.state == VolumeGateState.STABILIZING) {
+                        LinearProgressIndicator(
+                            progress = { state.runtime.volumeStabilizationProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     HorizontalDivider()
                     GateStatusRow(
                         "Zakres stabilizacji",
@@ -113,7 +124,56 @@ fun ControlsScreen(
                         sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",
                     )
                     Text(
-                        "Nie ma wymogu bezruchu ani odkładania kapsla. Dopóki przechył mieści się w 0–25°, ruch osi Z reguluje głośność.",
+                        "Utrzymuj zakres 0–25° przez 2 sekundy. Nie ma wymogu bezruchu ani odkładania kapsla; potem wygładzony ruch osi Z reguluje głośność.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        item {
+            Card(shape = RoundedCornerShape(24.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("Przytrzymaj + ruch pionowy", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Przytrzymaj przycisk około pół sekundy, a następnie przesuń kapsel pionowo o 20–30 cm.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("W górę → polub utwór", Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.ThumbDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("W dół → odrzuć utwór", Modifier.weight(1f))
+                    }
+                    HorizontalDivider()
+                    Text(
+                        when (state.runtime.ratingGesturePhase) {
+                            HoldGesturePhase.IDLE -> "Gotowe — rozpocznij od przytrzymania przycisku."
+                            HoldGesturePhase.HOLDING -> "Przytrzymanie %.0f%%".format(
+                                state.runtime.ratingGestureHoldProgress * 100f,
+                            )
+                            HoldGesturePhase.READY -> "Przycisk przytrzymany — przesuń kapsel w górę lub w dół."
+                            HoldGesturePhase.TRACKING -> "Wykryty ruch: %+.0f cm".format(
+                                state.runtime.ratingGestureDisplacementCentimeters,
+                            )
+                            HoldGesturePhase.TRIGGERED -> "Ocena wysłana — puść przycisk przed następną akcją."
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Text(
+                        when {
+                            !state.media.hasActiveSession -> "Uruchom odtwarzanie w aplikacji obsługującej Android MediaSession."
+                            state.media.canLike && state.media.canDislike -> "Odtwarzacz obsługuje polubienie i odrzucenie. Usłyszysz osobny krótki sygnał dla każdej akcji."
+                            state.media.canLike -> "Odtwarzacz obsługuje polubienie, ale nie udostępnia odrzucenia."
+                            state.media.canDislike -> "Odtwarzacz obsługuje odrzucenie, ale nie udostępnia polubienia."
+                            else -> "Aktywna aplikacja nie udostępnia oceniania utworów przez MediaSession."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

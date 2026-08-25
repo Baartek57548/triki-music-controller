@@ -24,6 +24,8 @@ enum class MediaAction(val displayName: String) {
     PLAY_PAUSE("Odtwórz / wstrzymaj"),
     NEXT("Następny utwór"),
     PREVIOUS("Poprzedni utwór"),
+    LIKE("Polub utwór"),
+    DISLIKE("Odrzuć utwór"),
     VOLUME_UP("Głośniej"),
     VOLUME_DOWN("Ciszej"),
     MUTE("Wycisz"),

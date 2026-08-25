@@ -139,9 +139,12 @@ fun HomeScreen(
         item {
             val buttonClick = state.runtime.lastButtonClick
             val volumeTimestamp = state.runtime.lastVolumeChangeTimestampNanos
+            val ratingTimestamp = state.runtime.lastRatingGestureTimestampNanos
             val buttonIsLatest = buttonClick != null &&
-                (volumeTimestamp == null || buttonClick.timestampNanos >= volumeTimestamp)
-            if (volumeTimestamp != null || buttonClick != null) {
+                buttonClick.timestampNanos >= maxOf(volumeTimestamp ?: Long.MIN_VALUE, ratingTimestamp ?: Long.MIN_VALUE)
+            val ratingIsLatest = ratingTimestamp != null &&
+                ratingTimestamp >= maxOf(volumeTimestamp ?: Long.MIN_VALUE, buttonClick?.timestampNanos ?: Long.MIN_VALUE)
+            if (volumeTimestamp != null || ratingTimestamp != null || buttonClick != null) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)),
                     shape = RoundedCornerShape(24.dp),
@@ -153,7 +156,11 @@ fun HomeScreen(
                         Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
                             Text("Ostatnie sterowanie", style = MaterialTheme.typography.bodyMedium)
                             Text(
-                                if (buttonIsLatest) buttonClick!!.type.displayName else "Obrót kapsla · oś Z",
+                                when {
+                                    buttonIsLatest -> buttonClick!!.type.displayName
+                                    ratingIsLatest -> "Przytrzymanie + ruch pionowy"
+                                    else -> "Obrót kapsla · oś Z"
+                                },
                                 style = MaterialTheme.typography.titleMedium,
                             )
                         }
@@ -282,10 +289,16 @@ private fun DeviceMetrics(state: MainUiState, modifier: Modifier = Modifier) {
 private fun latestControlName(state: MainUiState): String {
     val click = state.runtime.lastButtonClick
     val volumeTimestamp = state.runtime.lastVolumeChangeTimestampNanos
-    return if (click != null && (volumeTimestamp == null || click.timestampNanos >= volumeTimestamp)) {
-        click.type.displayName
-    } else {
-        state.runtime.lastAction?.displayName.takeIf { volumeTimestamp != null } ?: "—"
+    val ratingTimestamp = state.runtime.lastRatingGestureTimestampNanos
+    return when {
+        click != null && click.timestampNanos >= maxOf(
+            volumeTimestamp ?: Long.MIN_VALUE,
+            ratingTimestamp ?: Long.MIN_VALUE,
+        ) -> click.type.displayName
+        ratingTimestamp != null && ratingTimestamp >= (volumeTimestamp ?: Long.MIN_VALUE) ->
+            state.runtime.lastAction?.displayName ?: "Ocena utworu"
+        volumeTimestamp != null -> state.runtime.lastAction?.displayName ?: "Głośność"
+        else -> "—"
     }
 }
 

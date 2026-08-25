@@ -19,7 +19,7 @@ class VolumeControlPresentationTest {
     fun `disconnected state takes priority over stale sensor readiness`() {
         val state = uiState(
             connectionState = TrikiConnectionState.DISCONNECTED,
-            runtime = runtime(withinRange = true, tilt = 0f),
+            runtime = runtime(withinRange = true, stable = true, tilt = 0f),
         )
 
         val presentation = state.volumeControlPresentation()
@@ -39,13 +39,26 @@ class VolumeControlPresentationTest {
 
     @Test
     fun `valid sample in tilt range is ready without stationary state`() {
-        val ready = uiState(runtime = runtime(withinRange = true, tilt = 25f))
+        val ready = uiState(runtime = runtime(withinRange = true, stable = true, tilt = 25f))
 
         val presentation = ready.volumeControlPresentation()
 
         assertEquals(VolumeGateState.READY, presentation.state)
         assertTrue(presentation.ready)
         assertTrue(presentation.instruction.contains("Nie musisz zatrzymywać"))
+    }
+
+    @Test
+    fun `valid angle reports two second stabilization progress`() {
+        val stabilizing = uiState(
+            runtime = runtime(withinRange = true, stable = false, progress = 0.5f, tilt = 12f),
+        )
+
+        val presentation = stabilizing.volumeControlPresentation()
+
+        assertEquals(VolumeGateState.STABILIZING, presentation.state)
+        assertTrue(presentation.title.contains("50%"))
+        assertFalse(presentation.ready)
     }
 
     @Test
@@ -69,11 +82,15 @@ class VolumeControlPresentationTest {
     private fun runtime(
         sensorValid: Boolean = true,
         withinRange: Boolean,
+        stable: Boolean = false,
+        progress: Float = 0f,
         tilt: Float,
     ) = RuntimeState(
         latestSample = sample(),
         volumeSensorValid = sensorValid,
         volumeWithinTiltRange = withinRange,
+        volumeTiltStable = stable,
+        volumeStabilizationProgress = progress,
         volumeTiltDegrees = tilt,
     )
 
