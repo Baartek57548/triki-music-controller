@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="TrikiMusicController_Windows.Pages.DiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer>
+        <StackPanel MaxWidth="1000" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
+            <TextBlock Text="Diagnostyka" Style="{StaticResource PageTitleStyle}" />
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Dane IMU" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="{Binding SensorDetails}" FontFamily="Consolas" FontSize="15" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Protokół" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="{Binding ProtocolDetails}" TextWrapping="Wrap" />
+                    <TextBlock Text="Nordic UART Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E" FontFamily="Consolas" TextWrapping="Wrap" Opacity="0.75" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

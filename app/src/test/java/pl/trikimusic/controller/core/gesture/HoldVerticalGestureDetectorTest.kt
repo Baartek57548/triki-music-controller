@@ -16,12 +16,12 @@ class HoldVerticalGestureDetectorTest {
         val fixture = Fixture()
         fixture.holdAtRest()
 
-        fixture.accelerate(z = -1.4f, frames = 13)
         fixture.accelerate(z = -0.6f, frames = 13)
+        fixture.accelerate(z = -1.4f, frames = 13)
         fixture.accelerate(z = -1f, frames = 10)
 
         assertEquals(listOf(RatingGestureAction.LIKE), fixture.actions)
-        assertTrue(fixture.latest.estimatedDisplacementMeters >= 0.20f)
+        assertTrue(fixture.latest.estimatedDisplacementMeters <= -0.20f)
     }
 
     @Test
@@ -29,12 +29,12 @@ class HoldVerticalGestureDetectorTest {
         val fixture = Fixture()
         fixture.holdAtRest()
 
-        fixture.accelerate(z = -0.6f, frames = 13)
         fixture.accelerate(z = -1.4f, frames = 13)
+        fixture.accelerate(z = -0.6f, frames = 13)
         fixture.accelerate(z = -1f, frames = 10)
 
         assertEquals(listOf(RatingGestureAction.DISLIKE), fixture.actions)
-        assertTrue(fixture.latest.estimatedDisplacementMeters <= -0.20f)
+        assertTrue(fixture.latest.estimatedDisplacementMeters >= 0.20f)
     }
 
     @Test

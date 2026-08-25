@@ -30,7 +30,8 @@ data class HoldVerticalGestureResult(
  * An accelerometer cannot provide an absolute position. The detector therefore captures the local
  * gravity vector during the initial hold, removes that baseline, and double-integrates only a short,
  * thresholded acceleration pulse. The estimate is bounded and reset between attempts to prevent
- * unbounded drift. Positive displacement means lifting the face-up cap; negative means lowering it.
+ * unbounded drift. Hardware validation shows that a deliberate lift produces a negative projected
+ * displacement in Triki's face-up sensor convention; lowering produces a positive displacement.
  */
 class HoldVerticalGestureDetector(
     private val configuration: Configuration = Configuration(),
@@ -172,8 +173,8 @@ class HoldVerticalGestureDetector(
         )
 
         val action = when {
-            displacementMeters >= configuration.triggerDisplacementMeters -> RatingGestureAction.LIKE
-            displacementMeters <= -configuration.triggerDisplacementMeters -> RatingGestureAction.DISLIKE
+            displacementMeters <= -configuration.triggerDisplacementMeters -> RatingGestureAction.LIKE
+            displacementMeters >= configuration.triggerDisplacementMeters -> RatingGestureAction.DISLIKE
             else -> null
         }
         if (action != null) triggered = true

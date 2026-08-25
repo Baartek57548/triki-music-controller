@@ -9,3 +9,7 @@ captures/
 .cxx/
 *.jks
 *.keystore
+windows/artifacts/
+**/bin/
+**/obj/
+**/TestResults/

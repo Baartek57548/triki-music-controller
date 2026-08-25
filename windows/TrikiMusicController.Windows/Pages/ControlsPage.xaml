@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="TrikiMusicController_Windows.Pages.ControlsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer>
+        <StackPanel MaxWidth="900" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
+            <TextBlock Text="Sterowanie" Style="{StaticResource PageTitleStyle}" />
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Płynna regulacja głośności" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="Utrzymuj zakres przechyłu 0–25° przez 2 sekundy. Kapsel może być w ruchu. Potem obrót wokół osi Z zmienia głośność systemową." TextWrapping="Wrap" />
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding VolumeProgress}" />
+                    <TextBlock Text="{Binding VolumeControlTitle}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" Opacity="0.75" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Polubienie i dislike ruchem" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="Przytrzymaj przycisk przez 0,5 sekundy. Podniesienie kapsla o około 20–30 cm oznacza serduszko/Like; opuszczenie oznacza Dislike. Sygnał dźwiękowy potwierdza wynik." TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Ograniczenie Windows" Message="Systemowe Media Control obsługuje odtwarzanie, pauzę i zmianę utworu, ale nie udostępnia standardowej akcji Like/Dislike. Gest jest rozpoznawany i zgłasza błąd, jeśli odtwarzacz nie ma osobnej integracji." />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Akcje przycisku" Style="{StaticResource SectionTitleStyle}" />
+                    <Grid ColumnSpacing="14" RowSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <TextBlock Text="Jeden klik" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding SingleClickAction, Mode=TwoWay}" />
+                        <TextBlock Grid.Row="1" Text="Dwa kliknięcia" VerticalAlignment="Center" />
+                        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding DoubleClickAction, Mode=TwoWay}" />
+                        <TextBlock Grid.Row="2" Text="Trzy kliknięcia" VerticalAlignment="Center" />
+                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding TripleClickAction, Mode=TwoWay}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

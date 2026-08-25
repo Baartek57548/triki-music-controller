@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="TrikiMusicController_Windows.Pages.AboutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel MaxWidth="850" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
+        <TextBlock Text="O aplikacji" Style="{StaticResource PageTitleStyle}" />
+        <Border Style="{StaticResource CardBorderStyle}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
+                <TextBlock Text="Wersja 2.3.0 • Windows x64" />
+                <TextBlock Text="Natywna aplikacja WinUI 3. Steruje globalną sesją multimedialną Windows oraz głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button Content="Sprawdź aktualizacje" Click="CheckUpdates_Click" />
+                    <Button Content="Otwórz projekt na GitHub" Click="GitHub_Click" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</Page>

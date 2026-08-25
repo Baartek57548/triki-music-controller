@@ -2,7 +2,7 @@
 
 ## Cele
 
-Architektura oddziela niestabilne elementy platformy Android (GATT, uprawnienia, sesje multimedialne i service lifecycle) od deterministycznej logiki IMU. Dzięki temu parser, filtr, kalibracja, regulator głośności i mapowanie przycisku są testowane na JVM bez telefonu i fizycznego Triki.
+Architektura oddziela elementy platformowe Androida i Windows (GATT, cykl życia, sesje multimedialne i głośność) od deterministycznej logiki IMU. Dzięki temu parser, filtr, regulator głośności oraz gesty są testowane bez telefonu i fizycznego Triki: na JVM dla Androida i w xUnit dla Windows.
 
 ## Przepływ danych
 
@@ -42,7 +42,7 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie p
 - `SensorFilter` stosuje bias kalibracyjny, medianę z trzech próbek, adaptacyjną martwą strefę żyroskopu, low-pass i filtr komplementarny pitch/roll/yaw.
 - `GyroscopeVolumeController` wymaga 2 sekund ciągłego przechyłu 0–25° górą do góry, ale nie ma bramki bezruchu, wartości 0,8–1,2 g ani ruchu poza osią. Przekroczenie 25° zeruje stabilizację i całkę; dodatkowy EMA Z, histereza 18/10°/s oraz limit kroku do 100 ms wygładzają regulację co 15°.
 - `TrikiButtonInterpreter` rozpoznaje wariant pola statusu, eliminuje odbicia styku i liczy od jednego do trzech kliknięć bez fałszywej interpretacji licznika pakietów.
-- `HoldVerticalGestureDetector` po 500 ms przytrzymania estymuje krótkie pionowe przemieszczenie przez odjęcie lokalnej grawitacji i ograniczone podwójne całkowanie. +20 cm daje Like, −20 cm Dislike, maksymalnie raz do puszczenia przycisku.
+- `HoldVerticalGestureDetector` po 500 ms przytrzymania estymuje krótkie pionowe przemieszczenie przez odjęcie lokalnej grawitacji i ograniczone podwójne całkowanie. Sprzętowo zweryfikowane podniesienie (ujemny znak projekcji) daje Like, a opuszczenie (dodatni znak) Dislike, maksymalnie raz do puszczenia przycisku.
 - `AppLogger` przechowuje maksymalnie 400 skróconych wpisów; nie rośnie bez końca.
 
 ### Data
@@ -74,6 +74,14 @@ Wersja release uruchamia jedno sprawdzenie aktualizacji po zakończeniu onboardi
 7. Jawne `Rozłącz` kasuje oczekujące połączenie i zamyka obiekt `BluetoothGatt`; wyłączenie autołączenia w UI lub powiadomieniu dodatkowo utrwala tę decyzję w ustawieniach.
 
 Raw buffer ma 300 pakietów, a historia wykresu 360 przefiltrowanych próbek. Oba limity zapobiegają narastaniu pamięci.
+
+## Windows 11
+
+Projekt `windows/TrikiMusicController.Windows` jest natywną, niepakietowaną aplikacją WinUI 3 x64. `BluetoothService` prowadzi aktywny watcher reklam BLE, zapamiętuje adres po pierwszym pełnym połączeniu, odkrywa Nordic UART Service, włącza TX Notify i zapisuje potwierdzoną komendę startową. Po uśpieniu urządzenia watcher pozostaje aktywny; naciśnięcie przycisku powoduje reklamę znanego adresu i automatyczne połączenie.
+
+`TrikiRuntimeEngine` zachowuje priorytet Androida: gest przytrzymania i pionowego ruchu konsumuje klik, następnie obsługiwane są sekwencje przycisku, a regulator Z działa tylko bez aktywnej interakcji przyciskiem. `MediaControlService` używa Global System Media Transport Controls do Play/Pause/Next/Previous/Stop, a `SystemVolumeService` korzysta z Core Audio EndpointVolume. GSMTC nie ma standardowej akcji oceny utworu, dlatego Like/Dislike wymagałoby adaptera konkretnej usługi; UI i sygnał dźwiękowy jawnie raportują brak wykonania.
+
+`UpdateService` sprawdza najnowsze stabilne wydanie GitHub na starcie. Akceptuje dokładnie jeden instalator Windows z oczekiwaną nazwą i ścieżką HTTPS, wymaga rosnącej wersji, limituje rozmiar oraz porównuje SHA-256 przed sprawdzeniem nagłówka PE i otwarciem kreatora. Publikacja jest self-contained, a Inno Setup instaluje ją per-user, oferuje autostart `--background`, skróty i pełny deinstalator.
 
 ## Praca w tle
 

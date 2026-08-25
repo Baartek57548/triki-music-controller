@@ -1,8 +1,17 @@
 # Triki Music Controller
 
-Triki Music Controller zmienia kontroler **Żabka Triki** w pilot do muzyki na Androidzie. Aplikacja odbiera strumień IMU przez Bluetooth Low Energy, reguluje głośność obrotem kapsla wokół osi Z i obsługuje akcje multimedialne przez fizyczny przycisk.
+Triki Music Controller zmienia kontroler **Żabka Triki** w pilot do muzyki na Androidzie i Windows 11. Obie aplikacje odbierają strumień IMU przez Bluetooth Low Energy, regulują głośność obrotem kapsla wokół osi Z i obsługują akcje multimedialne przez fizyczny przycisk.
 
-To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całość działa przez publiczne API Androida: GATT, `MediaSessionManager`, `MediaController.TransportControls`, `AudioManager`, `NotificationListenerService` oraz foreground service typu `connectedDevice`.
+To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Implementacje używają publicznych API Androida oraz Windows: GATT/Bluetooth LE, systemowych sesji multimedialnych i systemowego sterowania głośnością.
+
+## Pobieranie
+
+Najnowsze stabilne wydanie znajduje się na stronie [GitHub Releases](https://github.com/Baartek57548/triki-music-controller/releases/latest):
+
+- Android: podpisany plik `triki-music-controller-android-v…-release.apk`;
+- Windows 11 x64: `triki-music-controller-windows-v…-setup.exe`, czyli kreator instalacji per-user bez wymagania osobnej instalacji .NET lub Windows App SDK.
+
+Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i instalacja wymagają decyzji użytkownika; plik jest przyjmowany tylko z tego repozytorium i weryfikowany przez rozmiar oraz SHA-256 z metadanych GitHub.
 
 ## Funkcje
 
@@ -24,6 +33,8 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 - `FakeTrikiDataSource` dostępny wyłącznie w buildzie debug po włączeniu trybu deweloperskiego;
 - automatyczne sprawdzanie najnowszego wydania GitHub przy uruchomieniu wersji release, ręczne sprawdzanie na ekranie **O aplikacji** oraz weryfikowany instalator APK;
 - jasny, ciemny i systemowy motyw Material 3, edge-to-edge oraz responsywny dashboard.
+- natywna wersja Windows 11 w WinUI 3: ten sam dekoder, filtr, gesty i mapowania, globalna sesja multimedialna, głośność domyślnego urządzenia audio, zapamiętywanie adresu Triki oraz automatyczne łączenie po naciśnięciu przycisku;
+- instalator Windows z opcjonalnym skrótem, autostartem w tle, deinstalatorem i wbudowanym mechanizmem aktualizacji.
 
 ## Wymagania
 
@@ -31,6 +42,8 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 - telefon z Bluetooth Low Energy;
 - kontroler Żabka Triki; przed skanowaniem należy nacisnąć jego przycisk, aby go wybudzić;
 - JDK 17 lub nowszy oraz Android SDK 36 do budowania projektu.
+- Windows 11 w wersji 22H2 lub nowszej i architektura x64 dla aplikacji desktopowej;
+- .NET SDK 10, Visual Studio z workloadem Windows App SDK oraz Inno Setup 6 tylko do samodzielnego budowania wersji Windows.
 
 Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zostały dobrane pod stabilny toolchain obsługujący compile SDK 36.
 
@@ -56,6 +69,16 @@ Build z linii poleceń na Windows:
 ```
 
 Na macOS/Linux odpowiednikami są `./gradlew assembleDebug` i `./gradlew test`.
+
+Build i testy Windows z linii poleceń:
+
+```powershell
+dotnet test .\windows\TrikiMusicController.Windows.Tests\TrikiMusicController.Windows.Tests.csproj -c Release -p:Platform=x64
+dotnet publish .\windows\TrikiMusicController.Windows\TrikiMusicController.Windows.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -o .\windows\artifacts\publish
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" .\windows\installer\TrikiMusicController.iss
+```
+
+Instalator domyślnie umieszcza aplikację w `%LOCALAPPDATA%\Programs\Triki Music Controller`. Włączenie autostartu uruchamia ją z argumentem `--background`, dzięki czemu czeka zminimalizowana na reklamę BLE zapamiętanego kapsla.
 
 ## Uprawnienia
 
@@ -96,6 +119,14 @@ ActionMapper + mapowanie przycisku i rating MediaSession
 AndroidMediaControllerGateway
 ```
 
+Wersja Windows zachowuje ten sam deterministyczny rdzeń i ma osobne adaptery platformowe:
+
+```text
+BluetoothLEAdvertisementWatcher → BluetoothService → TrikiProtocolDecoder
+    → SensorFilter → GyroscopeVolumeController / HoldVerticalGestureDetector
+    → TrikiRuntimeEngine → GSMTC / Core Audio EndpointVolume
+```
+
 - `core/bluetooth` — protokół, parser ramek i stanowa warstwa BLE;
 - `core/sensor` — filtracja, orientacja i kalibracja czujników;
 - `core/volume` — bezpieczna regulacja głośności z żyroskopu Z;
@@ -134,7 +165,7 @@ Martwa strefa osi Z 18°/s, próg zwolnienia 10°/s, zerowanie po zmianie kierun
 
 Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
 
-`HoldVerticalGestureDetector` uruchamia się dopiero po około 500 ms potwierdzonego przytrzymania. Zapamiętuje lokalny wektor grawitacji, odejmuje go od kolejnych próbek i przez krótkie okno całkuje progowane przyspieszenie pionowe. Szacowane przemieszczenie +20 cm wysyła Like, a −20 cm Dislike; po akcji przytrzymanie jest konsumowane, więc puszczenie nie generuje dodatkowego pojedynczego kliknięcia. `AndroidMediaControllerGateway` korzysta ze standardowego `ACTION_SET_RATING` lub akcji niestandardowej jawnie wystawionej przez aktywną MediaSession.
+`HoldVerticalGestureDetector` uruchamia się dopiero po około 500 ms potwierdzonego przytrzymania. Zapamiętuje lokalny wektor grawitacji, odejmuje go od kolejnych próbek i przez krótkie okno całkuje progowane przyspieszenie pionowe. Dla sprzętowej konwencji osi Triki podniesienie daje ujemne przemieszczenie i wysyła Like, a opuszczenie daje dodatnie przemieszczenie i wysyła Dislike; po akcji przytrzymanie jest konsumowane, więc puszczenie nie generuje dodatkowego pojedynczego kliknięcia. `AndroidMediaControllerGateway` korzysta ze standardowego `ACTION_SET_RATING` lub akcji niestandardowej jawnie wystawionej przez aktywną MediaSession.
 
 ## Diagnostyka
 
@@ -170,6 +201,8 @@ Testy JVM obejmują:
 - Metadane i okładka wymagają dostępu do aktywnej MediaSession. Play/Pause, Next, Previous i Stop mają fallback przez standardowe klawisze multimedialne, ale ostateczna obsługa komendy zależy od aktywnego odtwarzacza.
 - Aktualizator obsługuje publiczne, stabilne wydania GitHub zawierające jednoznaczny APK release. Android wymaga zgody na instalowanie z tego źródła oraz osobnego potwierdzenia każdej instalacji.
 - Like/Dislike działa tylko wtedy, gdy aktywna aplikacja udostępnia standardowe `ACTION_SET_RATING` albo jednoznaczną akcję niestandardową MediaSession. Brak takiej możliwości zwraca błąd i osobny sygnał dźwiękowy; aplikacja nie deklaruje wtedy zmiany oceny.
+- Windows Global System Media Transport Controls nie definiuje standardowej komendy Like/Dislike. Wersja Windows rozpoznaje poprawny kierunek gestu i sygnalizuje brak wykonania, ale bez osobnej integracji konkretnego odtwarzacza nie deklaruje zmiany oceny; Play/Pause, Next, Previous, Stop i głośność działają systemowo.
+- Publiczny instalator Windows nie jest podpisany komercyjnym certyfikatem Authenticode, dlatego SmartScreen może pokazać ostrzeżenie nieznanego wydawcy. Integralność pliku można porównać z digestem SHA-256 publikowanym przez GitHub.
 
 ## Licencja i znaki towarowe
 
