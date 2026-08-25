@@ -43,7 +43,7 @@ fun CalibrationScreen(state: MainUiState, viewModel: MainViewModel, onBack: () -
             Icon(Icons.Default.Tune, null, tint = MaterialTheme.colorScheme.primary)
             Text("Połóż Triki nieruchomo", style = MaterialTheme.typography.headlineMedium)
             Text(
-                "Umieść kapsel na stabilnej, płaskiej powierzchni. Przez trzy sekundy nie dotykaj urządzenia.",
+                "Umieść kapsel górną stroną do góry na stabilnej, płaskiej powierzchni. Przez trzy sekundy nie dotykaj urządzenia.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Card(shape = RoundedCornerShape(24.dp)) {

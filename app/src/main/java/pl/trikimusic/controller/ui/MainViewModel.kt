@@ -5,14 +5,17 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
@@ -22,12 +25,14 @@ import pl.trikimusic.controller.AppContainer
 import pl.trikimusic.controller.BuildConfig
 import pl.trikimusic.controller.domain.model.AppLogEntry
 import pl.trikimusic.controller.domain.model.AppSettings
+import pl.trikimusic.controller.domain.model.AppUpdateInfo
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.GattServiceInfo
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.MediaSessionState
 import pl.trikimusic.controller.domain.model.RawBlePacket
+import pl.trikimusic.controller.domain.model.LogCategory
 import pl.trikimusic.controller.domain.model.ThemePreference
 import pl.trikimusic.controller.domain.model.TrikiBleState
 import pl.trikimusic.controller.domain.model.TrikiConnectionState
@@ -46,6 +51,23 @@ data class CalibrationUiState(
     val error: String? = null,
 )
 
+enum class UpdateStage {
+    IDLE,
+    CHECKING,
+    AVAILABLE,
+    DOWNLOADING,
+    AWAITING_INSTALL_PERMISSION,
+    READY_TO_INSTALL,
+    ERROR,
+}
+
+data class UpdateUiState(
+    val stage: UpdateStage = UpdateStage.IDLE,
+    val info: AppUpdateInfo? = null,
+    val downloadProgress: Float = 0f,
+    val errorMessage: String? = null,
+)
+
 data class MainUiState(
     val settings: AppSettings = AppSettings(),
     val ble: TrikiBleState = TrikiBleState(),
@@ -55,6 +77,8 @@ data class MainUiState(
     val permissions: PermissionState = PermissionState(false, false, false, false, false, false, false),
     val logs: List<AppLogEntry> = emptyList(),
     val userMessage: String? = null,
+    val update: UpdateUiState = UpdateUiState(),
+    val settingsLoaded: Boolean = false,
 )
 
 class MainViewModel(
@@ -64,7 +88,13 @@ class MainViewModel(
     private val mutablePermissions = MutableStateFlow(container.permissionManager.state())
     private val mutableUserMessage = MutableStateFlow<String?>(null)
     private val mutableCalibration = MutableStateFlow(CalibrationUiState())
+    private val mutableUpdate = MutableStateFlow(UpdateUiState())
+    private val mutableSettings = MutableStateFlow<AppSettings?>(null)
     private var calibrationJob: Job? = null
+    private var updateCheckJob: Job? = null
+    private var updateDownloadJob: Job? = null
+    private var downloadedUpdateFile: File? = null
+    private var automaticUpdateCheckStarted = false
     private var autoConnectRequested = false
     private var rawRecordingStartedAtMillis: Long? = null
     private var frozenRawCapture: List<RawBlePacket>? = null
@@ -72,13 +102,20 @@ class MainViewModel(
     val calibration: StateFlow<CalibrationUiState> = mutableCalibration
 
     private val coreState = combine(
-        container.settings,
+        mutableSettings,
         container.bleManager.state,
         container.runtime.state,
         container.mediaController.state,
         container.bleManager.rawPackets,
     ) { settings, ble, runtime, media, packets ->
-        MainUiState(settings, ble, runtime, media, packets)
+        MainUiState(
+            settings = settings ?: AppSettings(),
+            ble = ble,
+            runtime = runtime,
+            media = media,
+            rawPackets = packets,
+            settingsLoaded = settings != null,
+        )
     }
 
     val uiState: StateFlow<MainUiState> = combine(
@@ -86,14 +123,40 @@ class MainViewModel(
         mutablePermissions,
         container.logger.entries,
         mutableUserMessage,
-    ) { core, permissions, logs, message ->
-        core.copy(permissions = permissions, logs = logs, userMessage = message)
+        mutableUpdate,
+    ) { core, permissions, logs, message, update ->
+        core.copy(permissions = permissions, logs = logs, userMessage = message, update = update)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     init {
         viewModelScope.launch {
-            container.settings.collectLatest { settings ->
+            container.settingsRepository.settings.collectLatest { settings ->
+                mutableSettings.value = settings
                 if (settings.knownDeviceAddress != null) autoConnectIfPossible()
+                if (
+                    settings.onboardingComplete &&
+                    !BuildConfig.DEBUG &&
+                    !automaticUpdateCheckStarted
+                ) {
+                    automaticUpdateCheckStarted = true
+                    checkForUpdates(showNoUpdateMessage = false)
+                }
+            }
+        }
+        viewModelScope.launch {
+            container.bleManager.state.collect { bleState ->
+                val connectedDevice = bleState.selectedDevice
+                if (bleState.connectionState == TrikiConnectionState.READY && connectedDevice != null) {
+                    val settings = currentSettings()
+                    if (
+                        !settings.knownDeviceAddress.equals(connectedDevice.address, ignoreCase = true) ||
+                        settings.knownDeviceName != connectedDevice.name
+                    ) {
+                        runCatching {
+                            container.settingsRepository.rememberDevice(connectedDevice.address, connectedDevice.name)
+                        }.onFailure(::showError)
+                    }
+                }
             }
         }
     }
@@ -102,23 +165,32 @@ class MainViewModel(
         mutablePermissions.value = container.permissionManager.state()
         container.mediaController.refresh()
         autoConnectIfPossible()
+        resumePendingUpdateInstallation()
     }
 
     fun completeOnboarding() = launchHandled { container.settingsRepository.completeOnboarding() }
 
     fun startScan() {
-        container.bleManager.startScan().onFailure(::showError)
+        container.bleManager.startScan(knownAddress = currentSettings().knownDeviceAddress).onFailure(::showError)
     }
 
     fun connect(device: TrikiDevice) {
-        container.bleManager.connect(device).onFailure(::showError)
-        launchHandled { container.settingsRepository.rememberDevice(device.address, device.name) }
-        if (container.settings.value.backgroundEnabled) TrikiForegroundService.start(getApplication())
+        container.bleManager.connect(device)
+            .onSuccess {
+                if (currentSettings().backgroundEnabled) startBackgroundService(showErrorToUser = true)
+            }
+            .onFailure(::showError)
     }
 
     fun disconnect() {
         container.bleManager.disconnect()
         TrikiForegroundService.stop(getApplication())
+    }
+
+    fun disableAutoConnect() = launchHandled {
+        container.bleManager.disconnect()
+        TrikiForegroundService.stop(getApplication())
+        container.settingsRepository.setBackgroundEnabled(false)
     }
 
     fun forgetDevice() = launchHandled {
@@ -131,15 +203,18 @@ class MainViewModel(
     }
 
     fun setButtonMapping(click: ButtonClickType, action: MediaAction) = launchHandled {
-        container.settingsRepository.setButtonMapping(container.settings.value.activeProfileId, click, action)
+        container.settingsRepository.setButtonMapping(currentSettings().activeProfileId, click, action)
     }
 
     fun setDeveloperMode(enabled: Boolean) = launchHandled { container.settingsRepository.setDeveloperMode(enabled) }
 
     fun setBackgroundEnabled(enabled: Boolean) = launchHandled {
         container.settingsRepository.setBackgroundEnabled(enabled)
-        if (enabled && container.bleManager.state.value.connectionState != TrikiConnectionState.DISCONNECTED) {
-            TrikiForegroundService.start(getApplication())
+        val settings = currentSettings()
+        if (enabled && settings.knownDeviceAddress != null) {
+            startBackgroundService(showErrorToUser = true)
+            container.bleManager.autoConnectKnown(settings.knownDeviceAddress, settings.knownDeviceName)
+            autoConnectRequested = true
         } else if (!enabled) {
             TrikiForegroundService.stop(getApplication())
         }
@@ -169,6 +244,133 @@ class MainViewModel(
 
     fun dismissMessage() {
         mutableUserMessage.value = null
+    }
+
+    fun checkForUpdates(showNoUpdateMessage: Boolean = true) {
+        if (updateCheckJob?.isActive == true || updateDownloadJob?.isActive == true) return
+        updateCheckJob = viewModelScope.launch {
+            mutableUpdate.value = UpdateUiState(stage = UpdateStage.CHECKING)
+            try {
+                val update = container.updateManager.checkForUpdate(BuildConfig.VERSION_NAME)
+                mutableUpdate.value = if (update == null) {
+                    if (showNoUpdateMessage) mutableUserMessage.value = "Masz najnowszą wersję aplikacji."
+                    UpdateUiState()
+                } else {
+                    UpdateUiState(stage = UpdateStage.AVAILABLE, info = update)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                container.logger.log(
+                    LogCategory.UPDATE,
+                    "Nie udało się sprawdzić aktualizacji.",
+                    error,
+                )
+                if (showNoUpdateMessage) {
+                    mutableUpdate.value = UpdateUiState(
+                        stage = UpdateStage.ERROR,
+                        errorMessage = error.message ?: "Nie udało się sprawdzić aktualizacji.",
+                    )
+                } else {
+                    mutableUpdate.value = UpdateUiState()
+                }
+            }
+        }
+    }
+
+    fun downloadAvailableUpdate() {
+        val update = mutableUpdate.value.info ?: return
+        if (updateDownloadJob?.isActive == true) return
+        updateDownloadJob = viewModelScope.launch {
+            mutableUpdate.value = UpdateUiState(stage = UpdateStage.DOWNLOADING, info = update)
+            try {
+                val apk = container.updateManager.downloadAndVerify(
+                    update = update,
+                    currentVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                    onProgress = { progress ->
+                        mutableUpdate.value = UpdateUiState(
+                            stage = UpdateStage.DOWNLOADING,
+                            info = update,
+                            downloadProgress = progress,
+                        )
+                    },
+                )
+                downloadedUpdateFile = apk
+                installDownloadedUpdate()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                container.logger.log(
+                    LogCategory.UPDATE,
+                    "Nie udało się pobrać aktualizacji.",
+                    error,
+                )
+                mutableUpdate.value = UpdateUiState(
+                    stage = UpdateStage.ERROR,
+                    info = update,
+                    errorMessage = error.message ?: "Nie udało się pobrać aktualizacji.",
+                )
+            }
+        }
+    }
+
+    fun requestUpdateInstallPermission() {
+        if (container.updateManager.canRequestPackageInstalls()) {
+            installDownloadedUpdate()
+            return
+        }
+        container.updateManager.openInstallPermissionSettings().onFailure(::showError)
+    }
+
+    fun installDownloadedUpdate() {
+        val update = mutableUpdate.value.info ?: return
+        val apk = downloadedUpdateFile
+        if (apk == null || !apk.isFile) {
+            mutableUpdate.value = UpdateUiState(
+                stage = UpdateStage.ERROR,
+                info = update,
+                errorMessage = "Pobrany plik aktualizacji nie jest już dostępny.",
+            )
+            return
+        }
+        if (!container.updateManager.canRequestPackageInstalls()) {
+            mutableUpdate.value = UpdateUiState(
+                stage = UpdateStage.AWAITING_INSTALL_PERMISSION,
+                info = update,
+                downloadProgress = 1f,
+            )
+            return
+        }
+        mutableUpdate.value = UpdateUiState(
+            stage = UpdateStage.READY_TO_INSTALL,
+            info = update,
+            downloadProgress = 1f,
+        )
+        container.updateManager.launchInstaller(apk).onFailure { error ->
+            mutableUpdate.value = UpdateUiState(
+                stage = UpdateStage.ERROR,
+                info = update,
+                downloadProgress = 1f,
+                errorMessage = error.message ?: "Nie udało się uruchomić instalatora.",
+            )
+        }
+    }
+
+    fun dismissUpdate() {
+        updateDownloadJob?.cancel()
+        updateDownloadJob = null
+        container.updateManager.deleteDownloadedUpdate(downloadedUpdateFile)
+        downloadedUpdateFile = null
+        mutableUpdate.value = UpdateUiState()
+    }
+
+    private fun resumePendingUpdateInstallation() {
+        if (
+            mutableUpdate.value.stage == UpdateStage.AWAITING_INSTALL_PERMISSION &&
+            container.updateManager.canRequestPackageInstalls()
+        ) {
+            installDownloadedUpdate()
+        }
     }
 
     fun startCalibration() {
@@ -224,8 +426,8 @@ class MainViewModel(
     }
 
     fun emitFakeButtonClicks(clickCount: Int) {
-        if (!BuildConfig.DEBUG || !container.settings.value.developerMode) {
-            showError(IllegalStateException("Generator przycisku wymaga buildu debug i Developer Mode."))
+        if (!BuildConfig.DEBUG || !currentSettings().developerMode) {
+            showError(IllegalStateException("Generator przycisku wymaga buildu debug i trybu deweloperskiego."))
             return
         }
         container.runtime.injectDebugSamples(container.fakeTrikiDataSource.generateButtonClicks(clickCount))
@@ -264,16 +466,31 @@ class MainViewModel(
 
     private fun autoConnectIfPossible() {
         if (autoConnectRequested) return
-        val address = container.settings.value.knownDeviceAddress ?: return
+        val settings = currentSettings()
+        val address = settings.knownDeviceAddress ?: return
         if (
-            !mutablePermissions.value.bluetoothPermissionsGranted ||
+            !mutablePermissions.value.connectGranted ||
             !mutablePermissions.value.bluetoothEnabled ||
-            !mutablePermissions.value.legacyLocationServicesEnabled
+            !mutablePermissions.value.bluetoothSupported
         ) return
         autoConnectRequested = true
-        if (container.settings.value.backgroundEnabled) TrikiForegroundService.start(getApplication())
-        container.bleManager.autoConnectKnown(address)
+        if (settings.backgroundEnabled) startBackgroundService(showErrorToUser = false)
+        container.bleManager.autoConnectKnown(address, settings.knownDeviceName)
     }
+
+    private fun startBackgroundService(showErrorToUser: Boolean) {
+        runCatching { TrikiForegroundService.start(getApplication()) }
+            .onFailure { error ->
+                container.logger.log(
+                    LogCategory.SERVICE,
+                    "Android nie pozwolił uruchomić autołączenia w tle.",
+                    error,
+                )
+                if (showErrorToUser) showError(error)
+            }
+    }
+
+    private fun currentSettings(): AppSettings = mutableSettings.value ?: container.settings.value
 
     private fun launchHandled(block: suspend () -> Unit) {
         viewModelScope.launch { runCatching { block() }.onFailure(::showError) }
@@ -285,6 +502,8 @@ class MainViewModel(
 
     override fun onCleared() {
         calibrationJob?.cancel()
+        updateCheckJob?.cancel()
+        updateDownloadJob?.cancel()
         super.onCleared()
     }
 

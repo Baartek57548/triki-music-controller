@@ -98,34 +98,57 @@ fun DeviceScreen(
                             TrikiConnectionState.SCANNING -> "Szukam aktywnego Triki…"
                             TrikiConnectionState.CONNECTING -> "Nawiązuję połączenie GATT…"
                             TrikiConnectionState.CONNECTED -> "Odczytuję usługi i informacje…"
-                            TrikiConnectionState.RECONNECTING -> "Czekam na ponowne połączenie…"
+                            TrikiConnectionState.RECONNECTING -> "Naciśnij przycisk Triki — telefon czeka na jego wybudzenie…"
                             else -> ""
                         },
                         working,
                     )
                     state.ble.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (state.ble.connectionState == TrikiConnectionState.READY) {
-                            Button(onClick = viewModel::disconnect, modifier = Modifier.weight(1f)) { Text("Rozłącz") }
-                            OutlinedButton(
-                                onClick = { ledOn = !ledOn; viewModel.setLed(ledOn) },
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(Icons.Default.Lightbulb, null)
-                                Text(if (ledOn) " Zgaś LED" else " Zapal LED")
+                        when (state.ble.connectionState) {
+                            TrikiConnectionState.READY -> {
+                                Button(onClick = viewModel::disconnect, modifier = Modifier.weight(1f)) { Text("Rozłącz") }
+                                OutlinedButton(
+                                    onClick = { ledOn = !ledOn; viewModel.setLed(ledOn) },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(Icons.Default.Lightbulb, null)
+                                    Text(if (ledOn) " Zgaś LED" else " Zapal LED")
+                                }
                             }
-                        } else {
-                            Button(
-                                onClick = { if (state.permissions.bluetoothPermissionsGranted) viewModel.startScan() else onPermissions() },
-                                enabled = !working,
+
+                            TrikiConnectionState.RECONNECTING,
+                            TrikiConnectionState.CONNECTING,
+                            TrikiConnectionState.CONNECTED,
+                            -> Button(
+                                onClick = if (state.ble.connectionState == TrikiConnectionState.RECONNECTING) {
+                                    viewModel::disableAutoConnect
+                                } else {
+                                    viewModel::disconnect
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.BluetoothSearching, null)
-                                Text(" Skanuj urządzenia")
+                                Text(if (state.ble.connectionState == TrikiConnectionState.RECONNECTING) "Wyłącz autołączenie" else "Anuluj")
+                            }
+
+                            else -> {
+                                Button(
+                                    onClick = { if (state.permissions.bluetoothPermissionsGranted) viewModel.startScan() else onPermissions() },
+                                    enabled = !working,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.BluetoothSearching, null)
+                                    Text(" Skanuj urządzenia")
+                                }
                             }
                         }
                     }
                     if (state.settings.knownDeviceAddress != null) {
+                        Text(
+                            "Triki jest zapamiętane. Po uśpieniu naciśnij jego przycisk — telefon połączy się automatycznie.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         OutlinedButton(onClick = viewModel::forgetDevice, modifier = Modifier.fillMaxWidth()) {
                             Text("Zapomnij urządzenie")
                         }
@@ -160,12 +183,24 @@ fun DeviceScreen(
         }
 
         item { SectionTitle("Narzędzia") }
-        item { NavigationRow(Icons.Default.Tune, "Kalibracja", "Wyznacz bias, neutralną pozycję i poziom szumu.", onCalibration) }
-        item { NavigationRow(Icons.Default.Sensors, "Sensor Monitor", "Akcelerometr, żyroskop, orientacja i wykresy na żywo.", onSensor) }
-        if (state.settings.developerMode) {
-            item { NavigationRow(Icons.Default.BugReport, "BLE Inspector", "Usługi GATT, properties oraz pakiety RAW w HEX i DEC.", onInspector) }
+        item {
+            NavigationRow(
+                Icons.Default.Tune,
+                "Kalibracja",
+                if (state.ble.connectionState == TrikiConnectionState.READY) {
+                    "Wyznacz odchylenie, pozycję neutralną i poziom szumu."
+                } else {
+                    "Najpierw połącz Triki, aby rozpocząć kalibrację."
+                },
+                onCalibration,
+                enabled = state.ble.connectionState == TrikiConnectionState.READY,
+            )
         }
-        item { NavigationRow(Icons.Default.Security, "Uprawnienia", "Bluetooth, powiadomienie usługi i dostęp do MediaSession.", onPermissions) }
+        item { NavigationRow(Icons.Default.Sensors, "Monitor czujników", "Akcelerometr, żyroskop, orientacja i wykresy na żywo.", onSensor) }
+        if (state.settings.developerMode) {
+            item { NavigationRow(Icons.Default.BugReport, "Inspektor BLE", "Usługi GATT, właściwości oraz pakiety RAW w HEX i DEC.", onInspector) }
+        }
+        item { NavigationRow(Icons.Default.Security, "Uprawnienia", "Bluetooth, powiadomienie usługi i informacje o odtwarzaniu.", onPermissions) }
     }
 }
 
@@ -178,7 +213,7 @@ private fun DeviceResult(device: TrikiDevice, onConnect: () -> Unit) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium)
                 Text("${device.address} · ${device.rssi ?: "—"} dBm", style = MaterialTheme.typography.bodyMedium)
             }
-            Button(onClick = onConnect) { Text("Połącz") }
+            Button(onClick = onConnect) { Text(if (device.isKnown) "Połącz ponownie" else "Połącz i zapamiętaj") }
         }
     }
 }

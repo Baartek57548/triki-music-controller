@@ -25,9 +25,9 @@ class FakeTrikiDataSource {
                 frameIndex = index.toLong(),
                 timestampNanos = startNanos + index * SAMPLE_PERIOD_NANOS,
                 gyroscopeDps = Vector3(0f, 0f, 0f),
-                accelerometerG = Vector3(0f, 0f, 1f),
+                accelerometerG = Vector3(0f, 0f, -1f),
                 rawGyroscope = RawVector3(0, 0, 0),
-                rawAccelerometer = RawVector3(0, 0, 2_048),
+                rawAccelerometer = RawVector3(0, 0, (-2_048).toShort()),
                 status = status,
             )
         }

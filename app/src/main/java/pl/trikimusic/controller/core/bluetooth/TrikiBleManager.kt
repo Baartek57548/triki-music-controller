@@ -67,14 +67,16 @@ class TrikiBleManager(
     val samples: SharedFlow<TrikiSensorData> = mutableSamples.asSharedFlow()
     val rawPackets: StateFlow<List<RawBlePacket>> = mutableRawPackets.asStateFlow()
 
-    private var bluetoothGatt: BluetoothGatt? = null
+    @Volatile private var bluetoothGatt: BluetoothGatt? = null
     private var scanCallback: ScanCallback? = null
     private var scanTimeoutJob: Job? = null
     private var reconnectJob: Job? = null
     private var rssiJob: Job? = null
-    private var autoConnectAddress: String? = null
-    private var manualDisconnect = false
-    private var reconnectAttempt = 0
+    @Volatile private var autoConnectAddress: String? = null
+    @Volatile private var gattUsesAutoConnect = false
+    @Volatile private var autoReconnectAuthorized = false
+    @Volatile private var manualDisconnect = false
+    @Volatile private var reconnectAttempt = 0
 
     fun startScan(knownAddress: String? = null, reconnecting: Boolean = false): Result<Unit> = runCatching {
         val permission = permissionManager.state()
@@ -86,7 +88,7 @@ class TrikiBleManager(
         }
         stopScanInternal()
         manualDisconnect = false
-        autoConnectAddress = knownAddress
+        if (knownAddress != null) autoConnectAddress = knownAddress
         mutableState.update {
             it.copy(
                 connectionState = if (reconnecting) TrikiConnectionState.RECONNECTING else TrikiConnectionState.SCANNING,
@@ -111,9 +113,46 @@ class TrikiBleManager(
         fail(error.message ?: "Nie można rozpocząć skanowania BLE.", error)
     }
 
-    fun autoConnectKnown(address: String) {
-        if (address.isBlank() || bluetoothGatt != null || scanCallback != null) return
-        startScan(knownAddress = address, reconnecting = reconnectAttempt > 0)
+    /**
+     * Registers a passive GATT connection for a device selected by the user earlier. Android
+     * keeps this request pending and completes it when a sleeping Triki wakes and becomes
+     * available, avoiding scan windows that could miss its short advertising period.
+     */
+    @SuppressLint("MissingPermission")
+    fun autoConnectKnown(address: String, rememberedName: String? = null): Result<Unit> = runCatching {
+        require(address.isNotBlank()) { "Adres zapamiętanego Triki jest pusty." }
+        autoConnectAddress = address
+        autoReconnectAuthorized = true
+        manualDisconnect = false
+        if (bluetoothGatt != null || scanCallback != null) return@runCatching
+
+        val permission = permissionManager.state()
+        require(permission.bluetoothSupported) { "Telefon nie obsługuje Bluetooth LE." }
+        require(permission.connectGranted) { "Brak uprawnienia do połączenia Bluetooth." }
+        require(permission.bluetoothEnabled) { "Bluetooth jest wyłączony." }
+        reconnectJob?.cancel()
+        reconnectJob = null
+        val adapter = requireNotNull(bluetoothManager?.adapter) { "Adapter Bluetooth jest niedostępny." }
+        val remoteDevice = adapter.getRemoteDevice(address)
+        val previous = mutableState.value.selectedDevice?.takeIf { it.address.equals(address, ignoreCase = true) }
+        val model = TrikiDevice(
+            name = rememberedName?.takeIf(String::isNotBlank) ?: previous?.name ?: "Triki",
+            address = address,
+            rssi = previous?.rssi,
+            isKnown = true,
+        )
+        connect(remoteDevice, model, useAutoConnect = true)
+    }.onFailure { error ->
+        fail(error.message ?: "Nie można oczekiwać na wybudzenie Triki.", error)
+        val permission = permissionManager.state()
+        if (
+            autoReconnectAuthorized &&
+            !manualDisconnect &&
+            permission.connectGranted &&
+            permission.bluetoothEnabled
+        ) {
+            scheduleReconnect()
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -121,12 +160,18 @@ class TrikiBleManager(
         require(permissionManager.state().connectGranted) { "Brak uprawnienia do połączenia Bluetooth." }
         val adapter = requireNotNull(bluetoothManager?.adapter) { "Adapter Bluetooth jest niedostępny." }
         val remoteDevice = adapter.getRemoteDevice(device.address)
-        connect(remoteDevice, device)
+        autoConnectAddress = device.address
+        autoReconnectAuthorized = device.isKnown
+        connect(remoteDevice, device, useAutoConnect = false)
     }.onFailure { error -> fail(error.message ?: "Połączenie nie powiodło się.", error) }
 
     @SuppressLint("MissingPermission")
     fun disconnect(forgetReconnect: Boolean = true) {
         manualDisconnect = forgetReconnect
+        if (forgetReconnect) {
+            autoReconnectAuthorized = false
+            autoConnectAddress = null
+        }
         reconnectJob?.cancel()
         reconnectJob = null
         reconnectAttempt = 0
@@ -135,6 +180,7 @@ class TrikiBleManager(
         rssiJob = null
         bluetoothGatt?.runCatching { disconnect() }
         closeGatt()
+        gattUsesAutoConnect = false
         decoder.reset()
         sampleRateWindow.clear()
         mutableState.update {
@@ -205,19 +251,35 @@ class TrikiBleManager(
                 discoveredDevices = devices,
             )
         }
-        if (isAddressMatch) connect(result.device, device)
+        if (isAddressMatch) {
+            runCatching { connect(result.device, device, useAutoConnect = false) }
+                .onFailure { error -> fail(error.message ?: "Połączenie nie powiodło się.", error) }
+        }
     }
 
     @SuppressLint("MissingPermission")
-    private fun connect(device: BluetoothDevice, model: TrikiDevice) {
+    private fun connect(device: BluetoothDevice, model: TrikiDevice, useAutoConnect: Boolean) {
         stopScanInternal()
         closeGatt()
         manualDisconnect = false
         mutableState.update {
-            it.copy(connectionState = TrikiConnectionState.CONNECTING, selectedDevice = model, errorMessage = null)
+            it.copy(
+                connectionState = if (useAutoConnect) TrikiConnectionState.RECONNECTING else TrikiConnectionState.CONNECTING,
+                selectedDevice = model,
+                discoveredDevices = emptyList(),
+                errorMessage = null,
+            )
         }
-        logger.log(LogCategory.BLE, "Łączenie z ${model.name} (${model.address}).")
-        bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        logger.log(
+            LogCategory.BLE,
+            if (useAutoConnect) {
+                "Czekam na wybudzenie ${model.name} (${model.address}); aktywne autoConnect GATT."
+            } else {
+                "Pierwsze połączenie z ${model.name} (${model.address})."
+            },
+        )
+        gattUsesAutoConnect = useAutoConnect
+        bluetoothGatt = device.connectGatt(context, useAutoConnect, gattCallback, BluetoothDevice.TRANSPORT_LE)
     }
 
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
@@ -229,38 +291,55 @@ class TrikiBleManager(
                 return
             }
             if (status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
-                reconnectAttempt = 0
                 mutableState.update { it.copy(connectionState = TrikiConnectionState.CONNECTED, errorMessage = null) }
                 logger.log(LogCategory.BLE, "Połączono; rozpoczynam discovery services.")
-                if (!gatt.discoverServices()) fail("Nie udało się rozpocząć odkrywania usług GATT.")
+                if (!gatt.discoverServices()) recoverFromGattSetupFailure(gatt, "Nie udało się rozpocząć odkrywania usług GATT.")
                 return
             }
             if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 logger.log(LogCategory.BLE, "Połączenie BLE przerwane (status=$status).")
-                closeGatt(gatt)
+                rssiJob?.cancel()
+                rssiJob = null
                 decoder.reset()
                 sampleRateWindow.clear()
-                if (!manualDisconnect && mutableState.value.selectedDevice != null) scheduleReconnect()
-                else mutableState.update { it.copy(connectionState = TrikiConnectionState.DISCONNECTED) }
+                if (manualDisconnect || mutableState.value.selectedDevice == null) {
+                    closeGatt(gatt)
+                    mutableState.update { it.disconnectedTelemetry() }
+                } else if (gattUsesAutoConnect && status == BluetoothGatt.GATT_SUCCESS) {
+                    // A successful peripheral-side disconnect keeps an autoConnect GATT alive;
+                    // Android will reconnect this same client after the button wakes Triki.
+                    mutableState.update { it.waitingForWakeTelemetry() }
+                    logger.log(LogCategory.BLE, "Triki śpi; system czeka na wybudzenie przyciskiem.")
+                } else {
+                    // Link-loss statuses can terminate a pending client on some Android stacks.
+                    // Recreate it with bounded backoff, then leave the platform request pending.
+                    closeGatt(gatt)
+                    scheduleReconnect()
+                }
                 return
             }
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                fail("Błąd GATT podczas łączenia: $status")
+                logger.log(LogCategory.BLE, "Błąd GATT podczas łączenia: $status.")
                 closeGatt(gatt)
                 if (!manualDisconnect) scheduleReconnect()
+                else mutableState.update { it.disconnectedTelemetry() }
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            if (gatt !== bluetoothGatt) {
+                closeGatt(gatt)
+                return
+            }
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                fail("Discovery services nie powiodło się: $status")
+                recoverFromGattSetupFailure(gatt, "Discovery services nie powiodło się: $status")
                 return
             }
             val services = gatt.services.map(::mapService)
             mutableState.update { it.copy(gattServices = services) }
             logger.log(LogCategory.BLE, "GATT: ${services.size} usług, ${services.sumOf { it.characteristics.size }} charakterystyk.")
             if (findCharacteristic(gatt, TrikiProtocol.NUS_TX_UUID) == null || findCharacteristic(gatt, TrikiProtocol.NUS_RX_UUID) == null) {
-                fail("Urządzenie nie udostępnia potwierdzonego profilu Nordic UART Triki.")
+                recoverFromGattSetupFailure(gatt, "Urządzenie nie udostępnia potwierdzonego profilu Nordic UART Triki.")
                 return
             }
             metadataValues.clear()
@@ -277,17 +356,20 @@ class TrikiBleManager(
 
         @Deprecated("Used for Android 8-12 GATT callbacks")
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (gatt !== bluetoothGatt) return
             handleCharacteristicRead(gatt, characteristic, characteristic.value ?: byteArrayOf(), status)
         }
 
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
+            if (gatt !== bluetoothGatt) return
             handleCharacteristicRead(gatt, characteristic, value, status)
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            if (gatt !== bluetoothGatt) return
             if (descriptor.characteristic.uuid == TrikiProtocol.NUS_TX_UUID) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
-                    fail("Nie udało się włączyć notyfikacji IMU: $status")
+                    recoverFromGattSetupFailure(gatt, "Nie udało się włączyć notyfikacji IMU: $status")
                     return
                 }
                 startImuStream(gatt)
@@ -296,15 +378,19 @@ class TrikiBleManager(
 
         @Deprecated("Used for Android 8-12 GATT callbacks")
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+            if (gatt !== bluetoothGatt) return
             handleNotification(characteristic.uuid, characteristic.value ?: byteArrayOf())
         }
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+            if (gatt !== bluetoothGatt) return
             handleNotification(characteristic.uuid, value)
         }
 
         override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS) mutableState.update { it.copy(rssi = rssi) }
+            if (gatt === bluetoothGatt && status == BluetoothGatt.GATT_SUCCESS) {
+                mutableState.update { it.copy(rssi = rssi) }
+            }
         }
     }
 
@@ -338,30 +424,34 @@ class TrikiBleManager(
     }
 
     @SuppressLint("MissingPermission")
-    private fun enableNotifications(gatt: BluetoothGatt, characteristicUuid: UUID) {
+    private fun enableNotifications(gatt: BluetoothGatt, characteristicUuid: UUID): Boolean {
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
-            fail("Brak charakterystyki notyfikacji $characteristicUuid.")
-            return
+            handleNotificationSetupFailure(gatt, characteristicUuid, "Brak charakterystyki notyfikacji $characteristicUuid.")
+            return false
         }
         if (!gatt.setCharacteristicNotification(characteristic, true)) {
-            fail("System nie włączył notyfikacji $characteristicUuid.")
-            return
+            handleNotificationSetupFailure(gatt, characteristicUuid, "System nie włączył notyfikacji $characteristicUuid.")
+            return false
         }
         val descriptor = characteristic.getDescriptor(TrikiProtocol.CLIENT_CHARACTERISTIC_CONFIG_UUID)
         if (descriptor == null) {
-            fail("Brak deskryptora CCCD dla $characteristicUuid.")
-            return
+            handleNotificationSetupFailure(gatt, characteristicUuid, "Brak deskryptora CCCD dla $characteristicUuid.")
+            return false
         }
         val status = writeDescriptor(gatt, descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-        if (status != BluetoothGatt.GATT_SUCCESS) fail("Zapis CCCD został odrzucony: $status")
+        if (status != BluetoothGatt.GATT_SUCCESS) {
+            handleNotificationSetupFailure(gatt, characteristicUuid, "Zapis CCCD został odrzucony: $status")
+            return false
+        }
+        return true
     }
 
     @SuppressLint("MissingPermission")
     private fun startImuStream(gatt: BluetoothGatt) {
         val rx = findCharacteristic(gatt, TrikiProtocol.NUS_RX_UUID)
         if (rx == null) {
-            fail("Brak charakterystyki NUS RX.")
+            recoverFromGattSetupFailure(gatt, "Brak charakterystyki NUS RX.")
             return
         }
         decoder.reset()
@@ -373,9 +463,11 @@ class TrikiBleManager(
             BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
         )
         if (status != BluetoothGatt.GATT_SUCCESS) {
-            fail("Komenda startowa Triki została odrzucona: $status")
+            recoverFromGattSetupFailure(gatt, "Komenda startowa Triki została odrzucona: $status")
             return
         }
+        reconnectAttempt = 0
+        autoReconnectAuthorized = true
         mutableState.update {
             it.copy(
                 connectionState = TrikiConnectionState.READY,
@@ -392,13 +484,37 @@ class TrikiBleManager(
             delay(BATTERY_NOTIFY_DELAY_MILLIS)
             val battery = findCharacteristic(gatt, TrikiProtocol.BATTERY_LEVEL_UUID)
             if (
+                gatt === bluetoothGatt &&
                 mutableState.value.connectionState == TrikiConnectionState.READY &&
                 battery != null &&
                 battery.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
             ) {
-                enableNotifications(gatt, TrikiProtocol.BATTERY_LEVEL_UUID)
-                logger.log(LogCategory.BLE, "Włączono opcjonalne notyfikacje poziomu baterii.")
+                if (enableNotifications(gatt, TrikiProtocol.BATTERY_LEVEL_UUID)) {
+                    logger.log(LogCategory.BLE, "Włączono opcjonalne notyfikacje poziomu baterii.")
+                }
             }
+        }
+    }
+
+    private fun handleNotificationSetupFailure(gatt: BluetoothGatt, characteristicUuid: UUID, message: String) {
+        if (characteristicUuid == TrikiProtocol.NUS_TX_UUID) {
+            recoverFromGattSetupFailure(gatt, message)
+        } else {
+            logger.log(LogCategory.BLE, message)
+        }
+    }
+
+    private fun recoverFromGattSetupFailure(gatt: BluetoothGatt, message: String) {
+        logger.log(LogCategory.BLE, message)
+        if (gatt !== bluetoothGatt) {
+            closeGatt(gatt)
+            return
+        }
+        closeGatt(gatt)
+        if (!manualDisconnect && mutableState.value.selectedDevice != null) {
+            scheduleReconnect()
+        } else {
+            mutableState.update { it.copy(connectionState = TrikiConnectionState.ERROR, errorMessage = message) }
         }
     }
 
@@ -482,17 +598,48 @@ class TrikiBleManager(
     }
 
     private fun scheduleReconnect() {
+        if (!autoReconnectAuthorized) {
+            mutableState.update { it.disconnectedTelemetry() }
+            return
+        }
         val address = mutableState.value.selectedDevice?.address ?: autoConnectAddress ?: return
+        val rememberedName = mutableState.value.selectedDevice?.name
         reconnectJob?.cancel()
         val delayMillis = minOf(MAX_RECONNECT_DELAY_MILLIS, BASE_RECONNECT_DELAY_MILLIS * 2.0.pow(reconnectAttempt).toLong())
         reconnectAttempt = minOf(reconnectAttempt + 1, MAX_RECONNECT_ATTEMPT_EXPONENT)
-        mutableState.update { it.copy(connectionState = TrikiConnectionState.RECONNECTING, errorMessage = null) }
-        logger.log(LogCategory.BLE, "Ponowne połączenie za ${delayMillis / 1_000}s.")
+        mutableState.update { it.waitingForWakeTelemetry() }
+        logger.log(LogCategory.BLE, "Ponowne zarejestrowanie autoConnect za ${delayMillis / 1_000}s.")
         reconnectJob = scope.launch {
             delay(delayMillis)
-            if (!manualDisconnect) startScan(address, reconnecting = true)
+            reconnectJob = null
+            if (!manualDisconnect) autoConnectKnown(address, rememberedName)
         }
     }
+
+    private fun TrikiBleState.waitingForWakeTelemetry(): TrikiBleState = copy(
+        connectionState = TrikiConnectionState.RECONNECTING,
+        rssi = null,
+        measuredSampleRateHz = null,
+        lastFrameMillis = null,
+        decodedFrames = 0L,
+        discardedStartupFrames = 0L,
+        droppedProtocolBytes = 0L,
+        lastPacketId = null,
+        errorMessage = null,
+    )
+
+    private fun TrikiBleState.disconnectedTelemetry(): TrikiBleState = copy(
+        connectionState = TrikiConnectionState.DISCONNECTED,
+        selectedDevice = null,
+        rssi = null,
+        measuredSampleRateHz = null,
+        lastFrameMillis = null,
+        decodedFrames = 0L,
+        discardedStartupFrames = 0L,
+        droppedProtocolBytes = 0L,
+        lastPacketId = null,
+        errorMessage = null,
+    )
 
     @SuppressLint("MissingPermission")
     private fun stopScanInternal() {
@@ -507,7 +654,10 @@ class TrikiBleManager(
     private fun closeGatt(specificGatt: BluetoothGatt? = null) {
         val target = specificGatt ?: bluetoothGatt
         runCatching { target?.close() }
-        if (target === bluetoothGatt || specificGatt == null) bluetoothGatt = null
+        if (target === bluetoothGatt || specificGatt == null) {
+            bluetoothGatt = null
+            gattUsesAutoConnect = false
+        }
     }
 
     private fun fail(message: String, throwable: Throwable? = null) {
@@ -585,9 +735,9 @@ class TrikiBleManager(
         const val BATTERY_NOTIFY_DELAY_MILLIS = 300L
         const val MAX_RAW_PACKETS = 300
         const val SAMPLE_RATE_WINDOW_NANOS = 2_000_000_000L
-        const val BASE_RECONNECT_DELAY_MILLIS = 2_000L
-        const val MAX_RECONNECT_DELAY_MILLIS = 60_000L
-        const val MAX_RECONNECT_ATTEMPT_EXPONENT = 5
+        const val BASE_RECONNECT_DELAY_MILLIS = 1_000L
+        const val MAX_RECONNECT_DELAY_MILLIS = 15_000L
+        const val MAX_RECONNECT_ATTEMPT_EXPONENT = 4
         const val GATT_REQUEST_REJECTED = -1
 
         val METADATA_UUIDS = setOf(

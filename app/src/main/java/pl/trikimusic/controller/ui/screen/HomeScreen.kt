@@ -61,6 +61,7 @@ import pl.trikimusic.controller.ui.components.EmptyState
 import pl.trikimusic.controller.ui.components.MetricCard
 import pl.trikimusic.controller.ui.components.SectionTitle
 import pl.trikimusic.controller.ui.components.StatusPill
+import pl.trikimusic.controller.ui.components.volumeControlPresentation
 
 @Composable
 fun HomeScreen(
@@ -84,7 +85,7 @@ fun HomeScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Triki", style = MaterialTheme.typography.displaySmall)
-                    Text("Music Controller", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Sterowanie muzyką", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusPill(state.ble.connectionState)
             }
@@ -110,7 +111,7 @@ fun HomeScreen(
             }
         }
 
-        item { SectionTitle("Now Playing", subtitle = "Aktywna sesja multimedialna Androida") }
+        item { SectionTitle("Teraz gra", subtitle = "Aktywna sesja multimedialna Androida") }
         item {
             when {
                 !state.media.hasPermission -> MediaKeyFallbackCard(onMediaAction, onOpenPermissions)
@@ -118,6 +119,20 @@ fun HomeScreen(
                     EmptyState("Brak aktywnego odtwarzacza", "Uruchom muzykę w dowolnej aplikacji obsługującej Android MediaSession.")
                 }
                 else -> NowPlayingCard(state, onMediaAction)
+            }
+        }
+
+        state.runtime.lastActionError?.let { message ->
+            item {
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Nie udało się wykonać sterowania", style = MaterialTheme.typography.titleMedium)
+                        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                }
             }
         }
 
@@ -167,7 +182,14 @@ private fun ConnectionCard(state: MainUiState, onOpenDevice: () -> Unit) {
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
-                state.ble.errorMessage ?: "Obudź kapsel przyciskiem, wyszukaj go i rozpocznij sterowanie.",
+                state.ble.errorMessage ?: if (
+                    state.ble.connectionState == TrikiConnectionState.RECONNECTING &&
+                    state.settings.knownDeviceAddress != null
+                ) {
+                    "Naciśnij przycisk zapamiętanego Triki. Telefon połączy się automatycznie, gdy kapsel się wybudzi."
+                } else {
+                    "Obudź kapsel przyciskiem, wyszukaj go i połącz pierwszy raz."
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = onOpenDevice) { Text("Przejdź do urządzenia") }
@@ -178,13 +200,20 @@ private fun ConnectionCard(state: MainUiState, onOpenDevice: () -> Unit) {
 @Composable
 private fun TrikiVisual(state: MainUiState, modifier: Modifier = Modifier) {
     val orientation = state.runtime.latestSample?.orientation
+    val volumePresentation = state.volumeControlPresentation()
     val pitch by animateFloatAsState(orientation?.pitch?.coerceIn(-40f, 40f) ?: 0f, label = "pitch")
     val roll by animateFloatAsState(orientation?.roll?.coerceIn(-40f, 40f) ?: 0f, label = "roll")
     val yaw by animateFloatAsState(orientation?.yaw ?: 0f, label = "yaw")
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(30.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (volumePresentation.ready) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.56f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+            },
+        ),
     ) {
         Box(
             Modifier.fillMaxWidth().height(250.dp).background(
@@ -212,7 +241,7 @@ private fun TrikiVisual(state: MainUiState, modifier: Modifier = Modifier) {
                 }
             }
             Text(
-                if (state.runtime.volumeControlStationary) "Regulator Z · gotowy" else "Regulator Z · oczekiwanie",
+                volumePresentation.title,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(18.dp),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -268,9 +297,9 @@ private fun MediaKeyFallbackCard(
     Card(shape = RoundedCornerShape(26.dp)) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.Security, null, tint = MaterialTheme.colorScheme.primary)
-            Text("Sterowanie jest aktywne", style = MaterialTheme.typography.titleLarge)
+            Text("Sterowanie systemowe jest dostępne", style = MaterialTheme.typography.titleLarge)
             Text(
-                "Przycisk i regulator głośności z osi Z działają bez ograniczonego dostępu. Włącz go opcjonalnie, jeśli chcesz widzieć tytuł i okładkę utworu.",
+                "Po połączeniu Triki przycisk i regulator głośności działają bez tego dostępu. Włącz go opcjonalnie tylko wtedy, gdy chcesz widzieć tytuł i okładkę utworu.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(

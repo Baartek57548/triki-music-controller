@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import pl.trikimusic.controller.domain.model.CalibrationProfile
+import pl.trikimusic.controller.domain.model.CURRENT_ORIENTATION_CONVENTION_VERSION
 import pl.trikimusic.controller.domain.model.RawVector3
 import pl.trikimusic.controller.domain.model.TrikiSensorData
 import pl.trikimusic.controller.domain.model.Vector3
@@ -15,9 +16,9 @@ class SensorFilterAndCalibrationTest {
     @Test
     fun `low pass filter smooths abrupt sensor change`() {
         val filter = SensorFilter(filterAlpha = 0.25f)
-        filter.process(sample(0L, accel = Vector3(0f, 0f, 1f)), CalibrationProfile())
+        filter.process(sample(0L, accel = Vector3(0f, 0f, -1f)), CalibrationProfile())
 
-        val result = filter.process(sample(10_000_000L, accel = Vector3(1f, 0f, 1f)), CalibrationProfile())
+        val result = filter.process(sample(10_000_000L, accel = Vector3(1f, 0f, -1f)), CalibrationProfile())
 
         assertEquals(0.25f, result.accelerometerG.x, 0.0001f)
     }
@@ -54,7 +55,7 @@ class SensorFilterAndCalibrationTest {
         assertEquals(0f, spike.gyroscopeMagnitude, 0.0001f)
         assertEquals(0f, spike.accelerometerG.x, 0.0001f)
         assertEquals(0f, spike.accelerometerG.y, 0.0001f)
-        assertEquals(1f, spike.accelerometerG.z, 0.0001f)
+        assertEquals(-1f, spike.accelerometerG.z, 0.0001f)
     }
 
     @Test
@@ -64,19 +65,19 @@ class SensorFilterAndCalibrationTest {
         val negativeRadians = Math.toRadians(-179.0)
         var timestamp = 0L
         var result = filter.process(
-            sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), cos(positiveRadians).toFloat())),
+            sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), -cos(positiveRadians).toFloat())),
             CalibrationProfile(),
         )
         repeat(180) {
             timestamp += 19_230_769L
             result = filter.process(
-                sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), cos(positiveRadians).toFloat())),
+                sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), -cos(positiveRadians).toFloat())),
                 CalibrationProfile(),
             )
         }
         timestamp += 19_230_769L
         result = filter.process(
-            sample(timestamp, accel = Vector3(0f, sin(negativeRadians).toFloat(), cos(negativeRadians).toFloat())),
+            sample(timestamp, accel = Vector3(0f, sin(negativeRadians).toFloat(), -cos(negativeRadians).toFloat())),
             CalibrationProfile(),
         )
 
@@ -89,7 +90,7 @@ class SensorFilterAndCalibrationTest {
             sample(
                 index * 10_000_000L,
                 gyro = Vector3(1.5f, -0.5f, 0.25f),
-                accel = Vector3(0.02f, -0.01f, 1.03f),
+                accel = Vector3(0.02f, -0.01f, -1.03f),
             )
         }
 
@@ -99,6 +100,7 @@ class SensorFilterAndCalibrationTest {
         assertEquals(1.5f, result.gyroscopeBiasX, 0.001f)
         assertEquals(120, result.sampleCount)
         assertEquals(1234L, result.calibratedAtMillis)
+        assertEquals(CURRENT_ORIENTATION_CONVENTION_VERSION, result.orientationConventionVersion)
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -106,10 +108,28 @@ class SensorFilterAndCalibrationTest {
         CalibrationCalculator.calculate(List(10) { sample(it.toLong()) }, 1L)
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun `calibration rejects vertical orientation`() {
+        val samples = List(120) { index ->
+            sample(index * 10_000_000L, accel = Vector3(0f, -1f, 0f))
+        }
+
+        CalibrationCalculator.calculate(samples, 1L)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `calibration rejects face-down orientation`() {
+        val samples = List(120) { index ->
+            sample(index * 10_000_000L, accel = Vector3(0f, 0f, 1f))
+        }
+
+        CalibrationCalculator.calculate(samples, 1L)
+    }
+
     private fun sample(
         timestamp: Long,
         gyro: Vector3 = Vector3(0f, 0f, 0f),
-        accel: Vector3 = Vector3(0f, 0f, 1f),
+        accel: Vector3 = Vector3(0f, 0f, -1f),
     ) = TrikiSensorData(
         timestamp,
         timestamp,

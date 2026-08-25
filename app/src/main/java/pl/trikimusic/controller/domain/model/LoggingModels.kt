@@ -5,6 +5,7 @@ enum class LogCategory {
     PROTOCOL,
     IMU,
     CONTROL,
+    UPDATE,
     MEDIA,
     SERVICE,
     PERMISSION,

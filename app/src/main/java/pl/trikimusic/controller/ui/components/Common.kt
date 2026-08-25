@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import pl.trikimusic.controller.domain.model.TrikiConnectionState
@@ -108,33 +109,49 @@ fun NavigationRow(
     subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     trailing: @Composable (() -> Unit)? = null,
 ) {
+    val iconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val titleColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val subtitleColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    }
     Card(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
+        ),
     ) {
         Row(
             modifier = Modifier.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(15.dp),
         ) {
-            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)) {
-                Icon(icon, contentDescription = null, modifier = Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.primary)
+            Surface(shape = RoundedCornerShape(14.dp), color = iconColor.copy(alpha = 0.13f)) {
+                Icon(icon, contentDescription = null, modifier = Modifier.padding(10.dp), tint = iconColor)
             }
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor)
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = subtitleColor,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (trailing != null) trailing() else Icon(Icons.Default.ChevronRight, contentDescription = null)
+            if (trailing != null) {
+                trailing()
+            } else {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = subtitleColor)
+            }
         }
     }
 }
@@ -157,8 +174,13 @@ fun EmptyState(
             modifier = Modifier.size(38.dp),
             tint = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -229,6 +251,6 @@ fun TrikiConnectionState.displayName(): String = when (this) {
     TrikiConnectionState.CONNECTING -> "Łączenie"
     TrikiConnectionState.CONNECTED -> "Połączone"
     TrikiConnectionState.READY -> "Gotowe"
-    TrikiConnectionState.RECONNECTING -> "Ponowne łączenie"
+    TrikiConnectionState.RECONNECTING -> "Czekam na Triki"
     TrikiConnectionState.ERROR -> "Błąd"
 }

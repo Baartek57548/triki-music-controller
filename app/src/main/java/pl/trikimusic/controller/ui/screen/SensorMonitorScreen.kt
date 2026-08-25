@@ -28,12 +28,14 @@ import pl.trikimusic.controller.ui.MainViewModel
 import pl.trikimusic.controller.ui.components.DetailTopBar
 import pl.trikimusic.controller.ui.components.EmptyState
 import pl.trikimusic.controller.ui.components.LiveLineChart
+import pl.trikimusic.controller.ui.components.volumeControlPresentation
 
 @Composable
 fun SensorMonitorScreen(state: MainUiState, onBack: () -> Unit, viewModel: MainViewModel? = null) {
     val sample = state.runtime.latestSample
     val history = state.runtime.history.takeLast(240)
-    Scaffold(topBar = { DetailTopBar("Sensor Monitor", onBack) }) { padding ->
+    val volumePresentation = state.volumeControlPresentation()
+    Scaffold(topBar = { DetailTopBar("Monitor czujników", onBack) }) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -45,55 +47,50 @@ fun SensorMonitorScreen(state: MainUiState, onBack: () -> Unit, viewModel: MainV
                 item {
                     Card(shape = RoundedCornerShape(24.dp)) {
                         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Accelerometer · g", style = MaterialTheme.typography.titleMedium)
+                            Text("Akcelerometr · g", style = MaterialTheme.typography.titleMedium)
                             AxisRow("X", sample.accelerometerG.x)
                             AxisRow("Y", sample.accelerometerG.y)
                             AxisRow("Z", sample.accelerometerG.z)
-                            AxisRow("Magnitude", sample.accelerationMagnitude)
+                            AxisRow("Długość wektora", sample.accelerationMagnitude)
                         }
                     }
                 }
                 item {
                     Card(shape = RoundedCornerShape(24.dp)) {
                         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Gyroscope · °/s", style = MaterialTheme.typography.titleMedium)
+                            Text("Żyroskop · °/s", style = MaterialTheme.typography.titleMedium)
                             AxisRow("X", sample.gyroscopeDps.x)
                             AxisRow("Y", sample.gyroscopeDps.y)
                             AxisRow("Z", sample.gyroscopeDps.z)
-                            AxisRow("Magnitude", sample.gyroscopeMagnitude)
+                            AxisRow("Długość wektora", sample.gyroscopeMagnitude)
                         }
                     }
                 }
                 item {
                     Card(shape = RoundedCornerShape(24.dp)) {
                         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Orientation", style = MaterialTheme.typography.titleMedium)
+                            Text("Orientacja i sterowanie", style = MaterialTheme.typography.titleMedium)
                             AxisRow("Pitch", sample.orientation.pitch, "°")
                             AxisRow("Roll", sample.orientation.roll, "°")
                             AxisRow("Yaw", sample.orientation.yaw, "°")
                             AxisRow("Status RAW", sample.source.status.toFloat())
-                            AxisRow("Gyro Z regulatora", state.runtime.volumeGyroscopeZDps, " °/s")
+                            AxisRow("Przechył od poziomu", state.runtime.volumeTiltDegrees, "°")
+                            AxisRow("Żyroskop Z regulatora", state.runtime.volumeGyroscopeZDps, " °/s")
                             Text(
                                 "Interpretacja statusu: ${state.runtime.buttonProtocolMode.displayName}",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Text(
-                                when {
-                                    state.runtime.volumeControlStationary -> "Regulator głośności: gotowy"
-                                    state.runtime.volumeAccelerometerWithinTolerance -> "Regulator głośności: stabilizacja"
-                                    else -> "Regulator głośności: zablokowany przez akcelerometr"
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                            Text("Regulator: ${volumePresentation.title}", style = MaterialTheme.typography.bodyMedium)
+                            Text(volumePresentation.instruction, style = MaterialTheme.typography.bodyMedium)
                             AxisRow("RSSI", state.ble.rssi?.toFloat(), " dBm")
-                            AxisRow("Battery", state.ble.battery.percent?.toFloat(), "%")
+                            AxisRow("Bateria", state.ble.battery.percent?.toFloat(), "%")
                         }
                     }
                 }
             }
             item {
                 ChartCard(
-                    "Accelerometer X / Y / Z",
+                    "Akcelerometr X / Y / Z",
                     listOf(
                         history.map { it.accelerometerG.x },
                         history.map { it.accelerometerG.y },
@@ -103,7 +100,7 @@ fun SensorMonitorScreen(state: MainUiState, onBack: () -> Unit, viewModel: MainV
             }
             item {
                 ChartCard(
-                    "Gyroscope X / Y / Z",
+                    "Żyroskop X / Y / Z",
                     listOf(
                         history.map { it.gyroscopeDps.x },
                         history.map { it.gyroscopeDps.y },

@@ -21,6 +21,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +39,8 @@ import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
 import pl.trikimusic.controller.ui.components.SectionTitle
+import pl.trikimusic.controller.ui.components.VolumeGateState
+import pl.trikimusic.controller.ui.components.volumeControlPresentation
 
 @Composable
 fun ControlsScreen(
@@ -48,6 +51,7 @@ fun ControlsScreen(
     var selectedClick by remember { mutableStateOf<ButtonClickType?>(null) }
     val sample = state.runtime.latestSample
     val accelerationMagnitude = sample?.accelerationMagnitude
+    val volumePresentation = state.volumeControlPresentation()
 
     androidx.compose.foundation.lazy.LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -69,7 +73,7 @@ fun ControlsScreen(
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (state.runtime.volumeControlStationary) {
+                    containerColor = if (volumePresentation.ready) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f)
@@ -83,29 +87,57 @@ fun ControlsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Column(Modifier.weight(1f)) {
-                            Text("Głośność z osi Z", style = MaterialTheme.typography.titleLarge)
+                            Text(volumePresentation.title, style = MaterialTheme.typography.titleLarge)
                             Text(
-                                volumeStatusText(state),
+                                volumePresentation.instruction,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
                         Icon(
-                            if (state.runtime.volumeControlStationary) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                            if (volumePresentation.ready) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                             contentDescription = null,
-                            tint = if (state.runtime.volumeControlStationary) {
+                            tint = if (volumePresentation.ready) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         )
                     }
+                    if (volumePresentation.state == VolumeGateState.ARMING) {
+                        LinearProgressIndicator(
+                            progress = { state.runtime.volumeArmingProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     HorizontalDivider()
-                    SensorValueRow("Żyroskop Z", "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps))
-                    SensorValueRow("Akcelerometr |a|", accelerationMagnitude?.let { "%.3f g".format(it) } ?: "—")
-                    SensorValueRow("Dozwolony zakres", "0,800–1,200 g")
+                    GateStatusRow(
+                        "Położenie",
+                        state.runtime.volumeOrientationLevel,
+                        sample?.let { "przechył %.0f° · limit 25°".format(state.runtime.volumeTiltDegrees) } ?: "brak danych",
+                    )
+                    GateStatusRow(
+                        "Przyspieszenie",
+                        state.runtime.volumeAccelerometerWithinTolerance,
+                        accelerationMagnitude?.let { "%.3f g · zakres 0,800–1,200 g".format(it) } ?: "brak danych",
+                    )
+                    GateStatusRow(
+                        "Bezruch",
+                        state.runtime.volumeControlArmed,
+                        when {
+                            sample == null -> "brak danych"
+                            state.runtime.volumeControlArmed -> "potwierdzony"
+                            state.runtime.volumeStillEnoughToArm -> "stabilizacja %.0f%%".format(state.runtime.volumeArmingProgress * 100f)
+                            else -> "oczekiwanie na pełne zatrzymanie"
+                        },
+                    )
+                    HorizontalDivider()
+                    SensorValueRow(
+                        "Żyroskop Z",
+                        sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",
+                    )
                     Text(
-                        "Dodatnia wartość Z podgłaśnia, ujemna ścisza. Szybszy obrót daje szybszą zmianę; martwa strefa i krótka stabilizacja chronią przed przypadkowymi skokami.",
+                        "Każdy ruch poza osią Z natychmiast rozbraja regulator. Aby uzbroić go ponownie, połóż Triki górą do góry i nie dotykaj przez około sekundę.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -151,18 +183,30 @@ fun ControlsScreen(
     }
 }
 
-private fun volumeStatusText(state: MainUiState): String = when {
-    state.runtime.latestSample == null -> "Połącz Triki, aby uruchomić regulator."
-    state.runtime.volumeControlStationary -> "Gotowe — obróć kapsel w miejscu."
-    state.runtime.volumeAccelerometerWithinTolerance -> "Stabilizacja bezruchu…"
-    else -> "Zmiana zablokowana — akcelerometr jest poza tolerancją ±20%."
-}
-
 @Composable
 private fun SensorValueRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun GateStatusRow(label: String, passed: Boolean, detail: String) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            if (passed) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

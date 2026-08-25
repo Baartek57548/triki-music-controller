@@ -19,16 +19,16 @@ data class ButtonClickEvent(
 
 @Serializable
 enum class MediaAction(val displayName: String) {
-    PLAY("Play"),
-    PAUSE("Pause"),
-    PLAY_PAUSE("Play / Pause"),
+    PLAY("Odtwórz"),
+    PAUSE("Wstrzymaj"),
+    PLAY_PAUSE("Odtwórz / wstrzymaj"),
     NEXT("Następny utwór"),
     PREVIOUS("Poprzedni utwór"),
     VOLUME_UP("Głośniej"),
     VOLUME_DOWN("Ciszej"),
     MUTE("Wycisz"),
     UNMUTE("Wyłącz wyciszenie"),
-    STOP("Stop"),
+    STOP("Zatrzymaj"),
     NONE("Brak akcji"),
 }
 

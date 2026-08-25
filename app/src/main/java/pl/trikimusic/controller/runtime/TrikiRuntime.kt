@@ -21,6 +21,7 @@ import pl.trikimusic.controller.domain.model.ButtonClickEvent
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.LogCategory
 import pl.trikimusic.controller.domain.model.MediaAction
+import pl.trikimusic.controller.domain.model.TrikiConnectionState
 import pl.trikimusic.controller.domain.model.TrikiSensorData
 import pl.trikimusic.controller.domain.repository.SettingsRepository
 import pl.trikimusic.controller.domain.usecase.ActionMapper
@@ -33,7 +34,11 @@ data class RuntimeState(
     val lastAction: MediaAction? = null,
     val lastActionError: String? = null,
     val volumeAccelerometerWithinTolerance: Boolean = false,
-    val volumeControlStationary: Boolean = false,
+    val volumeOrientationLevel: Boolean = false,
+    val volumeStillEnoughToArm: Boolean = false,
+    val volumeControlArmed: Boolean = false,
+    val volumeArmingProgress: Float = 0f,
+    val volumeTiltDegrees: Float = 180f,
     val volumeGyroscopeZDps: Float = 0f,
     val buttonProtocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
 )
@@ -75,6 +80,16 @@ class TrikiRuntime(
         scope.launch {
             bleManager.samples.collect(::consume)
         }
+        scope.launch {
+            bleManager.state.collectLatest { bleState ->
+                if (
+                    bleState.connectionState != TrikiConnectionState.READY &&
+                    mutableState.value.latestSample != null
+                ) {
+                    resetProcessing()
+                }
+            }
+        }
     }
 
     fun injectDebugSamples(samples: List<TrikiSensorData>) {
@@ -91,7 +106,11 @@ class TrikiRuntime(
                 history = emptyList(),
                 latestSample = null,
                 volumeAccelerometerWithinTolerance = false,
-                volumeControlStationary = false,
+                volumeOrientationLevel = false,
+                volumeStillEnoughToArm = false,
+                volumeControlArmed = false,
+                volumeArmingProgress = 0f,
+                volumeTiltDegrees = 180f,
                 volumeGyroscopeZDps = 0f,
                 buttonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
             )
@@ -142,7 +161,11 @@ class TrikiRuntime(
             mutableState.update {
                 it.copy(
                     volumeAccelerometerWithinTolerance = false,
-                    volumeControlStationary = false,
+                    volumeOrientationLevel = false,
+                    volumeStillEnoughToArm = false,
+                    volumeControlArmed = false,
+                    volumeArmingProgress = 0f,
+                    volumeTiltDegrees = 180f,
                     volumeGyroscopeZDps = filtered.gyroscopeDps.z,
                 )
             }
@@ -153,7 +176,11 @@ class TrikiRuntime(
         mutableState.update {
             it.copy(
                 volumeAccelerometerWithinTolerance = volumeResult.accelerometerWithinTolerance,
-                volumeControlStationary = volumeResult.stationary,
+                volumeOrientationLevel = volumeResult.levelOrientation,
+                volumeStillEnoughToArm = volumeResult.stillEnoughToArm,
+                volumeControlArmed = volumeResult.armed,
+                volumeArmingProgress = volumeResult.armingProgress,
+                volumeTiltDegrees = volumeResult.tiltDegrees,
                 volumeGyroscopeZDps = volumeResult.gyroscopeZDps,
             )
         }

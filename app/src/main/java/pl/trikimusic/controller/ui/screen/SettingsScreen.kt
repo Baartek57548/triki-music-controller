@@ -76,26 +76,26 @@ fun SettingsScreen(
         item {
             SettingSwitchRow(
                 title = "Sterowanie w tle",
-                description = "Utrzymuj połączenie tylko wtedy, gdy Triki służy jako aktywny pilot.",
+                description = "Czekaj na wybudzenie zapamiętanego Triki i łącz je automatycznie po naciśnięciu przycisku.",
                 checked = state.settings.backgroundEnabled,
                 onCheckedChange = viewModel::setBackgroundEnabled,
             )
         }
         item {
             SettingSwitchRow(
-                title = "Developer Mode",
-                description = "Pokazuje inspector GATT, RAW packets, logi i generator Fake Triki.",
+                title = "Tryb deweloperski",
+                description = "Pokazuje inspektor GATT, pakiety RAW, logi i generator testowych kliknięć.",
                 checked = state.settings.developerMode,
                 onCheckedChange = viewModel::setDeveloperMode,
             )
         }
         item { SectionTitle("System") }
-        item { NavigationRow(Icons.Default.Security, "Uprawnienia", "Sprawdź dostęp do Bluetooth i aktywnych MediaSession.", onPermissions) }
-        item { NavigationRow(Icons.Default.NotificationsActive, "Usługa w tle", if (state.settings.backgroundEnabled) "Włączona dla aktywnego połączenia." else "Wyłączona.", onPermissions) }
+        item { NavigationRow(Icons.Default.Security, "Uprawnienia", "Sprawdź dostęp do Bluetooth i informacji o odtwarzaniu.", onPermissions) }
+        item { NavigationRow(Icons.Default.NotificationsActive, "Autołączenie w tle", if (state.settings.backgroundEnabled) "Telefon oczekuje na zapamiętane Triki także po jego uśpieniu." else "Wyłączone.", onPermissions) }
         if (state.settings.developerMode) {
-            item { SectionTitle("Developer") }
-            item { NavigationRow(Icons.Default.Sensors, "Sensor Monitor", "Dane IMU i generator ruchu Fake Triki.", onSensor) }
-            item { NavigationRow(Icons.Default.BugReport, "BLE Inspector", "GATT, RAW packets i eksport sesji.", onInspector) }
+            item { SectionTitle("Narzędzia deweloperskie") }
+            item { NavigationRow(Icons.Default.Sensors, "Monitor czujników", "Dane IMU i generator testowych kliknięć.", onSensor) }
+            item { NavigationRow(Icons.Default.BugReport, "Inspektor BLE", "GATT, pakiety RAW i eksport sesji.", onInspector) }
         }
         item { NavigationRow(Icons.Default.Info, "O aplikacji", "Protokół, prywatność, architektura i ograniczenia.", onAbout) }
     }

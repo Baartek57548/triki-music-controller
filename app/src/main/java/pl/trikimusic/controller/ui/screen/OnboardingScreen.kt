@@ -45,10 +45,10 @@ private data class OnboardingPage(
 )
 
 private val pages = listOf(
-    OnboardingPage("Triki Music", "Obracaj kapsel w miejscu, aby precyzyjnie regulować głośność, i używaj przycisku do sterowania odtwarzaniem.", Icons.Default.MusicNote),
-    OnboardingPage("Połącz Triki", "Bezpieczne połączenie Bluetooth LE odbiera dane czujników bez wysyłania ich poza telefon.", Icons.AutoMirrored.Filled.BluetoothSearching),
-    OnboardingPage("Sterowanie muzyką", "Żyroskop Z reguluje głośność tylko przy stabilnym odczycie akcelerometru. Kliknięcia przycisku obsługują odtwarzanie i zmianę utworu.", Icons.Default.GraphicEq),
-    OnboardingPage("Kalibracja", "Krótka kalibracja dopasuje czujniki do Twojego egzemplarza Triki i ograniczy przypadkowe zmiany głośności.", Icons.Default.Tune),
+    OnboardingPage("Triki Music", "Bezpiecznie reguluj głośność obrotem kapsla i steruj odtwarzaniem jego fizycznym przyciskiem.", Icons.Default.MusicNote),
+    OnboardingPage("Połącz i zapamiętaj", "Pierwsze połączenie wybierzesz w aplikacji. Później wystarczy nacisnąć przycisk uśpionego Triki, a telefon połączy się z nim automatycznie.", Icons.AutoMirrored.Filled.BluetoothSearching),
+    OnboardingPage("Bezpieczna głośność", "Połóż kapsel górą do góry na płaskiej powierzchni i nie dotykaj go przez około sekundę. Dopiero wtedy obrót wokół osi Z zmieni głośność.", Icons.Default.GraphicEq),
+    OnboardingPage("Kalibracja", "Kalibracja na równej powierzchni dopasuje czujniki do Twojego egzemplarza Triki i dodatkowo ograniczy przypadkowe zmiany głośności.", Icons.Default.Tune),
 )
 
 @Composable

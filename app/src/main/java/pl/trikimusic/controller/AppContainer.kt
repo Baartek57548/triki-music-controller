@@ -13,6 +13,7 @@ import pl.trikimusic.controller.core.permissions.PermissionManager
 import pl.trikimusic.controller.data.bluetooth.FakeTrikiDataSource
 import pl.trikimusic.controller.data.media.AndroidMediaControllerGateway
 import pl.trikimusic.controller.data.repository.DataStoreSettingsRepository
+import pl.trikimusic.controller.data.update.GitHubUpdateManager
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.repository.SettingsRepository
 import pl.trikimusic.controller.domain.usecase.ActionMapper
@@ -22,6 +23,7 @@ class AppContainer(application: Application) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val logger = AppLogger()
     val permissionManager = PermissionManager(application)
+    val updateManager = GitHubUpdateManager(application, logger)
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(application, logger)
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         scope,

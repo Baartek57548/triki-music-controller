@@ -16,14 +16,35 @@ data class CalibrationProfile(
     val gyroscopeNoise: Float = 0f,
     val sampleCount: Int = 0,
     val calibratedAtMillis: Long? = null,
+    val orientationConventionVersion: Int = 0,
 ) {
     val isValid: Boolean
         get() = sampleCount >= 50 && calibratedAtMillis != null
 }
 
+const val CURRENT_ORIENTATION_CONVENTION_VERSION = 1
+
+/**
+ * Converts calibration profiles saved before the hardware's face-up −Z convention was
+ * accounted for. A legacy face-up roll close to ±180° becomes the equivalent angle close
+ * to 0°, while an invalid legacy face-down calibration remains non-neutral for safety.
+ */
+fun CalibrationProfile.withCurrentOrientationConvention(): CalibrationProfile {
+    if (!isValid || orientationConventionVersion >= CURRENT_ORIENTATION_CONVENTION_VERSION) return this
+    val migratedRoll = when {
+        neutralRoll > 90f -> 180f - neutralRoll
+        neutralRoll < -90f -> -180f - neutralRoll
+        else -> neutralRoll
+    }
+    return copy(
+        neutralRoll = migratedRoll,
+        orientationConventionVersion = CURRENT_ORIENTATION_CONVENTION_VERSION,
+    )
+}
+
 @Serializable
 enum class ThemePreference(val displayName: String) {
-    SYSTEM("Systemowy"),
+    SYSTEM("System"),
     LIGHT("Jasny"),
     DARK("Ciemny"),
 }

@@ -5,7 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -25,32 +29,48 @@ class TrikiForegroundService : Service() {
     private val container by lazy { (application as TrikiMusicApplication).container }
     private var stateJob: Job? = null
     private var bootstrapJob: Job? = null
+    private var bluetoothReceiverRegistered = false
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+            when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
+                BluetoothAdapter.STATE_OFF -> container.bleManager.disconnect(forgetReconnect = false)
+                BluetoothAdapter.STATE_ON -> bootstrapAutoConnect()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        ContextCompat.registerReceiver(
+            this,
+            bluetoothStateReceiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        bluetoothReceiverRegistered = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_DISCONNECT) {
             container.bleManager.disconnect()
+            container.scope.launch {
+                runCatching { container.settingsRepository.setBackgroundEnabled(false) }
+                    .onFailure { error ->
+                        container.logger.log(
+                            LogCategory.SERVICE,
+                            "Nie udało się trwale wyłączyć autołączenia.",
+                            error,
+                        )
+                    }
+            }
             stopSelf()
             return START_NOT_STICKY
         }
         startForeground(NOTIFICATION_ID, buildNotification(container.bleManager.state.value.connectionState))
-        container.logger.log(LogCategory.SERVICE, "Uruchomiono usługę połączenia w tle.")
-        bootstrapJob?.cancel()
-        bootstrapJob = container.scope.launch {
-            val persisted = withTimeoutOrNull(SETTINGS_LOAD_TIMEOUT_MILLIS) {
-                container.settingsRepository.settings.first()
-            } ?: container.settings.value
-            val knownAddress = persisted.knownDeviceAddress
-            if (knownAddress != null && container.bleManager.state.value.connectionState == TrikiConnectionState.DISCONNECTED) {
-                container.bleManager.autoConnectKnown(knownAddress)
-            }
-        }
+        container.logger.log(LogCategory.SERVICE, "Uruchomiono usługę autołączenia Triki w tle.")
         stateJob?.cancel()
-        bootstrapJob?.cancel()
         stateJob = container.scope.launch {
             container.bleManager.state.collectLatest { state ->
                 getSystemService(NotificationManager::class.java).notify(
@@ -59,18 +79,50 @@ class TrikiForegroundService : Service() {
                 )
                 if (state.connectionState in setOf(TrikiConnectionState.DISCONNECTED, TrikiConnectionState.ERROR)) {
                     delay(IDLE_STOP_DELAY_MILLIS)
-                    if (container.bleManager.state.value.connectionState in setOf(TrikiConnectionState.DISCONNECTED, TrikiConnectionState.ERROR)) {
+                    val settings = container.settings.value
+                    if (
+                        container.bleManager.state.value.connectionState in
+                        setOf(TrikiConnectionState.DISCONNECTED, TrikiConnectionState.ERROR) &&
+                        (!settings.backgroundEnabled || settings.knownDeviceAddress == null)
+                    ) {
                         stopSelf()
                     }
                 }
             }
         }
+        bootstrapAutoConnect(startId)
         return START_STICKY
+    }
+
+    private fun bootstrapAutoConnect(startId: Int? = null) {
+        bootstrapJob?.cancel()
+        bootstrapJob = container.scope.launch {
+            val persisted = withTimeoutOrNull(SETTINGS_LOAD_TIMEOUT_MILLIS) {
+                container.settingsRepository.settings.first()
+            } ?: container.settings.value
+            val knownAddress = persisted.knownDeviceAddress
+            if (!persisted.backgroundEnabled) {
+                if (startId != null) stopSelf(startId) else stopSelf()
+            } else if (
+                knownAddress != null &&
+                container.bleManager.state.value.connectionState in
+                setOf(TrikiConnectionState.DISCONNECTED, TrikiConnectionState.ERROR)
+            ) {
+                container.bleManager.autoConnectKnown(knownAddress, persisted.knownDeviceName)
+            } else if (knownAddress == null && container.bleManager.state.value.connectionState == TrikiConnectionState.DISCONNECTED) {
+                if (startId != null) stopSelf(startId) else stopSelf()
+            }
+        }
     }
 
     override fun onDestroy() {
         stateJob?.cancel()
-        container.logger.log(LogCategory.SERVICE, "Zatrzymano usługę połączenia w tle.")
+        bootstrapJob?.cancel()
+        if (bluetoothReceiverRegistered) {
+            runCatching { unregisterReceiver(bluetoothStateReceiver) }
+            bluetoothReceiverRegistered = false
+        }
+        container.logger.log(LogCategory.SERVICE, "Zatrzymano usługę autołączenia Triki w tle.")
         super.onDestroy()
     }
 
@@ -103,18 +155,22 @@ class TrikiForegroundService : Service() {
         )
         val text = when (state) {
             TrikiConnectionState.READY -> getString(R.string.notification_connected)
-            TrikiConnectionState.RECONNECTING,
+            TrikiConnectionState.RECONNECTING -> getString(R.string.notification_waiting_for_wake)
             TrikiConnectionState.SCANNING,
             TrikiConnectionState.CONNECTING,
             -> getString(R.string.notification_reconnecting)
-            else -> "Triki: ${state.name.lowercase()}"
+            else -> if (container.permissionManager.state().bluetoothEnabled) {
+                getString(R.string.notification_autoconnect_inactive)
+            } else {
+                getString(R.string.notification_bluetooth_off)
+            }
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
             .setContentIntent(contentIntent)
-            .setOngoing(state != TrikiConnectionState.DISCONNECTED && state != TrikiConnectionState.ERROR)
+            .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .addAction(0, getString(R.string.notification_disconnect), disconnectIntent)

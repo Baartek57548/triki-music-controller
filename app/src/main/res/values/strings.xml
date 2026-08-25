@@ -2,8 +2,11 @@
 <resources>
     <string name="app_name">Triki Music</string>
     <string name="notification_channel_name">Połączenie Triki</string>
-    <string name="notification_channel_description">Aktywne sterowanie muzyką kontrolerem Triki</string>
+    <string name="notification_channel_description">Połączenie i automatyczne oczekiwanie na wybudzenie Triki</string>
     <string name="notification_connected">Triki połączone</string>
-    <string name="notification_reconnecting">Ponowne łączenie z Triki…</string>
-    <string name="notification_disconnect">Rozłącz</string>
+    <string name="notification_reconnecting">Łączenie z Triki…</string>
+    <string name="notification_waiting_for_wake">Naciśnij przycisk Triki — telefon czeka</string>
+    <string name="notification_bluetooth_off">Włącz Bluetooth, aby wznowić autołączenie</string>
+    <string name="notification_autoconnect_inactive">Autołączenie oczekuje na wznowienie</string>
+    <string name="notification_disconnect">Wyłącz autołączenie</string>
 </resources>

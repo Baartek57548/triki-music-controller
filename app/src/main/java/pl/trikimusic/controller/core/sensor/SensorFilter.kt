@@ -107,7 +107,7 @@ class SensorFilter(
             ),
         ).toFloat() - calibration.neutralPitch)
         val accelRoll = normalizeDegrees(
-            Math.toDegrees(atan2(accelerometer.y.toDouble(), accelerometer.z.toDouble())).toFloat() - calibration.neutralRoll,
+            Math.toDegrees(atan2(accelerometer.y.toDouble(), -accelerometer.z.toDouble())).toFloat() - calibration.neutralRoll,
         )
         val accelReliable = accelNorm in RELIABLE_ACCEL_MIN..RELIABLE_ACCEL_MAX
         val gyroPitch = normalizeDegrees(previous.pitch + gyroscope.y * dt)

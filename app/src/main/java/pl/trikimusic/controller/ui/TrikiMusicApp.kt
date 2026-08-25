@@ -2,28 +2,39 @@ package pl.trikimusic.controller.ui
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import pl.trikimusic.controller.ui.components.AppUpdateDialog
 import pl.trikimusic.controller.ui.screen.AboutScreen
 import pl.trikimusic.controller.ui.screen.BleInspectorScreen
 import pl.trikimusic.controller.ui.screen.CalibrationScreen
@@ -36,10 +47,10 @@ import pl.trikimusic.controller.ui.screen.SensorMonitorScreen
 import pl.trikimusic.controller.ui.screen.SettingsScreen
 
 private enum class MainDestination(val route: String, val label: String, val icon: ImageVector) {
-    HOME("home", "Home", Icons.Default.Home),
+    HOME("home", "Start", Icons.Default.Home),
     CONTROLS("controls", "Sterowanie", Icons.Default.Tune),
-    DEVICE("device", "Device", Icons.Default.Bluetooth),
-    SETTINGS("settings", "Settings", Icons.Default.Settings),
+    DEVICE("device", "Urządzenie", Icons.Default.Bluetooth),
+    SETTINGS("settings", "Ustawienia", Icons.Default.Settings),
 }
 
 object Routes {
@@ -56,8 +67,20 @@ fun TrikiMusicApp(
     viewModel: MainViewModel,
     snackbarHostState: SnackbarHostState,
 ) {
+    if (!state.settingsLoaded) {
+        AppLoadingScreen()
+        return
+    }
     if (!state.settings.onboardingComplete) {
         OnboardingScreen(onComplete = viewModel::completeOnboarding)
+        AppUpdateDialog(
+            state = state.update,
+            onDownload = viewModel::downloadAvailableUpdate,
+            onRequestInstallPermission = viewModel::requestUpdateInstallPermission,
+            onInstall = viewModel::installDownloadedUpdate,
+            onRetryCheck = { viewModel.checkForUpdates() },
+            onDismiss = viewModel::dismissUpdate,
+        )
         return
     }
     val navController = rememberNavController()
@@ -158,7 +181,40 @@ fun TrikiMusicApp(
                 PermissionsScreen(state, viewModel, onBack = navController::popBackStack)
             }
             composable(Routes.ABOUT) {
-                AboutScreen(onBack = navController::popBackStack)
+                AboutScreen(
+                    updateState = state.update,
+                    onCheckForUpdates = { viewModel.checkForUpdates() },
+                    onBack = navController::popBackStack,
+                )
+            }
+        }
+    }
+    AppUpdateDialog(
+        state = state.update,
+        onDownload = viewModel::downloadAvailableUpdate,
+        onRequestInstallPermission = viewModel::requestUpdateInstallPermission,
+        onInstall = viewModel::installDownloadedUpdate,
+        onRetryCheck = { viewModel.checkForUpdates() },
+        onDismiss = viewModel::dismissUpdate,
+    )
+}
+
+@Composable
+private fun AppLoadingScreen() {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = null,
+                    modifier = Modifier.size(52.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text("Triki Music", style = MaterialTheme.typography.headlineMedium)
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
             }
         }
     }

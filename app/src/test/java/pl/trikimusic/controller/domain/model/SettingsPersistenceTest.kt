@@ -25,7 +25,11 @@ class SettingsPersistenceTest {
             knownDeviceName = "Triki 42",
             activeProfileId = custom.id,
             profiles = defaultProfiles() + custom,
-            calibration = CalibrationProfile(sampleCount = 200, calibratedAtMillis = 123L),
+            calibration = CalibrationProfile(
+                sampleCount = 200,
+                calibratedAtMillis = 123L,
+                orientationConventionVersion = CURRENT_ORIENTATION_CONVENTION_VERSION,
+            ),
             developerMode = true,
             backgroundEnabled = false,
             theme = ThemePreference.DARK,
@@ -39,6 +43,32 @@ class SettingsPersistenceTest {
         assertEquals(MediaAction.NEXT, restored.activeProfile.actionFor(ButtonClickType.DOUBLE))
         assertEquals(MediaAction.STOP, restored.activeProfile.actionFor(ButtonClickType.TRIPLE))
         assertTrue(restored.calibration.isValid)
+    }
+
+    @Test
+    fun `legacy face-up calibration migrates from 180 degrees to current convention`() {
+        val positive = CalibrationProfile(
+            neutralRoll = 178f,
+            sampleCount = 200,
+            calibratedAtMillis = 123L,
+        ).withCurrentOrientationConvention()
+        val negative = CalibrationProfile(
+            neutralRoll = -176f,
+            sampleCount = 200,
+            calibratedAtMillis = 123L,
+        ).withCurrentOrientationConvention()
+
+        assertEquals(2f, positive.neutralRoll, 0.001f)
+        assertEquals(-4f, negative.neutralRoll, 0.001f)
+        assertEquals(CURRENT_ORIENTATION_CONVENTION_VERSION, positive.orientationConventionVersion)
+        assertEquals(CURRENT_ORIENTATION_CONVENTION_VERSION, negative.orientationConventionVersion)
+    }
+
+    @Test
+    fun `invalid default calibration is not promoted by orientation migration`() {
+        val result = CalibrationProfile().withCurrentOrientationConvention()
+
+        assertEquals(CalibrationProfile(), result)
     }
 
     @Test

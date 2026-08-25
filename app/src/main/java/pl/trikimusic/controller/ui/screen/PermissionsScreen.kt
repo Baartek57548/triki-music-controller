@@ -104,7 +104,7 @@ fun PermissionsScreen(state: MainUiState, viewModel: MainViewModel, onBack: () -
                 PermissionCard(
                     icon = Icons.Default.Notifications,
                     title = "Powiadomienie usługi",
-                    description = "Widoczne powiadomienie informuje o połączeniu działającym w tle i zawiera przycisk Rozłącz.",
+                    description = "Widoczne powiadomienie informuje o połączeniu lub oczekiwaniu na wybudzenie Triki i pozwala wyłączyć autołączenie.",
                     granted = state.permissions.notificationGranted,
                     actionLabel = "Zezwól",
                     onAction = { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },

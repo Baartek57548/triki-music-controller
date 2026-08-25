@@ -56,6 +56,8 @@ Stała długość: **14 bajtów**.
 
 Akcelerometr pracuje w skali `2048 LSB/g`. Niezależna walidacja sprzętowa obrotami o znany kąt potwierdziła dla żyroskopu zakres ±2000 dps i `70 mdps/LSB`; wcześniejsze narzędzie TrikiScope używało skali `131 LSB/(°/s)`, która dla tego wariantu zaniża ruch około 9,17 raza. Aplikacja stosuje skalę potwierdzoną przez całkowanie rzeczywistych obrotów.
 
+Sprzętowo potwierdzony zapis spoczynku na płaskim podłożu, górą do góry, wynosi około `(24, 0, -2050)` jednostek akcelerometru. Bezpieczna pozycja odpowiada więc grawitacji na ujemnej osi Z; dodatnia oś Z oznacza kapsel odwrócony o 180°. Konwencję dokumentuje zestaw testów [TRIKI-Control](https://github.com/koksny/TRIKI-Control/blob/main/tests/test_triki_motion_engine.py).
+
 Parser akceptuje nagłówki `22 00` … `22 0F`. To obejmuje firmware z licznikiem pakietów `0..15` i starszy wariant raportujący tylko `0/1`. Po utracie synchronizacji wyszukuje kolejną prawidłową parę, zachowując końcowe `0x22`, jeżeli drugi bajt przyjdzie w następnej notyfikacji. Jedna notyfikacja może zawierać część ramki albo kilka ramek.
 
 ## Próbkowanie i czas
@@ -74,7 +76,7 @@ Aplikacja:
 - Dwa publiczne, sprzętowo testowane warianty nie są zgodne semantycznie: TrikiScope obserwuje `22 00` jako puszczenie i `22 01` jako wciśnięcie, natomiast everything-imu obserwuje licznik sekwencji `0..15`. Decoder zachowuje więc neutralną nazwę `status` i akceptuje cały zakres.
 - `TrikiButtonInterpreter` nie generuje zdarzeń w trybie `UNKNOWN`. Wartość `2..15` natychmiast potwierdza `SEQUENCE_COUNTER`. Tryb `BUTTON_FLAG` wymaga co najmniej 12 obserwacji `0/1` i serii czterech identycznych wartości; naprzemienny licznik `0/1` nigdy nie spełnia tego warunku.
 - Po potwierdzeniu flagi zbocza przechodzą debounce 18 ms. Liczone są tylko pełne naciśnięcia 25 ms–2 s. Okno 450 ms rozróżnia jeden, dwa i trzy kliki; trzeci kończy sekwencję od razu. Niespodziewane `2..15`, luka strumienia ponad 300 ms lub reset połączenia kasują sekwencję bez akcji.
-- Podczas sekwencji przycisku regulator osi Z jest resetowany i ponownie wymaga stabilnego akcelerometru. Dzięki temu mechaniczny ruch kapsla przy naciskaniu nie może równolegle zmienić głośności.
+- Podczas sekwencji przycisku regulator osi Z jest resetowany i ponownie wymaga 900 ms poziomego bezruchu. Dzięki temu mechaniczny ruch kapsla przy naciskaniu nie może równolegle zmienić głośności.
 - Bit 0 charakterystyki `6e400004-…` steruje LED: `00` wyłącza, `01` włącza. Pozostałe bity nie mają potwierdzonego znaczenia i aplikacja ich nie zapisuje.
 
 ## Bateria i informacje o urządzeniu
@@ -91,6 +93,4 @@ BLE Inspector pokazuje:
 - każdą notyfikację wraz z characteristic UUID, timestampem, HEX i DEC;
 - eksport ograniczonej sesji do pliku tekstowego.
 
-Ekran **Naucz gest** uzupełnia ten zapis o etykietowany CSV po dekodowaniu: zachowuje RAW `int16`, przeskalowane i filtrowane accel + gyro, status, timestampy, orientację, kalibrację, progi oraz wynik klasyfikatora. To jest preferowany materiał do analizy błędnego rozpoznania ruchu; BLE Inspector pozostaje właściwym narzędziem do diagnozy nieznanej ramki lub firmware.
-
-Nieznany pakiet pozostaje RAW. Decoder nie dopasowuje „podobnych” ramek ani nie zgaduje skali.
+Inspektor BLE pozostaje właściwym narzędziem do diagnozy nieznanej ramki lub wariantu firmware. Nieznany pakiet pozostaje RAW; decoder nie dopasowuje „podobnych” ramek ani nie zgaduje skali.

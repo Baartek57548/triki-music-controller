@@ -63,7 +63,7 @@ fun BleInspectorScreen(state: MainUiState, viewModel: MainViewModel, onBack: () 
             }
         }
     }
-    Scaffold(topBar = { DetailTopBar("BLE Inspector", onBack) }) { padding ->
+    Scaffold(topBar = { DetailTopBar("Inspektor BLE", onBack) }) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),

@@ -21,6 +21,7 @@ import pl.trikimusic.controller.domain.model.LogCategory
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.ThemePreference
 import pl.trikimusic.controller.domain.model.defaultProfiles
+import pl.trikimusic.controller.domain.model.withCurrentOrientationConvention
 import pl.trikimusic.controller.domain.repository.SettingsRepository
 
 private val Context.trikiDataStore: DataStore<Preferences> by preferencesDataStore(name = "triki_settings")
@@ -109,6 +110,7 @@ class DataStoreSettingsRepository(
         return copy(
             profiles = safeProfiles,
             activeProfileId = safeActive,
+            calibration = calibration.withCurrentOrientationConvention(),
         )
     }
 
