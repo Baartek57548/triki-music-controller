@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import pl.trikimusic.controller.BuildConfig
 import pl.trikimusic.controller.ui.components.DetailTopBar
 
 @Composable
@@ -30,7 +31,7 @@ fun AboutScreen(onBack: () -> Unit) {
         ) {
             Icon(Icons.Default.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
             Text("Triki Music Controller", style = MaterialTheme.typography.headlineMedium)
-            Text("Wersja 1.0.0", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Wersja ${BuildConfig.VERSION_NAME}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Card(shape = RoundedCornerShape(24.dp)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Interoperacyjność", style = MaterialTheme.typography.titleMedium)

@@ -1,4 +1,4 @@
-package pl.trikimusic.controller.core.gesture
+package pl.trikimusic.controller.core.sensor
 
 import kotlin.math.atan2
 import kotlin.math.sqrt

@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import pl.trikimusic.controller.BuildConfig
-import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
 import pl.trikimusic.controller.ui.components.DetailTopBar
@@ -73,8 +72,17 @@ fun SensorMonitorScreen(state: MainUiState, onBack: () -> Unit, viewModel: MainV
                             AxisRow("Roll", sample.orientation.roll, "°")
                             AxisRow("Yaw", sample.orientation.yaw, "°")
                             AxisRow("Status RAW", sample.source.status.toFloat())
+                            AxisRow("Gyro Z regulatora", state.runtime.volumeGyroscopeZDps, " °/s")
                             Text(
                                 "Interpretacja statusu: ${state.runtime.buttonProtocolMode.displayName}",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                when {
+                                    state.runtime.volumeControlStationary -> "Regulator głośności: gotowy"
+                                    state.runtime.volumeAccelerometerWithinTolerance -> "Regulator głośności: stabilizacja"
+                                    else -> "Regulator głośności: zablokowany przez akcelerometr"
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             AxisRow("RSSI", state.ble.rssi?.toFloat(), " dBm")
@@ -107,13 +115,6 @@ fun SensorMonitorScreen(state: MainUiState, onBack: () -> Unit, viewModel: MainV
                 item {
                     Text("Fake Triki", style = MaterialTheme.typography.titleLarge)
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        GestureType.entries.forEach { gesture ->
-                            AssistChip(
-                                onClick = { viewModel.emitFakeGesture(gesture) },
-                                label = { Text(gesture.displayName) },
-                                leadingIcon = { Icon(Icons.Default.Sensors, null) },
-                            )
-                        }
                         (1..3).forEach { clickCount ->
                             AssistChip(
                                 onClick = { viewModel.emitFakeButtonClicks(clickCount) },

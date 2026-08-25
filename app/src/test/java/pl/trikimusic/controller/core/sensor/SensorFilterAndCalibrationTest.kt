@@ -1,4 +1,4 @@
-package pl.trikimusic.controller.core.gesture
+package pl.trikimusic.controller.core.sensor
 
 import kotlin.math.abs
 import kotlin.math.cos
@@ -7,7 +7,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import pl.trikimusic.controller.domain.model.CalibrationProfile
-import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.RawVector3
 import pl.trikimusic.controller.domain.model.TrikiSensorData
 import pl.trikimusic.controller.domain.model.Vector3
@@ -15,11 +14,10 @@ import pl.trikimusic.controller.domain.model.Vector3
 class SensorFilterAndCalibrationTest {
     @Test
     fun `low pass filter smooths abrupt sensor change`() {
-        val filter = SensorFilter()
-        val thresholds = GestureThresholds(filterAlpha = 0.25f)
-        filter.process(sample(0L, accel = Vector3(0f, 0f, 1f)), CalibrationProfile(), thresholds)
+        val filter = SensorFilter(filterAlpha = 0.25f)
+        filter.process(sample(0L, accel = Vector3(0f, 0f, 1f)), CalibrationProfile())
 
-        val result = filter.process(sample(10_000_000L, accel = Vector3(1f, 0f, 1f)), CalibrationProfile(), thresholds)
+        val result = filter.process(sample(10_000_000L, accel = Vector3(1f, 0f, 1f)), CalibrationProfile())
 
         assertEquals(0.25f, result.accelerometerG.x, 0.0001f)
     }
@@ -32,7 +30,6 @@ class SensorFilterAndCalibrationTest {
         val result = filter.process(
             sample(0L, gyro = Vector3(4f, -2f, 1f)),
             calibration,
-            GestureThresholds(),
         )
 
         assertEquals(0f, result.gyroscopeMagnitude, 0.0001f)
@@ -40,11 +37,10 @@ class SensorFilterAndCalibrationTest {
 
     @Test
     fun `median stage rejects one sample spike from both sensors`() {
-        val filter = SensorFilter()
+        val filter = SensorFilter(filterAlpha = 1f)
         val calibration = CalibrationProfile()
-        val thresholds = GestureThresholds(filterAlpha = 1f)
-        filter.process(sample(0L), calibration, thresholds)
-        filter.process(sample(10_000_000L), calibration, thresholds)
+        filter.process(sample(0L), calibration)
+        filter.process(sample(10_000_000L), calibration)
 
         val spike = filter.process(
             sample(
@@ -53,7 +49,6 @@ class SensorFilterAndCalibrationTest {
                 accel = Vector3(8f, -6f, 5f),
             ),
             calibration,
-            thresholds,
         )
 
         assertEquals(0f, spike.gyroscopeMagnitude, 0.0001f)
@@ -64,29 +59,25 @@ class SensorFilterAndCalibrationTest {
 
     @Test
     fun `complementary orientation crosses angle wrap without a false jump`() {
-        val filter = SensorFilter()
-        val thresholds = GestureThresholds(filterAlpha = 1f)
+        val filter = SensorFilter(filterAlpha = 1f)
         val positiveRadians = Math.toRadians(179.0)
         val negativeRadians = Math.toRadians(-179.0)
         var timestamp = 0L
         var result = filter.process(
             sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), cos(positiveRadians).toFloat())),
             CalibrationProfile(),
-            thresholds,
         )
         repeat(180) {
             timestamp += 19_230_769L
             result = filter.process(
                 sample(timestamp, accel = Vector3(0f, sin(positiveRadians).toFloat(), cos(positiveRadians).toFloat())),
                 CalibrationProfile(),
-                thresholds,
             )
         }
         timestamp += 19_230_769L
         result = filter.process(
             sample(timestamp, accel = Vector3(0f, sin(negativeRadians).toFloat(), cos(negativeRadians).toFloat())),
             CalibrationProfile(),
-            thresholds,
         )
 
         assertTrue("Roll should stay near the ±180° boundary, got ${result.orientation.roll}", abs(abs(result.orientation.roll) - 180f) < 5f)

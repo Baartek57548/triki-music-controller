@@ -1,6 +1,6 @@
 # Triki Music Controller
 
-Triki Music Controller zmienia kontroler **Żabka Triki** w konfigurowalny pilot do muzyki na Androidzie. Aplikacja odbiera strumień IMU przez Bluetooth Low Energy, filtruje i klasyfikuje ruchy, mapuje gesty na akcje multimedialne oraz steruje aktualnie aktywną sesją Android MediaSession.
+Triki Music Controller zmienia kontroler **Żabka Triki** w pilot do muzyki na Androidzie. Aplikacja odbiera strumień IMU przez Bluetooth Low Energy, reguluje głośność obrotem kapsla wokół osi Z i obsługuje akcje multimedialne przez fizyczny przycisk.
 
 To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całość działa przez publiczne API Androida: GATT, `MediaSessionManager`, `MediaController.TransportControls`, `AudioManager`, `NotificationListenerService` oraz foreground service typu `connectedDevice`.
 
@@ -8,17 +8,16 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 
 - pełny cykl BLE: energooszczędny skan na żądanie, GATT discovery, NUS notifications, timeout, RSSI, bateria, reconnect z exponential backoff;
 - potwierdzony dekoder ramek IMU z resynchronizacją po rozciętych i sklejonych notyfikacjach;
-- `GestureEngine` niezależny od UI: lean, slide, rotate, tap, shake, double shake i flip klasyfikowane z akcelerometru oraz żyroskopu po pełnym oknie ruchu;
-- dynamiczna baza neutralna, wymagany cykl spoczynek–ruch–spoczynek oraz cooldown per gest;
+- ciągły regulator głośności wykorzystujący dokładnie przefiltrowaną wartość żyroskopu Z: dodatnie Z podgłaśnia, ujemne Z ścisza;
+- obowiązkowa bramka bezruchu akcelerometru: długość wektora musi pozostawać w zakresie 0,8–1,2 g przez 120 ms;
 - wielostopniowa filtracja IMU: mediana odrzucająca pojedyncze skoki, adaptacyjna martwa strefa gyro, low-pass i filtr komplementarny;
-- opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu; lokalny stabilny spoczynek automatycznie uzbraja sterowanie;
-- lokalny model few-shot k-NN uczony z 2–5 przykładów gestu; 40 cech łączy akcelerometr i żyroskop oraz ogranicza zależność od pozycji kapsla;
+- histereza, martwa strefa i całkowanie prędkości kątowej ograniczające przypadkowe skoki oraz zachowujące proporcję między szybkością obrotu i zmianą głośności;
+- opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
 - bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa przechodzą do następnego utworu, trzy do poprzedniego; każde mapowanie można zmienić w profilu;
-- konfigurowalne mapowania oraz profile zapisywane w Preferences DataStore;
+- konfigurowalne mapowania przycisku zapisywane w Preferences DataStore;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i Now Playing;
-- onboarding, kreator wszystkich ośmiu gestów, Gesture Trainer z nagrywaniem Start/Stop, Sensor Monitor i BLE Inspector;
-- instrukcje wykonania każdego ruchu, bezpieczna próba rozpoznawania oraz wybór własnej akcji lub wyłączenie gestu;
+- onboarding, ekran stanu regulatora, Sensor Monitor i BLE Inspector;
 - rotujący bufor pakietów RAW z eksportem HEX/DEC oraz ograniczony bufor logów;
 - foreground service z akcją `Rozłącz` i automatycznym wygaszaniem, gdy nie ma aktywnego połączenia;
 - `FakeTrikiDataSource` dostępny wyłącznie w buildzie debug po włączeniu Developer Mode;
@@ -42,8 +41,8 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 5. Nadaj dostęp do urządzeń w pobliżu. Na Androidzie 8–11 system wymaga podczas skanowania BLE uprawnienia lokalizacji, mimo że aplikacja nie odczytuje GPS.
 6. Dostęp listenera powiadomień jest opcjonalny i służy do okładki, tytułu oraz dokładnego stanu sesji. Na Xiaomi podstawowe sterowanie działa również bez niego przez publiczne media keys.
 7. Naciśnij przycisk Triki, wybierz **Device → Skanuj urządzenia**, a następnie **Połącz**.
-8. Po stanie **Gotowe** przejdź kreator, w którym wybierzesz akcje i opcjonalnie nagrasz po dwie krótkie próby gestu z różnych typowych pozycji kapsla. Kalibracja jest zalecana, ale nie blokuje sterowania.
-9. Uruchom muzykę. Kreator można później powtórzyć z ekranu **Gestures → Kreator gestów**.
+8. Po stanie **Gotowe** otwórz **Sterowanie**, sprawdź status regulatora Z i ustaw akcje dla jednego, dwóch oraz trzech kliknięć.
+9. Uruchom muzykę. Trzymaj kapsel bez przyspieszeń liniowych i obracaj go w miejscu: dodatnia wartość Z podgłaśnia, ujemna ścisza.
 
 Build z linii poleceń na Windows:
 
@@ -81,22 +80,21 @@ TrikiProtocolDecoder
     ↓
 SensorFilter + calibration + complementary orientation
     ↓
-GestureFeatureExtractor + lokalny model k-NN
+GyroscopeVolumeController + bramka 0,8–1,2 g
     ↓
-GestureEngine + reguły bezpieczeństwa
-    ↓
-ActionMapper + aktywny ControlProfile
+ActionMapper + mapowanie przycisku
     ↓
 AndroidMediaControllerGateway
 ```
 
 - `core/bluetooth` — protokół, parser ramek i stanowa warstwa BLE;
-- `core/gesture` — filtracja, orientacja, kalibracja i klasyfikacja ruchu;
+- `core/sensor` — filtracja, orientacja i kalibracja czujników;
+- `core/volume` — bezpieczna regulacja głośności z żyroskopu Z;
 - `data/media` — adapter publicznych API multimedialnych Androida;
 - `data/repository` — atomowy zapis ustawień w DataStore;
 - `domain` — modele, kontrakty repozytoriów i use cases niezależne od UI;
 - `runtime` — jednokierunkowe spięcie strumienia IMU z mapowaniem akcji;
-- `ui` — Compose, nawigacja, kreator gestów i pojedynczy ViewModel orkiestrujący interakcje;
+- `ui` — Compose, nawigacja i pojedynczy ViewModel orkiestrujący interakcje;
 - `service` — foreground service i wymagany komponent Notification Listener.
 
 Szczegóły: [ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -118,13 +116,11 @@ Potwierdzone minimum:
 
 Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [TRIKI_PROTOCOL.md](docs/TRIKI_PROTOCOL.md).
 
-## Gesture Engine
+## Regulator głośności
 
-Presety czułości zmieniają spójny zestaw progów, siłę wygładzania i cooldown. Tryb Advanced pozwala zmienić progi lean/rotate/shake/tap bez naruszania mechanizmów zapobiegających spamowi. Silnik najpierw ustala lokalny spoczynek, następnie zbiera ruch i klasyfikuje najwyżej jeden gest po ponownym uspokojeniu kontrolera. Model k-NN może skorygować wynik dla nauczonego sposobu użycia, ale nie omija fizycznych bramek bezpieczeństwa. Nieruchome Triki leżące pod kątem nie może więc samo wywołać `NEXT` lub `PREVIOUS`.
+`GyroscopeVolumeController` przyjmuje przefiltrowaną wartość osi Z w °/s i całkuje ją do kąta obrotu. Każde 15° daje jeden krok głośności; znak Z określa kierunek. Uruchomienie wymaga 120 ms stabilnego odczytu akcelerometru w zakresie 0,8–1,2 g. Zakres dotyczy długości wektora, a nie osobnych osi, dlatego działa także wtedy, gdy kapsel jest trzymany pod kątem w powietrzu. Martwa strefa 18°/s, próg zwolnienia 10°/s, zerowanie po zmianie kierunku i ponowne uzbrajanie po przerwie strumienia ograniczają niezamierzone zmiany.
 
 Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
-
-Opis stanów, kompromisów i testowania: [GESTURE_ENGINE.md](docs/GESTURE_ENGINE.md). Porównanie publicznych implementacji, uzasadnienie odczytu accel + gyro oraz kryteria walidacji sprzętowej: [GESTURE_RESEARCH.md](docs/GESTURE_RESEARCH.md).
 
 ## Diagnostyka
 
@@ -133,9 +129,9 @@ Po włączeniu **Settings → Developer Mode** dostępne są:
 - Sensor Monitor z wykresami X/Y/Z, orientation, magnitude, RSSI i baterią;
 - BLE Inspector z usługami, charakterystykami, properties, descriptorami i odczytanymi wartościami;
 - nagrywanie krótkiej sesji RAW i eksport do pliku tekstowego w HEX/DEC;
-- eksport ostatniej próby z ekranu **Naucz gest** do etykietowanego CSV: RAW, wartości przeskalowane i filtrowane z obu sensorów, orientacja, timing, status ramki, progi, kalibracja i wynik klasyfikacji;
-- kategorie logów `BLE`, `PROTOCOL`, `IMU`, `GESTURE`, `MEDIA`, `SERVICE`, `PERMISSION`;
-- Fake Triki generujący kontrolowane sekwencje wszystkich obsługiwanych gestów oraz jednego, dwóch i trzech kliknięć.
+- bieżący stan bramki akcelerometru oraz wartość osi Z używaną przez regulator;
+- kategorie logów `BLE`, `PROTOCOL`, `IMU`, `CONTROL`, `MEDIA`, `SERVICE`, `PERMISSION`;
+- Fake Triki generujący sekwencje jednego, dwóch i trzech kliknięć.
 
 ## Testy
 
@@ -144,20 +140,16 @@ Testy JVM obejmują:
 - dekodowanie little-endian, skalowanie, startup discard i resynchronizację parsera;
 - autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
-- ekstrakcję cech accel + gyro, odporność cech grawitacyjnych na obrót kapsla, uczenie k-NN, odrzucanie obcych próbek i fizyczne bramki gestów;
-- pełne cykle lean, slide, rotate, flip, tap i single/double shake, nagranie Start/Stop oraz regresje dla długiego spoczynku, szumu, uszkodzonej próbki i stałego błędu gyro;
-- profile referencyjne TRIKI-Control w skali prawdziwej ramki: spoczynek na `−Z`, krótkie skręty, lean 14°, płaski slide, stamp i flip, w tym uczenie wszystkich sześciu podstawowych klas;
-- wszystkie sześć podstawowych gestów po pięciu obrotach 3D kapsla, z szumem obu sensorów oraz przy 40/52/65 Hz i jitterze timestampów;
-- mapowanie gest/przycisk → akcja i brak wywołania dla `NONE`;
-- kompletność i kolejność czasową diagnostycznego eksportu CSV oraz walidację jego metadanych;
-- round-trip serializacji ustawień, profili, mapowań, kalibracji i stanu ukończenia kreatora, wraz z migracją danych ze starszej wersji.
+- dodatni i ujemny kierunek regulatora Z, tolerancję 0,8–1,2 g, niezależność od orientacji kapsla, histerezę oraz ponowne uzbrajanie po przerwie strumienia;
+- mapowanie przycisk → akcja i brak wywołania dla `NONE`;
+- round-trip serializacji ustawień, mapowań przycisku i kalibracji, wraz z bezpiecznym ignorowaniem pól starszego systemu sterowania.
 
 ## Znane ograniczenia
 
-- Fizyczna walidacja wymaga konkretnego egzemplarza Triki. Projekt kompiluje się i ma testy dekodera na potwierdzonych ramkach, ale bieżące środowisko CI/deweloperskie nie miało dostępu do rzeczywistego kapsla. Inspector oraz etykietowany eksport gestu są celowo częścią aplikacji, aby porównać firmware i dostroić detektor z prawdziwych danych bez fikcyjnego dekodowania.
+- Fizyczna walidacja wymaga konkretnego egzemplarza Triki. Projekt kompiluje się i ma testy dekodera na potwierdzonych ramkach, ale progi regulatora należy ostatecznie potwierdzić na rzeczywistym kapslu.
 - Częstotliwość IMU nie jest zakodowana jako gwarantowana stała protokołu. UI pokazuje wartość mierzoną na żywo; parser interpoluje znaczniki wewnątrz burstu wyłącznie na potrzeby stabilnego filtru.
 - Yaw bez magnetometru dryfuje. Pitch i roll są korygowane grawitacją, natomiast yaw opiera się na całkowaniu żyroskopu.
-- Bez magnetometru nie istnieje absolutny kierunek poziomy. Dlatego podstawowe mapowanie używa bezkierunkowego `Lean` i płaskiego `Slide`, natomiast kierunek lewo/prawo rozróżnia tylko obrót wokół grawitacji.
+- Akcelerometr nie odróżnia bezruchu od ruchu ze stałą prędkością. Bramka 0,8–1,2 g odrzuca przyspieszenia liniowe, lecz nie może wykryć jednostajnego przesuwania bez dodatkowego źródła pozycji.
 - Metadane i okładka wymagają dostępu do aktywnej MediaSession. Play/Pause, Next, Previous i Stop mają fallback przez standardowe klawisze multimedialne, ale ostateczna obsługa komendy zależy od aktywnego odtwarzacza.
 - Akcje specyficzne dla Spotify/YouTube Music, takie jak like, shuffle i repeat, nie mają wspólnego publicznego API Android MediaSession. Architektura pozwala dodać jawne integracje w przyszłości, ale obecna wersja nie udaje ich działania.
 

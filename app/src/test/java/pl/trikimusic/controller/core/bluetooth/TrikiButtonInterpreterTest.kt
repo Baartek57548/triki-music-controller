@@ -22,7 +22,7 @@ class TrikiButtonInterpreterTest {
 
         assertEquals(TrikiButtonProtocolMode.SEQUENCE_COUNTER, fixture.interpreter.protocolMode)
         assertTrue(fixture.events.isEmpty())
-        assertFalse(fixture.interpreter.shouldSuppressGestures)
+        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
     }
 
     @Test
@@ -40,11 +40,11 @@ class TrikiButtonInterpreterTest {
         val fixture = Fixture().apply { identifyButtonFirmware() }
 
         fixture.click()
-        assertTrue(fixture.interpreter.shouldSuppressGestures)
+        assertTrue(fixture.interpreter.shouldSuppressMotionControl)
         fixture.feed(0, frames = 25)
 
         assertEquals(listOf(ButtonClickType.SINGLE), fixture.events)
-        assertFalse(fixture.interpreter.shouldSuppressGestures)
+        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
     }
 
     @Test
@@ -67,7 +67,7 @@ class TrikiButtonInterpreterTest {
         fixture.click(releaseFrames = 2)
 
         assertEquals(listOf(ButtonClickType.TRIPLE), fixture.events)
-        assertFalse(fixture.interpreter.shouldSuppressGestures)
+        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
     }
 
     @Test
@@ -92,7 +92,7 @@ class TrikiButtonInterpreterTest {
 
         assertEquals(TrikiButtonProtocolMode.SEQUENCE_COUNTER, fixture.interpreter.protocolMode)
         assertTrue(fixture.events.isEmpty())
-        assertFalse(fixture.interpreter.shouldSuppressGestures)
+        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
     }
 
     @Test

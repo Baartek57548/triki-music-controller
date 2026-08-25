@@ -14,7 +14,7 @@ class TrikiButtonInterpreter {
     var protocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN
         private set
 
-    val shouldSuppressGestures: Boolean
+    val shouldSuppressMotionControl: Boolean
         get() = protocolMode == TrikiButtonProtocolMode.BUTTON_FLAG &&
             (stablePressed || candidatePressed || pendingClickCount > 0)
 

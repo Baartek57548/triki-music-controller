@@ -4,7 +4,7 @@ enum class LogCategory {
     BLE,
     PROTOCOL,
     IMU,
-    GESTURE,
+    CONTROL,
     MEDIA,
     SERVICE,
     PERMISSION,

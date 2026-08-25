@@ -8,38 +8,17 @@ import pl.trikimusic.controller.domain.model.ControlProfile
 import pl.trikimusic.controller.domain.model.ButtonClickEvent
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.ButtonMapping
-import pl.trikimusic.controller.domain.model.GestureEvent
-import pl.trikimusic.controller.domain.model.GestureMapping
-import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.MediaSessionState
 import pl.trikimusic.controller.domain.repository.MediaControllerGateway
 
 class ActionMapperTest {
     @Test
-    fun `maps gesture using active profile and delegates action`() {
+    fun `none action does not call media gateway`() {
         val gateway = FakeGateway()
         val mapper = ActionMapper(gateway)
-        val profile = ControlProfile(
-            "test",
-            "Test",
-            listOf(GestureMapping(GestureType.SLIDE, MediaAction.NEXT)),
-        )
 
-        val execution = mapper.execute(GestureEvent(GestureType.SLIDE, 1L, 1f, 30f), profile)
-
-        assertEquals(MediaAction.NEXT, execution.action)
-        assertEquals(listOf(MediaAction.NEXT), gateway.actions)
-        assertTrue(execution.result.isSuccess)
-    }
-
-    @Test
-    fun `none mapping does not call media gateway`() {
-        val gateway = FakeGateway()
-        val mapper = ActionMapper(gateway)
-        val profile = ControlProfile("empty", "Empty", emptyList())
-
-        val execution = mapper.execute(GestureEvent(GestureType.FLIP, 1L, 1f, 1f), profile)
+        val execution = mapper.execute(MediaAction.NONE)
 
         assertEquals(MediaAction.NONE, execution.action)
         assertTrue(gateway.actions.isEmpty())
@@ -52,7 +31,6 @@ class ActionMapperTest {
         val profile = ControlProfile(
             id = "buttons",
             name = "Buttons",
-            mappings = emptyList(),
             buttonMappings = listOf(ButtonMapping(ButtonClickType.DOUBLE, MediaAction.NEXT)),
         )
 

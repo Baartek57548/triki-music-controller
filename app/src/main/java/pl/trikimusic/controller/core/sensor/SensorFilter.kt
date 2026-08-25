@@ -1,4 +1,4 @@
-package pl.trikimusic.controller.core.gesture
+package pl.trikimusic.controller.core.sensor
 
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -6,12 +6,17 @@ import kotlin.math.max
 import kotlin.math.sqrt
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
-import pl.trikimusic.controller.domain.model.GestureThresholds
 import pl.trikimusic.controller.domain.model.OrientationData
 import pl.trikimusic.controller.domain.model.TrikiSensorData
 import pl.trikimusic.controller.domain.model.Vector3
 
-class SensorFilter {
+class SensorFilter(
+    private val filterAlpha: Float = DEFAULT_FILTER_ALPHA,
+) {
+    init {
+        require(filterAlpha in 0.02f..1f) { "Współczynnik filtru musi należeć do zakresu 0,02–1,00." }
+    }
+
     private var filteredGyroscope: Vector3? = null
     private var filteredAccelerometer: Vector3? = null
     private var orientation = OrientationData()
@@ -31,7 +36,6 @@ class SensorFilter {
     fun process(
         sample: TrikiSensorData,
         calibration: CalibrationProfile,
-        thresholds: GestureThresholds,
     ): FilteredSensorData {
         val calibratedGyroscope = sample.gyroscopeDps - Vector3(
             calibration.gyroscopeBiasX,
@@ -51,9 +55,8 @@ class SensorFilter {
             medianGyroscope,
             max(MIN_GYROSCOPE_NOISE_FLOOR_DPS, calibration.gyroscopeNoise * GYROSCOPE_NOISE_MULTIPLIER),
         )
-        val alpha = thresholds.filterAlpha
-        filteredGyroscope = lowPass(filteredGyroscope, stabilizedGyroscope, alpha)
-        filteredAccelerometer = lowPass(filteredAccelerometer, medianAccelerometer, alpha)
+        filteredGyroscope = lowPass(filteredGyroscope, stabilizedGyroscope, filterAlpha)
+        filteredAccelerometer = lowPass(filteredAccelerometer, medianAccelerometer, filterAlpha)
 
         val dt = previousTimestampNanos?.let { previous ->
             ((sample.timestampNanos - previous).coerceIn(MIN_DT_NANOS, MAX_DT_NANOS) / 1_000_000_000f)
@@ -144,6 +147,7 @@ class SensorFilter {
         const val MAX_DT_NANOS = 100_000_000L
         const val MIN_GYROSCOPE_NOISE_FLOOR_DPS = 2.5f
         const val GYROSCOPE_NOISE_MULTIPLIER = 2.8f
+        const val DEFAULT_FILTER_ALPHA = 0.32f
     }
 
     private class MedianOfThreeVectorFilter {

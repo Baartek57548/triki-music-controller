@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.io.IOException
-import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -18,16 +17,8 @@ import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.ButtonMapping
 import pl.trikimusic.controller.domain.model.CalibrationProfile
-import pl.trikimusic.controller.domain.model.ControlProfile
-import pl.trikimusic.controller.domain.model.CURRENT_GESTURE_LEARNING_VERSION
-import pl.trikimusic.controller.domain.model.GestureMapping
-import pl.trikimusic.controller.domain.model.GestureFeatureVector
-import pl.trikimusic.controller.domain.model.GestureThresholds
-import pl.trikimusic.controller.domain.model.GestureType
 import pl.trikimusic.controller.domain.model.LogCategory
-import pl.trikimusic.controller.domain.model.LearnedGestureSample
 import pl.trikimusic.controller.domain.model.MediaAction
-import pl.trikimusic.controller.domain.model.SensitivityLevel
 import pl.trikimusic.controller.domain.model.ThemePreference
 import pl.trikimusic.controller.domain.model.defaultProfiles
 import pl.trikimusic.controller.domain.repository.SettingsRepository
@@ -57,13 +48,6 @@ class DataStoreSettingsRepository(
 
     override suspend fun completeOnboarding() = update { copy(onboardingComplete = true) }
 
-    override suspend fun completeGestureWizard() = update {
-        copy(
-            gestureWizardCompleted = true,
-            gestureLearningVersion = CURRENT_GESTURE_LEARNING_VERSION,
-        )
-    }
-
     override suspend fun rememberDevice(address: String, name: String) {
         require(address.isNotBlank())
         require(name.isNotBlank())
@@ -71,22 +55,6 @@ class DataStoreSettingsRepository(
     }
 
     override suspend fun forgetDevice() = update { copy(knownDeviceAddress = null, knownDeviceName = null) }
-
-    override suspend fun setGestureMapping(profileId: String, gesture: GestureType, action: MediaAction) {
-        update {
-            val changed = profiles.map { profile ->
-                if (profile.id != profileId) {
-                    profile
-                } else {
-                    profile.copy(
-                        mappings = profile.mappings
-                            .filterNot { it.gesture == gesture } + GestureMapping(gesture, action),
-                    )
-                }
-            }
-            copy(profiles = changed)
-        }
-    }
 
     override suspend fun setButtonMapping(profileId: String, click: ButtonClickType, action: MediaAction) {
         update {
@@ -103,76 +71,6 @@ class DataStoreSettingsRepository(
             copy(profiles = changed)
         }
     }
-
-    override suspend fun saveGestureTrainingSample(gesture: GestureType, features: GestureFeatureVector) {
-        require(features.isValid) { "Nie można zapisać nieprawidłowej próbki modelu gestów." }
-        val sample = LearnedGestureSample(
-            gesture = gesture,
-            features = features,
-            capturedAtMillis = System.currentTimeMillis(),
-        )
-        update { copy(personalizedGestureModel = personalizedGestureModel.withSample(sample)) }
-    }
-
-    override suspend fun clearGestureTraining(gesture: GestureType) =
-        update { copy(personalizedGestureModel = personalizedGestureModel.withoutGesture(gesture)) }
-
-    override suspend fun createProfile(name: String): Result<ControlProfile> = runCatching {
-        val validName = validateProfileName(name)
-        val profile = ControlProfile(
-            id = UUID.randomUUID().toString(),
-            name = validName,
-            mappings = defaultProfiles().first().mappings,
-        )
-        update { copy(profiles = profiles + profile, activeProfileId = profile.id) }
-        profile
-    }
-
-    override suspend fun copyProfile(profileId: String, newName: String): Result<ControlProfile> = runCatching {
-        val validName = validateProfileName(newName)
-        var copy: ControlProfile? = null
-        update {
-            val source = profiles.firstOrNull { it.id == profileId }
-                ?: error("Nie znaleziono profilu do skopiowania.")
-            copy = source.copy(id = UUID.randomUUID().toString(), name = validName, builtIn = false)
-            this.copy(profiles = profiles + requireNotNull(copy), activeProfileId = requireNotNull(copy).id)
-        }
-        requireNotNull(copy)
-    }
-
-    override suspend fun renameProfile(profileId: String, newName: String): Result<Unit> = runCatching {
-        val validName = validateProfileName(newName)
-        update {
-            val target = profiles.firstOrNull { it.id == profileId } ?: error("Profil nie istnieje.")
-            require(!target.builtIn) { "Wbudowanego profilu nie można zmienić." }
-            copy(profiles = profiles.map { if (it.id == profileId) it.copy(name = validName) else it })
-        }
-    }
-
-    override suspend fun deleteProfile(profileId: String): Result<Unit> = runCatching {
-        update {
-            val target = profiles.firstOrNull { it.id == profileId } ?: error("Profil nie istnieje.")
-            require(!target.builtIn) { "Wbudowanego profilu nie można usunąć." }
-            val remaining = profiles.filterNot { it.id == profileId }
-            require(remaining.isNotEmpty()) { "Musi pozostać co najmniej jeden profil." }
-            copy(
-                profiles = remaining,
-                activeProfileId = if (activeProfileId == profileId) remaining.first().id else activeProfileId,
-            )
-        }
-    }
-
-    override suspend fun setActiveProfile(profileId: String) {
-        update {
-            require(profiles.any { it.id == profileId }) { "Profil nie istnieje." }
-            copy(activeProfileId = profileId)
-        }
-    }
-
-    override suspend fun setSensitivity(level: SensitivityLevel) = update { copy(sensitivity = level) }
-
-    override suspend fun setAdvancedThresholds(thresholds: GestureThresholds) =
-        update { copy(advancedThresholds = thresholds, sensitivity = SensitivityLevel.ADVANCED) }
 
     override suspend fun saveCalibration(profile: CalibrationProfile) {
         require(profile.isValid) { "Profil kalibracji zawiera zbyt mało próbek." }
@@ -208,24 +106,10 @@ class DataStoreSettingsRepository(
     private fun AppSettings.normalized(): AppSettings {
         val safeProfiles = profiles.ifEmpty { defaultProfiles() }
         val safeActive = activeProfileId.takeIf { id -> safeProfiles.any { it.id == id } } ?: safeProfiles.first().id
-        val oldSensorPipeline = gestureLearningVersion < CURRENT_GESTURE_LEARNING_VERSION
         return copy(
             profiles = safeProfiles,
             activeProfileId = safeActive,
-            sensitivity = if (oldSensorPipeline && sensitivity == SensitivityLevel.ADVANCED) {
-                SensitivityLevel.NORMAL
-            } else {
-                sensitivity
-            },
-            advancedThresholds = if (oldSensorPipeline) GestureThresholds() else advancedThresholds,
-            personalizedGestureModel = personalizedGestureModel.normalized(),
         )
-    }
-
-    private fun validateProfileName(name: String): String {
-        val normalized = name.trim()
-        require(normalized.length in 2..40) { "Nazwa profilu musi mieć od 2 do 40 znaków." }
-        return normalized
     }
 
     private companion object {

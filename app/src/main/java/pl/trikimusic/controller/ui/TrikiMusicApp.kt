@@ -5,9 +5,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -16,7 +16,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -25,14 +24,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import pl.trikimusic.controller.domain.model.CURRENT_GESTURE_LEARNING_VERSION
 import pl.trikimusic.controller.ui.screen.AboutScreen
 import pl.trikimusic.controller.ui.screen.BleInspectorScreen
 import pl.trikimusic.controller.ui.screen.CalibrationScreen
+import pl.trikimusic.controller.ui.screen.ControlsScreen
 import pl.trikimusic.controller.ui.screen.DeviceScreen
-import pl.trikimusic.controller.ui.screen.GestureTrainerScreen
-import pl.trikimusic.controller.ui.screen.GestureWizardScreen
-import pl.trikimusic.controller.ui.screen.GesturesScreen
 import pl.trikimusic.controller.ui.screen.HomeScreen
 import pl.trikimusic.controller.ui.screen.OnboardingScreen
 import pl.trikimusic.controller.ui.screen.PermissionsScreen
@@ -41,15 +37,13 @@ import pl.trikimusic.controller.ui.screen.SettingsScreen
 
 private enum class MainDestination(val route: String, val label: String, val icon: ImageVector) {
     HOME("home", "Home", Icons.Default.Home),
-    GESTURES("gestures", "Gestures", Icons.Default.Gesture),
+    CONTROLS("controls", "Sterowanie", Icons.Default.Tune),
     DEVICE("device", "Device", Icons.Default.Bluetooth),
     SETTINGS("settings", "Settings", Icons.Default.Settings),
 }
 
 object Routes {
     const val CALIBRATION = "calibration"
-    const val TRAINER = "trainer"
-    const val GESTURE_WIZARD = "gesture-wizard"
     const val SENSOR = "sensor"
     const val INSPECTOR = "inspector"
     const val PERMISSIONS = "permissions"
@@ -71,16 +65,6 @@ fun TrikiMusicApp(
     val currentDestination = backStackEntry?.destination
     val mainRoutes = MainDestination.entries.map { it.route }.toSet()
     val showBottomBar = currentDestination?.route in mainRoutes
-
-    LaunchedEffect(state.settings.calibration.isValid, state.settings.gestureLearningVersion) {
-        if (
-            state.settings.calibration.isValid &&
-            state.settings.gestureLearningVersion < CURRENT_GESTURE_LEARNING_VERSION &&
-            currentDestination?.route != Routes.GESTURE_WIZARD
-        ) {
-            navController.navigate(Routes.GESTURE_WIZARD) { launchSingleTop = true }
-        }
-    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -132,13 +116,11 @@ fun TrikiMusicApp(
                     onOpenPermissions = { navController.navigate(Routes.PERMISSIONS) },
                 )
             }
-            composable(MainDestination.GESTURES.route) {
-                GesturesScreen(
+            composable(MainDestination.CONTROLS.route) {
+                ControlsScreen(
                     state = state,
                     contentPadding = padding,
                     viewModel = viewModel,
-                    onOpenTrainer = { navController.navigate(Routes.TRAINER) },
-                    onOpenWizard = { navController.navigate(Routes.GESTURE_WIZARD) },
                 )
             }
             composable(MainDestination.DEVICE.route) {
@@ -165,21 +147,6 @@ fun TrikiMusicApp(
             }
             composable(Routes.CALIBRATION) {
                 CalibrationScreen(state, viewModel, onBack = navController::popBackStack)
-            }
-            composable(Routes.TRAINER) {
-                GestureTrainerScreen(state, viewModel, onBack = navController::popBackStack)
-            }
-            composable(Routes.GESTURE_WIZARD) {
-                GestureWizardScreen(
-                    state = state,
-                    viewModel = viewModel,
-                    onBack = navController::popBackStack,
-                    onFinished = {
-                        if (!navController.popBackStack()) {
-                            navController.navigate(MainDestination.GESTURES.route) { launchSingleTop = true }
-                        }
-                    },
-                )
             }
             composable(Routes.SENSOR) {
                 SensorMonitorScreen(state, onBack = navController::popBackStack, viewModel = viewModel)

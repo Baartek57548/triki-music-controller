@@ -3,72 +3,6 @@ package pl.trikimusic.controller.domain.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class SensitivityLevel(val displayName: String) {
-    LOW("Niska"),
-    NORMAL("Normalna"),
-    HIGH("Wysoka"),
-    VERY_HIGH("Bardzo wysoka"),
-    ADVANCED("Advanced"),
-}
-
-@Serializable
-data class GestureThresholds(
-    val tiltDegrees: Float = 12f,
-    val tiltReleaseDegrees: Float = 7f,
-    val rotationDps: Float = 42f,
-    val shakeDps: Float = 260f,
-    val impactG: Float = 1.24f,
-    val freeFallG: Float = 0.38f,
-    val filterAlpha: Float = 0.32f,
-    val cooldownMillis: Long = 650L,
-) {
-    init {
-        require(tiltDegrees in 6f..80f)
-        require(tiltReleaseDegrees >= 2f && tiltReleaseDegrees < tiltDegrees)
-        require(rotationDps in 20f..2_000f)
-        require(shakeDps in 50f..2_000f)
-        require(impactG in 1.1f..16f)
-        require(freeFallG in 0.05f..0.9f)
-        require(filterAlpha in 0.02f..1f)
-        require(cooldownMillis in 100L..5_000L)
-    }
-}
-
-fun SensitivityLevel.thresholds(custom: GestureThresholds): GestureThresholds = when (this) {
-    SensitivityLevel.LOW -> GestureThresholds(
-        tiltDegrees = 22f,
-        tiltReleaseDegrees = 11f,
-        rotationDps = 70f,
-        shakeDps = 360f,
-        impactG = 1.45f,
-        filterAlpha = 0.24f,
-        cooldownMillis = 850L,
-    )
-    SensitivityLevel.NORMAL -> GestureThresholds()
-    SensitivityLevel.HIGH -> GestureThresholds(
-        tiltDegrees = 9f,
-        tiltReleaseDegrees = 5f,
-        rotationDps = 34f,
-        shakeDps = 215f,
-        impactG = 1.18f,
-        freeFallG = 0.45f,
-        filterAlpha = 0.36f,
-        cooldownMillis = 520L,
-    )
-    SensitivityLevel.VERY_HIGH -> GestureThresholds(
-        tiltDegrees = 7f,
-        tiltReleaseDegrees = 4f,
-        rotationDps = 26f,
-        shakeDps = 170f,
-        impactG = 1.12f,
-        freeFallG = 0.5f,
-        filterAlpha = 0.45f,
-        cooldownMillis = 420L,
-    )
-    SensitivityLevel.ADVANCED -> custom
-}
-
-@Serializable
 data class CalibrationProfile(
     val accelerometerBiasX: Float = 0f,
     val accelerometerBiasY: Float = 0f,
@@ -97,16 +31,11 @@ enum class ThemePreference(val displayName: String) {
 @Serializable
 data class AppSettings(
     val onboardingComplete: Boolean = false,
-    val gestureWizardCompleted: Boolean = false,
-    val gestureLearningVersion: Int = 0,
     val knownDeviceAddress: String? = null,
     val knownDeviceName: String? = null,
     val activeProfileId: String = DEFAULT_PROFILE_ID,
     val profiles: List<ControlProfile> = defaultProfiles(),
-    val sensitivity: SensitivityLevel = SensitivityLevel.NORMAL,
-    val advancedThresholds: GestureThresholds = GestureThresholds(),
     val calibration: CalibrationProfile = CalibrationProfile(),
-    val personalizedGestureModel: PersonalizedGestureModel = PersonalizedGestureModel(),
     val developerMode: Boolean = false,
     val backgroundEnabled: Boolean = true,
     val theme: ThemePreference = ThemePreference.SYSTEM,
@@ -122,30 +51,5 @@ fun defaultProfiles(): List<ControlProfile> = listOf(
         id = DEFAULT_PROFILE_ID,
         name = "Music",
         builtIn = true,
-        mappings = listOf(
-            GestureMapping(GestureType.LEAN, MediaAction.PREVIOUS),
-            GestureMapping(GestureType.SLIDE, MediaAction.NEXT),
-            GestureMapping(GestureType.TAP, MediaAction.PLAY_PAUSE),
-            GestureMapping(GestureType.ROTATE_LEFT, MediaAction.VOLUME_DOWN),
-            GestureMapping(GestureType.ROTATE_RIGHT, MediaAction.VOLUME_UP),
-            GestureMapping(GestureType.SHAKE, MediaAction.MUTE),
-            GestureMapping(GestureType.DOUBLE_SHAKE, MediaAction.PLAY_PAUSE),
-            GestureMapping(GestureType.FLIP, MediaAction.STOP),
-        ),
-    ),
-    ControlProfile(
-        id = "spotify",
-        name = "Spotify",
-        builtIn = true,
-        mappings = listOf(
-            GestureMapping(GestureType.LEAN, MediaAction.PREVIOUS),
-            GestureMapping(GestureType.SLIDE, MediaAction.NEXT),
-            GestureMapping(GestureType.TAP, MediaAction.PLAY_PAUSE),
-            GestureMapping(GestureType.ROTATE_LEFT, MediaAction.VOLUME_DOWN),
-            GestureMapping(GestureType.ROTATE_RIGHT, MediaAction.VOLUME_UP),
-            GestureMapping(GestureType.SHAKE, MediaAction.PLAY_PAUSE),
-            GestureMapping(GestureType.DOUBLE_SHAKE, MediaAction.NEXT),
-            GestureMapping(GestureType.FLIP, MediaAction.STOP),
-        ),
     ),
 )

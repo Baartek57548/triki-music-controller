@@ -1,29 +1,6 @@
 package pl.trikimusic.controller.domain.model
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
-
-@Serializable
-enum class GestureType(val displayName: String) {
-    @SerialName("TILT_LEFT")
-    LEAN("Przechylenie w dowolną stronę"),
-    @SerialName("TILT_RIGHT")
-    SLIDE("Płaskie przesunięcie"),
-    SHAKE("Potrząśnięcie"),
-    DOUBLE_SHAKE("Podwójne potrząśnięcie"),
-    FLIP("Odwrócenie"),
-    ROTATE_LEFT("Obrót w lewo"),
-    ROTATE_RIGHT("Obrót w prawo"),
-    @SerialName("THROW_UP")
-    TAP("Stuknięcie / odstawienie"),
-}
-
-data class GestureEvent(
-    val type: GestureType,
-    val timestampNanos: Long,
-    val confidence: Float,
-    val magnitude: Float,
-)
 
 @Serializable
 enum class ButtonClickType(
@@ -56,12 +33,6 @@ enum class MediaAction(val displayName: String) {
 }
 
 @Serializable
-data class GestureMapping(
-    val gesture: GestureType,
-    val action: MediaAction,
-)
-
-@Serializable
 data class ButtonMapping(
     val click: ButtonClickType,
     val action: MediaAction,
@@ -77,13 +48,9 @@ fun defaultButtonMappings(): List<ButtonMapping> = listOf(
 data class ControlProfile(
     val id: String,
     val name: String,
-    val mappings: List<GestureMapping>,
     val builtIn: Boolean = false,
     val buttonMappings: List<ButtonMapping> = defaultButtonMappings(),
 ) {
-    fun actionFor(gesture: GestureType): MediaAction =
-        mappings.firstOrNull { it.gesture == gesture }?.action ?: MediaAction.NONE
-
     fun actionFor(click: ButtonClickType): MediaAction =
         buttonMappings.firstOrNull { it.click == click }?.action ?: MediaAction.NONE
 }

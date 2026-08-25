@@ -122,11 +122,11 @@ fun HomeScreen(
         }
 
         item {
-            val gesture = state.runtime.lastGesture
             val buttonClick = state.runtime.lastButtonClick
+            val volumeTimestamp = state.runtime.lastVolumeChangeTimestampNanos
             val buttonIsLatest = buttonClick != null &&
-                (gesture == null || buttonClick.timestampNanos >= gesture.timestampNanos)
-            if (gesture != null || buttonClick != null) {
+                (volumeTimestamp == null || buttonClick.timestampNanos >= volumeTimestamp)
+            if (volumeTimestamp != null || buttonClick != null) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)),
                     shape = RoundedCornerShape(24.dp),
@@ -138,7 +138,7 @@ fun HomeScreen(
                         Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
                             Text("Ostatnie sterowanie", style = MaterialTheme.typography.bodyMedium)
                             Text(
-                                if (buttonIsLatest) buttonClick!!.type.displayName else gesture!!.type.displayName,
+                                if (buttonIsLatest) buttonClick!!.type.displayName else "Obrót kapsla · oś Z",
                                 style = MaterialTheme.typography.titleMedium,
                             )
                         }
@@ -212,7 +212,7 @@ private fun TrikiVisual(state: MainUiState, modifier: Modifier = Modifier) {
                 }
             }
             Text(
-                "Ruch na żywo",
+                if (state.runtime.volumeControlStationary) "Regulator Z · gotowy" else "Regulator Z · oczekiwanie",
                 modifier = Modifier.align(Alignment.BottomCenter).padding(18.dp),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -251,12 +251,12 @@ private fun DeviceMetrics(state: MainUiState, modifier: Modifier = Modifier) {
 }
 
 private fun latestControlName(state: MainUiState): String {
-    val gesture = state.runtime.lastGesture
     val click = state.runtime.lastButtonClick
-    return if (click != null && (gesture == null || click.timestampNanos >= gesture.timestampNanos)) {
+    val volumeTimestamp = state.runtime.lastVolumeChangeTimestampNanos
+    return if (click != null && (volumeTimestamp == null || click.timestampNanos >= volumeTimestamp)) {
         click.type.displayName
     } else {
-        gesture?.type?.displayName ?: "—"
+        state.runtime.lastAction?.displayName.takeIf { volumeTimestamp != null } ?: "—"
     }
 }
 
@@ -270,7 +270,7 @@ private fun MediaKeyFallbackCard(
             Icon(Icons.Default.Security, null, tint = MaterialTheme.colorScheme.primary)
             Text("Sterowanie jest aktywne", style = MaterialTheme.typography.titleLarge)
             Text(
-                "Przyciski i gesty działają bez ograniczonego dostępu. Włącz go opcjonalnie, jeśli chcesz widzieć tytuł i okładkę utworu.",
+                "Przycisk i regulator głośności z osi Z działają bez ograniczonego dostępu. Włącz go opcjonalnie, jeśli chcesz widzieć tytuł i okładkę utworu.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(
