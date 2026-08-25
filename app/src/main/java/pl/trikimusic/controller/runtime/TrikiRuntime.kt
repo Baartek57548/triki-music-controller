@@ -33,11 +33,8 @@ data class RuntimeState(
     val lastVolumeChangeTimestampNanos: Long? = null,
     val lastAction: MediaAction? = null,
     val lastActionError: String? = null,
-    val volumeAccelerometerWithinTolerance: Boolean = false,
-    val volumeOrientationLevel: Boolean = false,
-    val volumeStillEnoughToArm: Boolean = false,
-    val volumeControlArmed: Boolean = false,
-    val volumeArmingProgress: Float = 0f,
+    val volumeSensorValid: Boolean = false,
+    val volumeWithinTiltRange: Boolean = false,
     val volumeTiltDegrees: Float = 180f,
     val volumeGyroscopeZDps: Float = 0f,
     val buttonProtocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
@@ -105,11 +102,8 @@ class TrikiRuntime(
             it.copy(
                 history = emptyList(),
                 latestSample = null,
-                volumeAccelerometerWithinTolerance = false,
-                volumeOrientationLevel = false,
-                volumeStillEnoughToArm = false,
-                volumeControlArmed = false,
-                volumeArmingProgress = 0f,
+                volumeSensorValid = false,
+                volumeWithinTiltRange = false,
                 volumeTiltDegrees = 180f,
                 volumeGyroscopeZDps = 0f,
                 buttonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
@@ -136,8 +130,8 @@ class TrikiRuntime(
             )
         }
         if (buttonEvent != null || buttonInterpreter.shouldSuppressMotionControl) {
-            // A physical press also moves the IMU. The complete click sequence owns the
-            // input window, then the stationary gate must arm again before volume control.
+            // A physical press also moves the IMU. The complete click sequence owns the input
+            // window; tilt-based volume control becomes active again on the next eligible sample.
             volumeController.reset()
         }
         if (buttonEvent != null) {
@@ -160,11 +154,8 @@ class TrikiRuntime(
         if (buttonInterpreter.shouldSuppressMotionControl) {
             mutableState.update {
                 it.copy(
-                    volumeAccelerometerWithinTolerance = false,
-                    volumeOrientationLevel = false,
-                    volumeStillEnoughToArm = false,
-                    volumeControlArmed = false,
-                    volumeArmingProgress = 0f,
+                    volumeSensorValid = false,
+                    volumeWithinTiltRange = false,
                     volumeTiltDegrees = 180f,
                     volumeGyroscopeZDps = filtered.gyroscopeDps.z,
                 )
@@ -175,11 +166,8 @@ class TrikiRuntime(
         val volumeResult = volumeController.process(filtered)
         mutableState.update {
             it.copy(
-                volumeAccelerometerWithinTolerance = volumeResult.accelerometerWithinTolerance,
-                volumeOrientationLevel = volumeResult.levelOrientation,
-                volumeStillEnoughToArm = volumeResult.stillEnoughToArm,
-                volumeControlArmed = volumeResult.armed,
-                volumeArmingProgress = volumeResult.armingProgress,
+                volumeSensorValid = volumeResult.sensorValid,
+                volumeWithinTiltRange = volumeResult.withinTiltRange,
                 volumeTiltDegrees = volumeResult.tiltDegrees,
                 volumeGyroscopeZDps = volumeResult.gyroscopeZDps,
             )

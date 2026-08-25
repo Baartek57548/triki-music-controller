@@ -19,7 +19,7 @@ class VolumeControlPresentationTest {
     fun `disconnected state takes priority over stale sensor readiness`() {
         val state = uiState(
             connectionState = TrikiConnectionState.DISCONNECTED,
-            runtime = runtime(armed = true, level = true, still = true, tilt = 0f),
+            runtime = runtime(withinRange = true, tilt = 0f),
         )
 
         val presentation = state.volumeControlPresentation()
@@ -30,21 +30,32 @@ class VolumeControlPresentationTest {
 
     @Test
     fun `vertical and upside down poses provide distinct corrective guidance`() {
-        val vertical = uiState(runtime = runtime(level = false, tilt = 90f))
-        val upsideDown = uiState(runtime = runtime(level = false, tilt = 180f))
+        val vertical = uiState(runtime = runtime(withinRange = false, tilt = 90f))
+        val upsideDown = uiState(runtime = runtime(withinRange = false, tilt = 180f))
 
-        assertEquals(VolumeGateState.NOT_LEVEL, vertical.volumeControlPresentation().state)
+        assertEquals(VolumeGateState.OUTSIDE_TILT_RANGE, vertical.volumeControlPresentation().state)
         assertEquals(VolumeGateState.UPSIDE_DOWN, upsideDown.volumeControlPresentation().state)
     }
 
     @Test
-    fun `arming and ready are represented as separate states`() {
-        val arming = uiState(runtime = runtime(level = true, still = true, progress = 0.5f))
-        val ready = uiState(runtime = runtime(armed = true, level = true, still = false, progress = 1f))
+    fun `valid sample in tilt range is ready without stationary state`() {
+        val ready = uiState(runtime = runtime(withinRange = true, tilt = 25f))
 
-        assertEquals(VolumeGateState.ARMING, arming.volumeControlPresentation().state)
-        assertEquals(VolumeGateState.READY, ready.volumeControlPresentation().state)
-        assertTrue(ready.volumeControlPresentation().ready)
+        val presentation = ready.volumeControlPresentation()
+
+        assertEquals(VolumeGateState.READY, presentation.state)
+        assertTrue(presentation.ready)
+        assertTrue(presentation.instruction.contains("Nie musisz zatrzymywać"))
+    }
+
+    @Test
+    fun `invalid IMU sample has dedicated error state`() {
+        val invalid = uiState(runtime = runtime(sensorValid = false, withinRange = false, tilt = 180f))
+
+        val presentation = invalid.volumeControlPresentation()
+
+        assertEquals(VolumeGateState.SENSOR_INVALID, presentation.state)
+        assertFalse(presentation.ready)
     }
 
     private fun uiState(
@@ -56,18 +67,13 @@ class VolumeControlPresentationTest {
     )
 
     private fun runtime(
-        armed: Boolean = false,
-        level: Boolean,
-        still: Boolean = false,
-        progress: Float = 0f,
-        tilt: Float = 0f,
+        sensorValid: Boolean = true,
+        withinRange: Boolean,
+        tilt: Float,
     ) = RuntimeState(
         latestSample = sample(),
-        volumeAccelerometerWithinTolerance = true,
-        volumeOrientationLevel = level,
-        volumeStillEnoughToArm = still,
-        volumeControlArmed = armed,
-        volumeArmingProgress = progress,
+        volumeSensorValid = sensorValid,
+        volumeWithinTiltRange = withinRange,
         volumeTiltDegrees = tilt,
     )
 

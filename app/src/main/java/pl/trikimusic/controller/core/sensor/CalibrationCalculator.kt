@@ -24,7 +24,7 @@ object CalibrationCalculator {
         val gravityY = averageAy / gravityMagnitude
         val gravityZ = averageAz / gravityMagnitude
         val faceUpTiltDegrees = Math.toDegrees(kotlin.math.acos((-gravityZ).coerceIn(-1f, 1f).toDouble())).toFloat()
-        require(faceUpTiltDegrees <= MAX_FACE_UP_TILT_DEGREES) {
+        require(faceUpTiltDegrees <= MAX_FACE_UP_TILT_DEGREES + TILT_COMPARISON_EPSILON_DEGREES) {
             "Połóż Triki górną stroną do góry na płaskiej powierzchni (odchylenie ${"%.1f".format(faceUpTiltDegrees)}°)."
         }
         val neutralPitch = Math.toDegrees(
@@ -61,4 +61,5 @@ object CalibrationCalculator {
     private const val MAX_GRAVITY = 1.25f
     private const val MAX_GYROSCOPE_NOISE_DPS = 25f
     private const val MAX_FACE_UP_TILT_DEGREES = 25f
+    private const val TILT_COMPARISON_EPSILON_DEGREES = 0.001f
 }

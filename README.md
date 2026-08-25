@@ -9,7 +9,7 @@ To nie jest emulator Żappki i nie omija zabezpieczeń żadnej usługi. Całoś�
 - pełny cykl BLE: skan pierwszego urządzenia na żądanie, zapamiętanie po udanym połączeniu, pasywne GATT `autoConnect`, discovery, NUS notifications, timeout, RSSI i bateria;
 - potwierdzony dekoder ramek IMU z resynchronizacją po rozciętych i sklejonych notyfikacjach;
 - ciągły regulator głośności wykorzystujący dokładnie przefiltrowaną wartość żyroskopu Z: dodatnie Z podgłaśnia, ujemne Z ścisza;
-- wielowarstwowa bramka bezpieczeństwa: kapsel musi leżeć górą do góry w przechyle do 25°, akcelerometr pozostawać w zakresie 0,8–1,2 g, a cały żyroskop wskazywać bezruch nieprzerwanie przez 900 ms;
+- kątowa bramka sterowania: regulator działa natychmiast, gdy kapsel pozostaje górą do góry w zakresie przechyłu 0–25° — również podczas trzymania i poruszania nim w powietrzu;
 - wielostopniowa filtracja IMU: mediana odrzucająca pojedyncze skoki, adaptacyjna martwa strefa gyro, low-pass i filtr komplementarny;
 - histereza, martwa strefa i całkowanie prędkości kątowej ograniczające przypadkowe skoki oraz zachowujące proporcję między szybkością obrotu i zmianą głośności;
 - opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
@@ -85,7 +85,7 @@ TrikiProtocolDecoder
     ↓
 SensorFilter + calibration + complementary orientation
     ↓
-GyroscopeVolumeController + bramka poziomu, bezruchu i 0,8–1,2 g
+GyroscopeVolumeController + bramka przechyłu 0–25°
     ↓
 ActionMapper + mapowanie przycisku
     ↓
@@ -124,9 +124,9 @@ Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [
 
 ## Regulator głośności
 
-`GyroscopeVolumeController` przyjmuje przefiltrowaną wartość żyroskopu Z w °/s i całkuje ją do kąta obrotu. Każde 15° daje jeden krok głośności; znak żyroskopu Z określa kierunek. Sprzętowo potwierdzona pozycja kapsla górą do góry daje około −1 g na osi akcelerometru Z. Uzbrojenie wymaga 900 ms ciągłego spoczynku całego żyroskopu poniżej 5°/s, długości wektora akcelerometru 0,8–1,2 g oraz położenia górą do góry z przechyłem maksymalnie 25°. Po uzbrojeniu histereza dopuszcza przechył do 32°, ale przekroczenie tego progu albo obrót poza osią Z powyżej 22°/s natychmiast rozbraja regulator. Położenie pionowe 90° i odwrócone 180° nie może zmienić głośności.
+`GyroscopeVolumeController` przyjmuje przefiltrowaną wartość żyroskopu Z w °/s i całkuje ją do kąta obrotu. Każde 15° daje jeden krok głośności; znak żyroskopu Z określa kierunek. Sprzętowo potwierdzona pozycja kapsla górą do góry daje około −1 g na osi akcelerometru Z. Regulator działa natychmiast przy przechyle 0–25° i nie wymaga bezruchu, odkładania kapsla ani długości wektora 0,8–1,2 g. Przekroczenie 25° zeruje nagromadzony obrót i blokuje zmianę głośności. Położenie pionowe 90° i odwrócone 180° również nie może zmienić głośności.
 
-Martwa strefa osi Z 18°/s, próg zwolnienia 10°/s, zerowanie po zmianie kierunku i ponowne uzbrajanie po przerwie strumienia ograniczają niezamierzone skoki. Interfejs pokazuje osobno położenie, zakres przyspieszenia, postęp stabilizacji i bieżącą wartość żyroskopu Z, dzięki czemu użytkownik wie, co blokuje sterowanie.
+Martwa strefa osi Z 18°/s, próg zwolnienia 10°/s, zerowanie po zmianie kierunku, wyjściu poza 25° i przerwie strumienia ograniczają niezamierzone skoki. Interfejs pokazuje bieżący przechył, dozwolony zakres i wartość żyroskopu Z, dzięki czemu użytkownik wie, co blokuje sterowanie.
 
 Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
 
@@ -148,7 +148,7 @@ Testy JVM obejmują:
 - dekodowanie little-endian, skalowanie, startup discard i resynchronizację parsera;
 - autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
-- dodatni i ujemny kierunek regulatora Z, pełne 900 ms bezruchu, tolerancję 0,8–1,2 g, położenie poziome, blokadę przy 90°/180°, ruch poza osią, histerezę oraz ponowne uzbrajanie po przerwie strumienia;
+- dodatni i ujemny kierunek regulatora Z, natychmiastową aktywację w przechyle 0–25°, brak bramki bezruchu i wartości g, blokadę powyżej 25°, położenie 90°/180° oraz zerowanie po przerwie strumienia;
 - mapowanie przycisk → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, mapowań przycisku i kalibracji, migrację starszej konwencji osi oraz bezpieczne ignorowanie pól poprzedniego systemu sterowania;
 - parsowanie i numeryczne porównywanie wersji semantycznych używanych przez aktualizator.
@@ -158,7 +158,7 @@ Testy JVM obejmują:
 - Fizyczna walidacja wymaga konkretnego egzemplarza Triki. Projekt kompiluje się i ma testy dekodera na potwierdzonych ramkach, ale progi regulatora należy ostatecznie potwierdzić na rzeczywistym kapslu.
 - Częstotliwość IMU nie jest zakodowana jako gwarantowana stała protokołu. UI pokazuje wartość mierzoną na żywo; parser interpoluje znaczniki wewnątrz burstu wyłącznie na potrzeby stabilnego filtru.
 - Yaw bez magnetometru dryfuje. Pitch i roll są korygowane grawitacją, natomiast yaw opiera się na całkowaniu żyroskopu.
-- Czujniki IMU nie potrafią potwierdzić fizycznego kontaktu ze stołem. Połączenie kierunku grawitacji, 900 ms spoczynku akcelerometru i żyroskopu oraz blokady ruchu poza osią bardzo ogranicza przypadkowe sterowanie, ale urządzenie trzymane idealnie płasko i nieruchomo w powietrzu może spełnić te same warunki.
+- Kąt przechyłu jest wyznaczany z kierunku wektora akcelerometru. Silne przyspieszenie liniowe podczas trzymania kapsla w powietrzu może chwilowo zniekształcić ten kąt i zablokować sterowanie do powrotu w zakres 0–25°.
 - Autołączenie wymaga włączonego Bluetooth, przyznanego dostępu do urządzeń w pobliżu i aktywnego ustawienia **Sterowanie w tle**. Wymuszone zatrzymanie aplikacji w ustawieniach Androida blokuje jej usługi i odbiorniki do następnego ręcznego uruchomienia; część nakładek producentów może również wymagać zezwolenia na autostart.
 - Metadane i okładka wymagają dostępu do aktywnej MediaSession. Play/Pause, Next, Previous i Stop mają fallback przez standardowe klawisze multimedialne, ale ostateczna obsługa komendy zależy od aktywnego odtwarzacza.
 - Aktualizator obsługuje publiczne, stabilne wydania GitHub zawierające jednoznaczny APK release. Android wymaga zgody na instalowanie z tego źródła oraz osobnego potwierdzenia każdej instalacji.

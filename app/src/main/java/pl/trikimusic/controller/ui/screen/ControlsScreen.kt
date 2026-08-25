@@ -21,7 +21,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,7 +38,6 @@ import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
 import pl.trikimusic.controller.ui.components.SectionTitle
-import pl.trikimusic.controller.ui.components.VolumeGateState
 import pl.trikimusic.controller.ui.components.volumeControlPresentation
 
 @Composable
@@ -50,7 +48,6 @@ fun ControlsScreen(
 ) {
     var selectedClick by remember { mutableStateOf<ButtonClickType?>(null) }
     val sample = state.runtime.latestSample
-    val accelerationMagnitude = sample?.accelerationMagnitude
     val volumePresentation = state.volumeControlPresentation()
 
     androidx.compose.foundation.lazy.LazyColumn(
@@ -104,32 +101,11 @@ fun ControlsScreen(
                             },
                         )
                     }
-                    if (volumePresentation.state == VolumeGateState.ARMING) {
-                        LinearProgressIndicator(
-                            progress = { state.runtime.volumeArmingProgress.coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
                     HorizontalDivider()
                     GateStatusRow(
-                        "Położenie",
-                        state.runtime.volumeOrientationLevel,
-                        sample?.let { "przechył %.0f° · limit 25°".format(state.runtime.volumeTiltDegrees) } ?: "brak danych",
-                    )
-                    GateStatusRow(
-                        "Przyspieszenie",
-                        state.runtime.volumeAccelerometerWithinTolerance,
-                        accelerationMagnitude?.let { "%.3f g · zakres 0,800–1,200 g".format(it) } ?: "brak danych",
-                    )
-                    GateStatusRow(
-                        "Bezruch",
-                        state.runtime.volumeControlArmed,
-                        when {
-                            sample == null -> "brak danych"
-                            state.runtime.volumeControlArmed -> "potwierdzony"
-                            state.runtime.volumeStillEnoughToArm -> "stabilizacja %.0f%%".format(state.runtime.volumeArmingProgress * 100f)
-                            else -> "oczekiwanie na pełne zatrzymanie"
-                        },
+                        "Zakres stabilizacji",
+                        state.runtime.volumeWithinTiltRange,
+                        sample?.let { "przechył %.1f° · dozwolone 0–25°".format(state.runtime.volumeTiltDegrees) } ?: "brak danych",
                     )
                     HorizontalDivider()
                     SensorValueRow(
@@ -137,7 +113,7 @@ fun ControlsScreen(
                         sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",
                     )
                     Text(
-                        "Każdy ruch poza osią Z natychmiast rozbraja regulator. Aby uzbroić go ponownie, połóż Triki górą do góry i nie dotykaj przez około sekundę.",
+                        "Nie ma wymogu bezruchu ani odkładania kapsla. Dopóki przechył mieści się w 0–25°, ruch osi Z reguluje głośność.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -40,7 +40,7 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie p
 - `TrikiProtocolDecoder` ma bufor streamu, resynchronizację, skalowanie i statystyki odrzuconych bajtów.
 - `TrikiBleManager` implementuje maszynę stanów `DISCONNECTED → SCANNING → FOUND → CONNECTING → CONNECTED → READY`. Pierwsze połączenie jest bezpośrednie; po jego powodzeniu zapamiętany adres przechodzi przez `RECONNECTING` z systemowym GATT `autoConnect=true`, które pasywnie czeka na wybudzenie urządzenia.
 - `SensorFilter` stosuje bias kalibracyjny, medianę z trzech próbek, adaptacyjną martwą strefę żyroskopu, low-pass i filtr komplementarny pitch/roll/yaw.
-- `GyroscopeVolumeController` uzbraja się po 900 ms spoczynku żyroskopu poniżej 5°/s, przy 0,8–1,2 g i przechyle do 25° górą do góry. Po uzbrojeniu stosuje histerezę położenia do 32°, blokadę ruchu poza osią 22°/s, histerezę Z 18/10°/s i całkuje żyroskop Z do kroków co 15°.
+- `GyroscopeVolumeController` działa natychmiast przy przechyle 0–25° górą do góry. Nie ma bramki bezruchu, wartości 0,8–1,2 g ani ruchu poza osią, dlatego kapslem można sterować w powietrzu. Przekroczenie 25° zeruje całkę; histereza Z 18/10°/s ogranicza szum, a całkowanie żyroskopu Z generuje kroki co 15°.
 - `TrikiButtonInterpreter` rozpoznaje wariant pola statusu, eliminuje odbicia styku i liczy od jednego do trzech kliknięć bez fałszywej interpretacji licznika pakietów.
 - `AppLogger` przechowuje maksymalnie 400 skróconych wpisów; nie rośnie bez końca.
 
@@ -54,7 +54,7 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie p
 
 ### Runtime
 
-`TrikiRuntime` jest jedynym miejscem łączącym sensor lub przycisk z akcją. Zmiana kalibracji lub parametrów filtru resetuje cały pipeline, aby nie mieszać dwóch układów odniesienia. `TrikiButtonInterpreter` ma pierwszeństwo podczas kliknięcia, ponieważ nacisk również porusza IMU. Po zakończeniu sekwencji kliknięć regulator Z jest zerowany i ponownie wymaga pełnych 900 ms poziomego bezruchu. Przerwa strumienia dłuższa niż 250 ms, utrata połączenia, odwrócenie, nadmierny przechył lub ruch poza osią także wymuszają ponowne uzbrojenie.
+`TrikiRuntime` jest jedynym miejscem łączącym sensor lub przycisk z akcją. Zmiana kalibracji lub parametrów filtru resetuje cały pipeline, aby nie mieszać dwóch układów odniesienia. `TrikiButtonInterpreter` ma pierwszeństwo podczas kliknięcia, ponieważ nacisk również porusza IMU. W czasie sekwencji kliknięć regulator Z jest zerowany, a na następnej próbce po zakończeniu przycisku działa od razu, jeśli przechył mieści się w 0–25°. Przerwa strumienia dłuższa niż 250 ms, utrata połączenia, odwrócenie lub przekroczenie 25° zerują nagromadzony obrót.
 
 ### Presentation
 

@@ -5,11 +5,9 @@ import pl.trikimusic.controller.ui.MainUiState
 
 enum class VolumeGateState {
     NO_DATA,
-    ACCELERATION_OUTSIDE_TOLERANCE,
+    SENSOR_INVALID,
     UPSIDE_DOWN,
-    NOT_LEVEL,
-    MOVING,
-    ARMING,
+    OUTSIDE_TILT_RANGE,
     READY,
 }
 
@@ -28,50 +26,34 @@ fun MainUiState.volumeControlPresentation(): VolumeControlPresentation = when {
         false,
     )
 
-    !runtime.volumeAccelerometerWithinTolerance -> VolumeControlPresentation(
-        VolumeGateState.ACCELERATION_OUTSIDE_TOLERANCE,
-        "Wykryto ruch urządzenia",
-        "Odłóż Triki na stabilną powierzchnię i przestań go poruszać.",
+    !runtime.volumeSensorValid -> VolumeControlPresentation(
+        VolumeGateState.SENSOR_INVALID,
+        "Brak prawidłowych danych IMU",
+        "Sprawdź połączenie z Triki i transmisję czujników.",
         false,
     )
 
     runtime.volumeTiltDegrees >= UPSIDE_DOWN_TILT_DEGREES -> VolumeControlPresentation(
         VolumeGateState.UPSIDE_DOWN,
         "Triki jest odwrócone",
-        "Połóż kapsel górną stroną do góry.",
+        "Ustaw kapsel górną stroną do góry.",
         false,
     )
 
-    !runtime.volumeOrientationLevel -> VolumeControlPresentation(
-        VolumeGateState.NOT_LEVEL,
-        "Połóż Triki bardziej płasko",
-        "Regulacja działa przy przechyle do około 25°; teraz ${runtime.volumeTiltDegrees.rounded()}°.",
-        false,
-    )
-
-    runtime.volumeControlArmed -> VolumeControlPresentation(
-        VolumeGateState.READY,
-        "Regulator gotowy",
-        "Obracaj kapsel płasko wokół osi Z: dodatnia wartość podgłaśnia, ujemna ścisza.",
-        true,
-    )
-
-    !runtime.volumeStillEnoughToArm -> VolumeControlPresentation(
-        VolumeGateState.MOVING,
-        "Nie poruszaj Triki",
-        "Zatrzymaj urządzenie; odliczanie zacznie się, gdy żyroskop będzie nieruchomy.",
+    !runtime.volumeWithinTiltRange -> VolumeControlPresentation(
+        VolumeGateState.OUTSIDE_TILT_RANGE,
+        "Przechył poza zakresem",
+        "Utrzymuj Triki w zakresie 0–25°; teraz ${runtime.volumeTiltDegrees.rounded()}°.",
         false,
     )
 
     else -> VolumeControlPresentation(
-        VolumeGateState.ARMING,
-        "Stabilizacja ${runtime.volumeArmingProgress.percent()}%",
-        "Nie dotykaj Triki przez około sekundę.",
-        false,
+        VolumeGateState.READY,
+        "Regulator gotowy",
+        "Obracaj kapsel wokół osi Z. Nie musisz zatrzymywać go ani odkładać na powierzchnię.",
+        true,
     )
 }
-
-private fun Float.percent(): Int = (coerceIn(0f, 1f) * 100f).toInt().coerceIn(0, 100)
 
 private fun Float.rounded(): Int = if (isFinite()) Math.round(this) else 180
 

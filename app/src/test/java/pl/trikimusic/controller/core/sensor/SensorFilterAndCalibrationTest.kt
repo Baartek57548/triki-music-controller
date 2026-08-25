@@ -126,6 +126,30 @@ class SensorFilterAndCalibrationTest {
         CalibrationCalculator.calculate(samples, 1L)
     }
 
+    @Test
+    fun `calibration accepts exactly twenty five degrees of face-up tilt`() {
+        val radians = Math.toRadians(25.0)
+        val gravity = Vector3(sin(radians).toFloat(), 0f, -cos(radians).toFloat())
+        val samples = List(120) { index ->
+            sample(index * 10_000_000L, accel = gravity)
+        }
+
+        val result = CalibrationCalculator.calculate(samples, 1L)
+
+        assertTrue(result.isValid)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `calibration rejects face-up tilt above twenty five degrees`() {
+        val radians = Math.toRadians(25.1)
+        val gravity = Vector3(sin(radians).toFloat(), 0f, -cos(radians).toFloat())
+        val samples = List(120) { index ->
+            sample(index * 10_000_000L, accel = gravity)
+        }
+
+        CalibrationCalculator.calculate(samples, 1L)
+    }
+
     private fun sample(
         timestamp: Long,
         gyro: Vector3 = Vector3(0f, 0f, 0f),
