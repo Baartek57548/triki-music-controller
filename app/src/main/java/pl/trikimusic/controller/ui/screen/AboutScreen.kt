@@ -57,7 +57,7 @@ fun InfoScreen(
                     )
                     InfoSection(
                         "Like i Dislike",
-                        "Przytrzymaj przycisk około pół sekundy. Podnieś kapsel o 20–30 cm, aby polubić utwór, albo opuść go o 20–30 cm, aby wysłać Dislike, a na końcu łagodnie wyhamuj. Detektor odrzuca szarpnięcia, wielokrotne zmiany kierunku, silny obrót i ruch dłuższy niż około 34 cm. Krótkie początkowe drgnięcie może zostać skorygowane, zanim kierunek zostanie zablokowany.",
+                        "Odwróć kapsel górą w dół i ustaw jego znacznik od siebie. Przytrzymaj przycisk około pół sekundy, a następnie poprowadź płytki łuk 20–30 cm: w prawo dla Like albo w lewo dla Dislike. Akcja wymaga pionowego przebiegu łuku i łagodnego wyhamowania; prosty ruch, szarpnięcie, silny obrót i zejście z osi są odrzucane.",
                     )
                     InfoSection(
                         "Prywatność i zgodność",

@@ -59,7 +59,7 @@ public sealed record MediaSnapshot(
 public sealed record RuntimeSnapshot(
     FilteredSensorData? LatestSample,
     VolumeControlResult? Volume,
-    HoldVerticalGestureResult Gesture,
+    HoldArcGestureResult Gesture,
     TrikiButtonProtocolMode ButtonProtocol,
     MediaAction? LastAction,
     string LastActionStatus,
@@ -68,7 +68,7 @@ public sealed record RuntimeSnapshot(
     public static RuntimeSnapshot Initial { get; } = new(
         null,
         null,
-        new HoldVerticalGestureResult(null, null, HoldGesturePhase.Idle, 0, 0),
+        new HoldArcGestureResult(null, null, HoldGesturePhase.Idle, 0, false, 0, 0),
         TrikiButtonProtocolMode.Unknown,
         null,
         "Oczekiwanie na dane Triki",
@@ -107,7 +107,7 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "2.4.0";
+    public const string Version = "2.5.0";
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }

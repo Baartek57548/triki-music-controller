@@ -91,9 +91,11 @@ public enum HoldGesturePhase
     Triggered,
 }
 
-public sealed record HoldVerticalGestureResult(
+public sealed record HoldArcGestureResult(
     RatingGestureAction? Action,
     RatingGestureAction? Direction,
     HoldGesturePhase Phase,
     float HoldProgress,
-    float EstimatedDisplacementMeters);
+    bool FaceDown,
+    float EstimatedHorizontalDisplacementMeters,
+    float EstimatedArcDepthMeters);

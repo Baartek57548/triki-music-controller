@@ -103,23 +103,25 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         : "Utrzymuj kapsel w zakresie 0–25° przez 2 sekundy i unikaj gwałtownych ruchów.";
     public string GestureStatus => _lastRuntime.Gesture.Phase switch
     {
-        HoldGesturePhase.Holding => $"Przytrzymanie: {_lastRuntime.Gesture.HoldProgress * 100:0}%",
-        HoldGesturePhase.Ready => "Przycisk przytrzymany — podnieś lub opuść kapsel",
+        HoldGesturePhase.Holding => _lastRuntime.Gesture.FaceDown
+            ? $"Odwrócenie potwierdzone • przytrzymanie {_lastRuntime.Gesture.HoldProgress * 100:0}%"
+            : "Odwróć kapsel górą w dół i uspokój go przed ruchem",
+        HoldGesturePhase.Ready => "Przycisk przytrzymany — wykonaj płytki łuk w lewo lub w prawo",
         HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction switch
         {
-            RatingGestureAction.Like => $"Ruch w górę: {Math.Abs(_lastRuntime.Gesture.EstimatedDisplacementMeters * 100):0.0} cm",
-            RatingGestureAction.Dislike => $"Ruch w dół: {Math.Abs(_lastRuntime.Gesture.EstimatedDisplacementMeters * 100):0.0} cm",
+            RatingGestureAction.Like => $"Łuk w prawo: {Math.Abs(_lastRuntime.Gesture.EstimatedHorizontalDisplacementMeters * 100):0.0} cm • głębokość {_lastRuntime.Gesture.EstimatedArcDepthMeters * 100:0.0} cm",
+            RatingGestureAction.Dislike => $"Łuk w lewo: {Math.Abs(_lastRuntime.Gesture.EstimatedHorizontalDisplacementMeters * 100):0.0} cm • głębokość {_lastRuntime.Gesture.EstimatedArcDepthMeters * 100:0.0} cm",
             _ => "Potwierdzam kierunek ruchu…",
         },
         HoldGesturePhase.Completing => _lastRuntime.Gesture.Direction switch
         {
-            RatingGestureAction.Like => "Kierunek w górę potwierdzony — łagodnie wyhamuj ruch",
-            RatingGestureAction.Dislike => "Kierunek w dół potwierdzony — łagodnie wyhamuj ruch",
-            _ => "Łagodnie wyhamuj ruch",
+            RatingGestureAction.Like => "Prawo potwierdzone — dokończ łuk i łagodnie wyhamuj",
+            RatingGestureAction.Dislike => "Lewo potwierdzone — dokończ łuk i łagodnie wyhamuj",
+            _ => "Dokończ łuk i łagodnie wyhamuj",
         },
         HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
         HoldGesturePhase.Triggered => "Gest oceny rozpoznany",
-        _ => "Przytrzymaj 0,5 s, potem wykonaj ruch pionowy 20–30 cm",
+        _ => "Odwróć kapsel, przytrzymaj 0,5 s i wykonaj łuk 20–30 cm: lewo Dislike, prawo Like",
     };
     public string LastActionStatus => _lastRuntime.LastActionStatus;
     public string SensorDetails => _lastRuntime.LatestSample is { } sample

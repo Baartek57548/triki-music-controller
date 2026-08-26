@@ -129,36 +129,47 @@ fun ControlsScreen(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("Przytrzymaj + ruch pionowy", style = MaterialTheme.typography.titleLarge)
+                    Text("Przytrzymaj + łuk odwróconym kapslem", style = MaterialTheme.typography.titleLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("W górę → polub utwór", Modifier.weight(1f))
+                        Text("Łuk w prawo → polub utwór", Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Default.ThumbDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("W dół → odrzuć utwór", Modifier.weight(1f))
+                        Text("Łuk w lewo → odrzuć utwór", Modifier.weight(1f))
                     }
+                    Text(
+                        "Ustaw odwrócony kapsel znacznikiem od siebie, przytrzymaj przycisk 0,5 s i poprowadź płytki łuk 20–30 cm.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     HorizontalDivider()
                     Text(
                         when (state.runtime.ratingGesturePhase) {
-                            HoldGesturePhase.IDLE -> "Gotowe — rozpocznij od przytrzymania przycisku."
-                            HoldGesturePhase.HOLDING -> "Przytrzymanie %.0f%%".format(
-                                state.runtime.ratingGestureHoldProgress * 100f,
-                            )
-                            HoldGesturePhase.READY -> "Przycisk przytrzymany — przesuń kapsel w górę lub w dół."
-                            HoldGesturePhase.TRACKING -> when (state.runtime.ratingGestureDirection) {
-                                RatingGestureAction.LIKE -> "Ruch w górę: %.0f cm".format(
-                                    abs(state.runtime.ratingGestureDisplacementCentimeters),
+                            HoldGesturePhase.IDLE -> "Gotowe — odwróć kapsel i przytrzymaj przycisk."
+                            HoldGesturePhase.HOLDING -> if (state.runtime.ratingGestureFaceDown) {
+                                "Odwrócenie potwierdzone · przytrzymanie %.0f%%".format(
+                                    state.runtime.ratingGestureHoldProgress * 100f,
                                 )
-                                RatingGestureAction.DISLIKE -> "Ruch w dół: %.0f cm".format(
-                                    abs(state.runtime.ratingGestureDisplacementCentimeters),
+                            } else {
+                                "Odwróć kapsel górą w dół i uspokój go przed ruchem."
+                            }
+                            HoldGesturePhase.READY -> "Przycisk przytrzymany — wykonaj płytki łuk w lewo lub w prawo."
+                            HoldGesturePhase.TRACKING -> when (state.runtime.ratingGestureDirection) {
+                                RatingGestureAction.LIKE -> "Łuk w prawo: %.0f cm · głębokość %.0f cm".format(
+                                    abs(state.runtime.ratingGestureHorizontalCentimeters),
+                                    state.runtime.ratingGestureArcDepthCentimeters,
+                                )
+                                RatingGestureAction.DISLIKE -> "Łuk w lewo: %.0f cm · głębokość %.0f cm".format(
+                                    abs(state.runtime.ratingGestureHorizontalCentimeters),
+                                    state.runtime.ratingGestureArcDepthCentimeters,
                                 )
                                 null -> "Potwierdzam kierunek ruchu…"
                             }
                             HoldGesturePhase.COMPLETING -> when (state.runtime.ratingGestureDirection) {
-                                RatingGestureAction.LIKE -> "Kierunek w górę potwierdzony — łagodnie wyhamuj ruch."
-                                RatingGestureAction.DISLIKE -> "Kierunek w dół potwierdzony — łagodnie wyhamuj ruch."
-                                null -> "Łagodnie wyhamuj ruch."
+                                RatingGestureAction.LIKE -> "Prawo potwierdzone — dokończ łuk i łagodnie wyhamuj."
+                                RatingGestureAction.DISLIKE -> "Lewo potwierdzone — dokończ łuk i łagodnie wyhamuj."
+                                null -> "Dokończ łuk i łagodnie wyhamuj."
                             }
                             HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
                             HoldGesturePhase.TRIGGERED -> "Ocena wysłana — puść przycisk przed następną akcją."

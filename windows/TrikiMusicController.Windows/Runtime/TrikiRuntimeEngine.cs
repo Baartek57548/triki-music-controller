@@ -13,7 +13,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly FeedbackToneService _feedback;
     private readonly SensorFilter _sensorFilter = new();
     private readonly GyroscopeVolumeController _volumeController = new();
-    private readonly HoldVerticalGestureDetector _ratingGestureDetector = new();
+    private readonly HoldArcGestureDetector _ratingGestureDetector = new();
     private readonly TrikiButtonInterpreter _buttonInterpreter = new();
     private readonly ConnectionActivityLease _connectionActivityLease = new();
     private bool _connectionWasReady;

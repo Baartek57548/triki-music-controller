@@ -17,7 +17,7 @@ import pl.trikimusic.controller.core.bluetooth.ConnectionActivityLease
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.core.sensor.SensorFilter
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
-import pl.trikimusic.controller.core.gesture.HoldVerticalGestureDetector
+import pl.trikimusic.controller.core.gesture.HoldArcGestureDetector
 import pl.trikimusic.controller.core.gesture.RatingGestureAction
 import pl.trikimusic.controller.core.volume.GyroscopeVolumeController
 import pl.trikimusic.controller.data.media.RatingFeedbackPlayer
@@ -49,7 +49,9 @@ data class RuntimeState(
     val ratingGesturePhase: HoldGesturePhase = HoldGesturePhase.IDLE,
     val ratingGestureDirection: RatingGestureAction? = null,
     val ratingGestureHoldProgress: Float = 0f,
-    val ratingGestureDisplacementCentimeters: Float = 0f,
+    val ratingGestureFaceDown: Boolean = false,
+    val ratingGestureHorizontalCentimeters: Float = 0f,
+    val ratingGestureArcDepthCentimeters: Float = 0f,
     val buttonProtocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
 )
 
@@ -63,7 +65,7 @@ class TrikiRuntime(
 ) {
     private val sensorFilter = SensorFilter()
     private val volumeController = GyroscopeVolumeController()
-    private val ratingGestureDetector = HoldVerticalGestureDetector()
+    private val ratingGestureDetector = HoldArcGestureDetector()
     private val buttonInterpreter = TrikiButtonInterpreter()
     private val connectionActivityLease = ConnectionActivityLease()
     private val mutableState = MutableStateFlow(RuntimeState())
@@ -138,7 +140,9 @@ class TrikiRuntime(
                 ratingGesturePhase = HoldGesturePhase.IDLE,
                 ratingGestureDirection = null,
                 ratingGestureHoldProgress = 0f,
-                ratingGestureDisplacementCentimeters = 0f,
+                ratingGestureFaceDown = false,
+                ratingGestureHorizontalCentimeters = 0f,
+                ratingGestureArcDepthCentimeters = 0f,
                 buttonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
             )
         }
@@ -186,7 +190,10 @@ class TrikiRuntime(
                 ratingGesturePhase = ratingGestureResult.phase,
                 ratingGestureDirection = ratingGestureResult.direction,
                 ratingGestureHoldProgress = ratingGestureResult.holdProgress,
-                ratingGestureDisplacementCentimeters = ratingGestureResult.estimatedDisplacementMeters * 100f,
+                ratingGestureFaceDown = ratingGestureResult.faceDown,
+                ratingGestureHorizontalCentimeters =
+                    ratingGestureResult.estimatedHorizontalDisplacementMeters * 100f,
+                ratingGestureArcDepthCentimeters = ratingGestureResult.estimatedArcDepthMeters * 100f,
             )
         }
         ratingGestureResult.action?.let { gestureAction ->
@@ -214,8 +221,6 @@ class TrikiRuntime(
             return
         }
         if (buttonEvent != null || buttonInterpreter.shouldSuppressMotionControl) {
-            // A physical press also moves the IMU. The complete click/hold sequence owns the input
-            // window; angle stabilization restarts after the interaction has fully ended.
             volumeController.reset()
         }
         if (buttonEvent != null) {

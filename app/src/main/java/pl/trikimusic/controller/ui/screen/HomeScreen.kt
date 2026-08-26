@@ -157,7 +157,7 @@ fun HomeScreen(
                             Text(
                                 when {
                                     buttonIsLatest -> buttonClick!!.type.displayName
-                                    ratingIsLatest -> "Przytrzymanie + ruch pionowy"
+                                    ratingIsLatest -> "Przytrzymanie + łuk lewo/prawo"
                                     else -> "Obrót kapsla · oś Z"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
