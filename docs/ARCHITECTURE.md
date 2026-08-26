@@ -42,7 +42,7 @@ UI jedynie obserwuje immutable `StateFlow`. Nie interpretuje bajtów BLE i nie p
 - `SensorFilter` stosuje bias kalibracyjny, medianę z trzech próbek, adaptacyjną martwą strefę żyroskopu, low-pass i filtr komplementarny pitch/roll/yaw.
 - `GyroscopeVolumeController` wymaga 2 sekund ciągłego przechyłu 0–25° górą do góry, ale nie ma bramki bezruchu, wartości 0,8–1,2 g ani ruchu poza osią. Przekroczenie 25° zeruje stabilizację i całkę; dodatkowy EMA Z, histereza 18/10°/s oraz limit kroku do 100 ms wygładzają regulację co 15°.
 - `TrikiButtonInterpreter` rozpoznaje wariant pola statusu, eliminuje odbicia styku i liczy od jednego do trzech kliknięć bez fałszywej interpretacji licznika pakietów.
-- `HoldVerticalGestureDetector` po 500 ms przytrzymania estymuje krótkie pionowe przemieszczenie przez odjęcie lokalnej grawitacji i ograniczone podwójne całkowanie. Sprzętowo zweryfikowane podniesienie (ujemny znak projekcji) daje Like, a opuszczenie (dodatni znak) Dislike, maksymalnie raz do puszczenia przycisku.
+- `HoldVerticalGestureDetector` po 500 ms przytrzymania estymuje krótkie pionowe przemieszczenie przez odjęcie lokalnej grawitacji i ograniczone podwójne całkowanie. Kierunek wymaga spójnego czasu, szczytu i impulsu przyspieszenia; pojedyncza korekta początkowego drgnięcia jest dozwolona. Akcja wymaga następnie hamowania rozpoczętego po zauważalnym przemieszczeniu oraz obniżenia prędkości, a ruch zbyt długi, obrotowy lub naprzemienny jest unieważniany. Sprzętowo zweryfikowane podniesienie (ujemny znak projekcji) daje Like, a opuszczenie (dodatni znak) Dislike, maksymalnie raz do puszczenia przycisku.
 - `AppLogger` przechowuje maksymalnie 400 skróconych wpisów; nie rośnie bez końca.
 
 ### Data

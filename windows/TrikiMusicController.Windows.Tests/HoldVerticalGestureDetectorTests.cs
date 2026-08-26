@@ -23,6 +23,83 @@ public sealed class HoldVerticalGestureDetectorTests
     }
 
     [Fact]
+    public void BriefWrongWayImpulse_IsCorrectedForBothDirections()
+    {
+        var lift = new Fixture();
+        lift.HoldAtRest();
+
+        lift.Accelerate(-1.4f, 5);
+        lift.Accelerate(-0.6f, 13);
+        lift.Accelerate(-1.4f, 13);
+
+        var lowering = new Fixture();
+        lowering.HoldAtRest();
+        lowering.Accelerate(-0.6f, 5);
+        lowering.Accelerate(-1.4f, 13);
+        lowering.Accelerate(-0.6f, 13);
+
+        Assert.Equal([RatingGestureAction.Like], lift.Actions);
+        Assert.Equal([RatingGestureAction.Dislike], lowering.Actions);
+    }
+
+    [Fact]
+    public void EarlyOppositePulse_CannotSatisfyBraking()
+    {
+        var fixture = new Fixture();
+        fixture.HoldAtRest();
+
+        fixture.Accelerate(-0.6f, 7);
+        fixture.Accelerate(-1.4f, 2);
+        fixture.Accelerate(-0.6f, 18);
+
+        Assert.Empty(fixture.Actions);
+        Assert.Equal(HoldGesturePhase.Rearming, fixture.Latest.Phase);
+    }
+
+    [Fact]
+    public void ConfirmedGesture_WaitsUntilBrakingSlowsCapsule()
+    {
+        var fixture = new Fixture();
+        fixture.HoldAtRest();
+
+        fixture.Accelerate(-0.6f, 15);
+        fixture.Accelerate(-1.4f, 3);
+
+        Assert.Empty(fixture.Actions);
+        Assert.Equal(HoldGesturePhase.Completing, fixture.Latest.Phase);
+
+        fixture.Accelerate(-1.4f, 12);
+
+        Assert.Equal([RatingGestureAction.Like], fixture.Actions);
+    }
+
+    [Fact]
+    public void OversizedThrow_IsRejectedInsteadOfGuessingRating()
+    {
+        var fixture = new Fixture();
+        fixture.HoldAtRest();
+
+        fixture.Accelerate(-0.6f, 23);
+
+        Assert.Empty(fixture.Actions);
+        Assert.Equal(HoldGesturePhase.Rearming, fixture.Latest.Phase);
+    }
+
+    [Fact]
+    public void RepeatedDirectionChanges_InvalidateAttempt()
+    {
+        var fixture = new Fixture();
+        fixture.HoldAtRest();
+
+        fixture.Accelerate(-0.6f, 4);
+        fixture.Accelerate(-1.4f, 4);
+        fixture.Accelerate(-0.6f, 1);
+
+        Assert.Empty(fixture.Actions);
+        Assert.Equal(HoldGesturePhase.Rearming, fixture.Latest.Phase);
+    }
+
+    [Fact]
     public void LiftNearTwentyFiveDegreeTilt_StillEmitsLike()
     {
         var gravityAtTiltLimit = new Vector3f(0.423f, 0, -0.906f);

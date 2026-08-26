@@ -104,6 +104,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             RatingGestureAction.Dislike => $"Ruch w dół: {Math.Abs(_lastRuntime.Gesture.EstimatedDisplacementMeters * 100):0.0} cm",
             _ => "Potwierdzam kierunek ruchu…",
         },
+        HoldGesturePhase.Completing => _lastRuntime.Gesture.Direction switch
+        {
+            RatingGestureAction.Like => "Kierunek w górę potwierdzony — łagodnie wyhamuj ruch",
+            RatingGestureAction.Dislike => "Kierunek w dół potwierdzony — łagodnie wyhamuj ruch",
+            _ => "Łagodnie wyhamuj ruch",
+        },
         HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
         HoldGesturePhase.Triggered => "Gest oceny rozpoznany",
         _ => "Przytrzymaj 0,5 s, potem wykonaj ruch pionowy 20–30 cm",

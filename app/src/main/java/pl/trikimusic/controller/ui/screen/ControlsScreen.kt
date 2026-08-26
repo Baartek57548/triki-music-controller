@@ -155,6 +155,11 @@ fun ControlsScreen(
                                 )
                                 null -> "Potwierdzam kierunek ruchu…"
                             }
+                            HoldGesturePhase.COMPLETING -> when (state.runtime.ratingGestureDirection) {
+                                RatingGestureAction.LIKE -> "Kierunek w górę potwierdzony — łagodnie wyhamuj ruch."
+                                RatingGestureAction.DISLIKE -> "Kierunek w dół potwierdzony — łagodnie wyhamuj ruch."
+                                null -> "Łagodnie wyhamuj ruch."
+                            }
                             HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
                             HoldGesturePhase.TRIGGERED -> "Ocena wysłana — puść przycisk przed następną akcją."
                         },

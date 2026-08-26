@@ -24,7 +24,7 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
 - bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa przechodzą do następnego utworu, trzy do poprzedniego; każde mapowanie można zmienić w profilu;
 - konfigurowalne mapowania przycisku zapisywane w Preferences DataStore;
-- przytrzymanie przycisku i pionowy ruch o około 20 cm: podniesienie wysyła Like, opuszczenie Dislike; kierunek jest blokowany po potwierdzeniu, a hamowanie, filtr obrotu i ponowne uzbrojenie po uspokojeniu ruchu ograniczają fałszywe oceny;
+- przytrzymanie przycisku i pionowy ruch 20–30 cm: podniesienie wysyła Like, opuszczenie Dislike; kierunek wymaga trwałego impulsu, jedno początkowe drgnięcie może zostać skorygowane, a akcja następuje dopiero po potwierdzonym wyhamowaniu;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Like, Dislike, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i informacją o odtwarzanym utworze;
 - uproszczone ekrany robocze i wspólny ekran **Informacje**, otwierany ikoną w prawym górnym rogu aplikacji Android i Windows;
@@ -59,7 +59,7 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 7. Naciśnij przycisk Triki, wybierz **Urządzenie → Skanuj urządzenia**, a następnie **Połącz i zapamiętaj**. Adres jest zapisywany dopiero po pełnym uruchomieniu strumienia IMU.
 8. Po stanie **Gotowe** otwórz **Sterowanie**, sprawdź status regulatora Z i ustaw akcje dla jednego, dwóch oraz trzech kliknięć.
 9. Uruchom muzykę i utrzymuj kapsel górą do góry w przechyle 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć; gwałtowne przyspieszenie ponownie uruchamia 2-sekundową stabilizację. Gdy UI pokaże „Regulator gotowy”, obracaj go łagodnie: dodatnia wartość Z podgłaśnia, ujemna ścisza.
-10. Aby ocenić utwór, przytrzymaj przycisk około pół sekundy, a następnie podnieś kapsel o 20–30 cm dla Like albo opuść go o 20–30 cm dla Dislike. Sygnał potwierdzi wysłanie akcji; sygnał błędu oznacza brak obsługi przez aktywny odtwarzacz.
+10. Aby ocenić utwór, przytrzymaj przycisk około pół sekundy, następnie podnieś kapsel o 20–30 cm dla Like albo opuść go o 20–30 cm dla Dislike i łagodnie wyhamuj. Sygnał potwierdzi wysłanie akcji; sygnał błędu oznacza brak obsługi przez aktywny odtwarzacz.
 11. Gdy Triki uśnie i rozłączy BLE, naciśnij jego fizyczny przycisk. Przy włączonym **Sterowaniu w tle** Android automatycznie dokończy oczekujące połączenie z zapamiętanym kapslem — bez ponownego wybierania urządzenia.
 
 Build z linii poleceń na Windows:
@@ -166,7 +166,7 @@ Martwa strefa osi Z 22°/s, próg zwolnienia 12°/s, zerowanie po zmianie kierun
 
 Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
 
-`HoldVerticalGestureDetector` uruchamia się dopiero po około 500 ms potwierdzonego przytrzymania. Zapamiętuje lokalny wektor grawitacji, odejmuje go od kolejnych próbek i przez krótkie okno całkuje progowane przyspieszenie pionowe. Dla sprzętowej konwencji osi Triki podniesienie daje ujemne przemieszczenie i wysyła Like, a opuszczenie daje dodatnie przemieszczenie i wysyła Dislike; po akcji przytrzymanie jest konsumowane, więc puszczenie nie generuje dodatkowego pojedynczego kliknięcia. `AndroidMediaControllerGateway` korzysta ze standardowego `ACTION_SET_RATING` lub akcji niestandardowej jawnie wystawionej przez aktywną MediaSession.
+`HoldVerticalGestureDetector` uruchamia się dopiero po około 500 ms potwierdzonego przytrzymania. Zapamiętuje lokalny wektor grawitacji, odejmuje go od kolejnych próbek i przez krótkie okno całkuje progowane przyspieszenie pionowe. Kierunek zostaje zablokowany dopiero po co najmniej 120 ms spójnego impulsu o wymaganej sile; jedna korekta początkowego kierunku jest dozwolona, a kolejne zmiany unieważniają próbę. Hamowanie liczy się dopiero po pierwszych 6 cm ruchu i musi mieć wystarczający impuls oraz zmniejszyć prędkość kapsla. Ruch przekraczający około 34 cm, silny obrót albo odwrotny dryf są odrzucane. Dla sprzętowej konwencji osi Triki podniesienie daje ujemne przemieszczenie i wysyła Like, a opuszczenie daje dodatnie przemieszczenie i wysyła Dislike; po akcji przytrzymanie jest konsumowane, więc puszczenie nie generuje dodatkowego pojedynczego kliknięcia. `AndroidMediaControllerGateway` korzysta ze standardowego `ACTION_SET_RATING` lub akcji niestandardowej jawnie wystawionej przez aktywną MediaSession.
 
 ## Diagnostyka
 
@@ -187,7 +187,7 @@ Testy JVM obejmują:
 - autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
 - dodatni i ujemny kierunek regulatora Z, pełne 2 sekundy w przechyle 0–25°, tolerancję ruchu 0,80–1,20 g, reset po gwałtownym przyspieszeniu, łagodniejsze wygładzenie Z, limit kroków, blokadę powyżej 25°, położenie 90°/180° oraz reset po przerwie strumienia;
-- przytrzymanie konsumujące zwykły klik, estymację ruchu +/−20 cm, pojedyncze Like/Dislike na jedno przytrzymanie oraz bezpieczne dopasowanie niestandardowych akcji ratingu;
+- przytrzymanie konsumujące zwykły klik, symetryczną estymację ruchu góra/dół, korektę pojedynczego początkowego impulsu, potwierdzenie kierunku i hamowania, odrzucanie ruchu zbyt długiego lub naprzemiennego, pojedyncze Like/Dislike na jedno przytrzymanie oraz bezpieczne dopasowanie niestandardowych akcji ratingu;
 - mapowanie przycisk → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, mapowań przycisku i kalibracji, migrację starszej konwencji osi oraz bezpieczne ignorowanie pól poprzedniego systemu sterowania;
 - parsowanie i numeryczne porównywanie wersji semantycznych używanych przez aktualizator.

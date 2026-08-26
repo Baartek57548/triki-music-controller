@@ -11,10 +11,17 @@ public sealed record HoldGestureConfiguration(
     float LinearAccelerationSmoothingAlpha = 0.35f,
     float ArmingAccelerationToleranceG = 0.18f,
     float ArmingMaximumAngularRateDps = 45f,
-    long DirectionConfirmationMillis = 80,
+    long DirectionConfirmationMillis = 120,
+    float MinimumDirectionImpulseGSeconds = 0.025f,
+    float MinimumDirectionPeakAccelerationG = 0.16f,
+    int MaximumCandidateDirectionChanges = 1,
     float BrakingAccelerationG = 0.08f,
+    float MinimumDisplacementBeforeBrakingMeters = 0.06f,
+    float MinimumBrakingImpulseGSeconds = 0.025f,
     long MinimumMotionMillis = 220,
     float DirectionMismatchToleranceMeters = 0.06f,
+    float MaximumTriggerVelocityMetersPerSecond = 0.70f,
+    float MaximumTriggerDisplacementMeters = 0.34f,
     float MaximumMotionAngularRateDps = 120f,
     long MaximumRotationMillis = 80,
     long RearmQuietMillis = 140);
@@ -34,7 +41,10 @@ public sealed class HoldVerticalGestureDetector
     private RatingGestureAction? _candidateAction;
     private RatingGestureAction? _confirmedAction;
     private long _directionConfirmationNanos;
-    private bool _brakingObserved;
+    private float _directionImpulseGSeconds;
+    private float _peakDirectionAccelerationG;
+    private int _candidateDirectionChanges;
+    private float _brakingImpulseGSeconds;
     private long? _excessiveRotationSinceNanos;
     private bool _awaitingQuietRearm;
     private long? _quietRearmSinceNanos;
@@ -53,14 +63,30 @@ public sealed class HoldVerticalGestureDetector
             !float.IsFinite(_configuration.ArmingAccelerationToleranceG) || _configuration.ArmingAccelerationToleranceG is < 0.05f or > 0.40f ||
             !float.IsFinite(_configuration.ArmingMaximumAngularRateDps) || _configuration.ArmingMaximumAngularRateDps is < 10f or > 120f ||
             _configuration.DirectionConfirmationMillis is < 40 or > 300 ||
+            !float.IsFinite(_configuration.MinimumDirectionImpulseGSeconds) ||
+            _configuration.MinimumDirectionImpulseGSeconds is < 0.005f or > 0.20f ||
+            !float.IsFinite(_configuration.MinimumDirectionPeakAccelerationG) ||
+            _configuration.MinimumDirectionPeakAccelerationG < _configuration.MotionStartAccelerationG ||
+            _configuration.MinimumDirectionPeakAccelerationG > 1f ||
+            _configuration.MaximumCandidateDirectionChanges is < 0 or > 3 ||
             !float.IsFinite(_configuration.BrakingAccelerationG) ||
             _configuration.BrakingAccelerationG < _configuration.AccelerationDeadZoneG ||
             _configuration.BrakingAccelerationG > _configuration.MotionStartAccelerationG ||
+            !float.IsFinite(_configuration.MinimumDisplacementBeforeBrakingMeters) ||
+            _configuration.MinimumDisplacementBeforeBrakingMeters is < 0.02f ||
+            _configuration.MinimumDisplacementBeforeBrakingMeters > _configuration.TriggerDisplacementMeters ||
+            !float.IsFinite(_configuration.MinimumBrakingImpulseGSeconds) ||
+            _configuration.MinimumBrakingImpulseGSeconds is < 0.005f or > 0.20f ||
             _configuration.MinimumMotionMillis < _configuration.DirectionConfirmationMillis ||
             _configuration.MinimumMotionMillis > _configuration.MaximumMotionMillis ||
             !float.IsFinite(_configuration.DirectionMismatchToleranceMeters) ||
             _configuration.DirectionMismatchToleranceMeters is < 0.02f ||
             _configuration.DirectionMismatchToleranceMeters > _configuration.TriggerDisplacementMeters ||
+            !float.IsFinite(_configuration.MaximumTriggerVelocityMetersPerSecond) ||
+            _configuration.MaximumTriggerVelocityMetersPerSecond is < 0.20f or > 2f ||
+            !float.IsFinite(_configuration.MaximumTriggerDisplacementMeters) ||
+            _configuration.MaximumTriggerDisplacementMeters < _configuration.TriggerDisplacementMeters ||
+            _configuration.MaximumTriggerDisplacementMeters > 0.60f ||
             !float.IsFinite(_configuration.MaximumMotionAngularRateDps) ||
             _configuration.MaximumMotionAngularRateDps is < 60f or > 360f ||
             _configuration.MaximumMotionAngularRateDps <= _configuration.ArmingMaximumAngularRateDps ||
@@ -205,20 +231,31 @@ public sealed class HoldVerticalGestureDetector
             var currentAction = ActionForAcceleration(effectiveAccelerationG);
             if (currentAction != _candidateAction)
             {
-                StartMotion(timestamp, currentAction);
+                _candidateDirectionChanges++;
+                if (_candidateDirectionChanges > _configuration.MaximumCandidateDirectionChanges)
+                {
+                    InvalidateMotion();
+                    return Result(HoldGesturePhase.Rearming, 1);
+                }
+                StartMotion(timestamp, currentAction, preserveDirectionChanges: true);
                 motionElapsedNanos = 0;
             }
             else
             {
                 _directionConfirmationNanos += deltaNanos;
-                if (_directionConfirmationNanos >= _configuration.DirectionConfirmationMillis * 1_000_000)
+                _directionImpulseGSeconds += Math.Abs(effectiveAccelerationG) * deltaSeconds;
+                _peakDirectionAccelerationG = Math.Max(_peakDirectionAccelerationG, Math.Abs(effectiveAccelerationG));
+                if (_directionConfirmationNanos >= _configuration.DirectionConfirmationMillis * 1_000_000 &&
+                    _directionImpulseGSeconds >= _configuration.MinimumDirectionImpulseGSeconds &&
+                    _peakDirectionAccelerationG >= _configuration.MinimumDirectionPeakAccelerationG)
                     _confirmedAction = currentAction;
             }
         }
         else if (IsAccelerationOppositeTo(effectiveAccelerationG, _confirmedAction.Value) &&
-                 Math.Abs(effectiveAccelerationG) >= _configuration.BrakingAccelerationG)
+                 Math.Abs(effectiveAccelerationG) >= _configuration.BrakingAccelerationG &&
+                 DirectionalDisplacement(_confirmedAction.Value) >= _configuration.MinimumDisplacementBeforeBrakingMeters)
         {
-            _brakingObserved = true;
+            _brakingImpulseGSeconds += Math.Abs(effectiveAccelerationG) * deltaSeconds;
         }
 
         var accelerationMetersPerSecondSquared = effectiveAccelerationG * StandardGravity;
@@ -237,14 +274,27 @@ public sealed class HoldVerticalGestureDetector
             return Result(HoldGesturePhase.Rearming, 1);
         }
 
+        if (lockedAction is RatingGestureAction boundedAction &&
+            DirectionalDisplacement(boundedAction) > _configuration.MaximumTriggerDisplacementMeters)
+        {
+            InvalidateMotion();
+            return Result(HoldGesturePhase.Rearming, 1);
+        }
+
         RatingGestureAction? action = lockedAction is RatingGestureAction locked &&
-                                      _brakingObserved &&
+                                      _brakingImpulseGSeconds >= _configuration.MinimumBrakingImpulseGSeconds &&
+                                      Math.Abs(_verticalVelocityMetersPerSecond) <= _configuration.MaximumTriggerVelocityMetersPerSecond &&
                                       motionElapsedNanos >= _configuration.MinimumMotionMillis * 1_000_000 &&
                                       DirectionalDisplacement(locked) >= _configuration.TriggerDisplacementMeters
             ? locked
             : null;
         if (action is not null) _triggered = true;
-        return Result(_triggered ? HoldGesturePhase.Triggered : HoldGesturePhase.Tracking, 1, action);
+        var phase = _triggered
+            ? HoldGesturePhase.Triggered
+            : _brakingImpulseGSeconds > 0
+                ? HoldGesturePhase.Completing
+                : HoldGesturePhase.Tracking;
+        return Result(phase, 1, action);
     }
 
     private HoldVerticalGestureResult Result(HoldGesturePhase phase, float progress, RatingGestureAction? action = null) =>
@@ -266,7 +316,10 @@ public sealed class HoldVerticalGestureDetector
         _candidateAction = null;
         _confirmedAction = null;
         _directionConfirmationNanos = 0;
-        _brakingObserved = false;
+        _directionImpulseGSeconds = 0;
+        _peakDirectionAccelerationG = 0;
+        _candidateDirectionChanges = 0;
+        _brakingImpulseGSeconds = 0;
         _excessiveRotationSinceNanos = null;
     }
 
@@ -277,7 +330,7 @@ public sealed class HoldVerticalGestureDetector
         _quietRearmSinceNanos = null;
     }
 
-    private void StartMotion(long timestamp, RatingGestureAction action)
+    private void StartMotion(long timestamp, RatingGestureAction action, bool preserveDirectionChanges = false)
     {
         _motionStartedNanos = timestamp;
         _verticalVelocityMetersPerSecond = 0;
@@ -285,7 +338,10 @@ public sealed class HoldVerticalGestureDetector
         _candidateAction = action;
         _confirmedAction = null;
         _directionConfirmationNanos = 0;
-        _brakingObserved = false;
+        _directionImpulseGSeconds = 0;
+        _peakDirectionAccelerationG = 0;
+        _brakingImpulseGSeconds = 0;
+        if (!preserveDirectionChanges) _candidateDirectionChanges = 0;
     }
 
     private void RestartArming(long timestamp, Vector3f? acceleration)

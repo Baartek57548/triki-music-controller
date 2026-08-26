@@ -28,6 +28,78 @@ class HoldVerticalGestureDetectorTest {
     }
 
     @Test
+    fun `brief wrong-way impulse is corrected for both directions`() {
+        val lift = Fixture()
+        lift.holdAtRest()
+
+        lift.accelerate(z = -1.4f, frames = 5)
+        lift.accelerate(z = -0.6f, frames = 13)
+        lift.accelerate(z = -1.4f, frames = 13)
+
+        val lowering = Fixture()
+        lowering.holdAtRest()
+        lowering.accelerate(z = -0.6f, frames = 5)
+        lowering.accelerate(z = -1.4f, frames = 13)
+        lowering.accelerate(z = -0.6f, frames = 13)
+
+        assertEquals(listOf(RatingGestureAction.LIKE), lift.actions)
+        assertEquals(listOf(RatingGestureAction.DISLIKE), lowering.actions)
+    }
+
+    @Test
+    fun `early opposite pulse cannot satisfy braking`() {
+        val fixture = Fixture()
+        fixture.holdAtRest()
+
+        fixture.accelerate(z = -0.6f, frames = 7)
+        fixture.accelerate(z = -1.4f, frames = 2)
+        fixture.accelerate(z = -0.6f, frames = 18)
+
+        assertTrue(fixture.actions.isEmpty())
+        assertEquals(HoldGesturePhase.REARMING, fixture.latest.phase)
+    }
+
+    @Test
+    fun `confirmed gesture waits until braking slows the capsule`() {
+        val fixture = Fixture()
+        fixture.holdAtRest()
+
+        fixture.accelerate(z = -0.6f, frames = 15)
+        fixture.accelerate(z = -1.4f, frames = 3)
+
+        assertTrue(fixture.actions.isEmpty())
+        assertEquals(HoldGesturePhase.COMPLETING, fixture.latest.phase)
+
+        fixture.accelerate(z = -1.4f, frames = 12)
+
+        assertEquals(listOf(RatingGestureAction.LIKE), fixture.actions)
+    }
+
+    @Test
+    fun `oversized throw is rejected instead of guessing rating`() {
+        val fixture = Fixture()
+        fixture.holdAtRest()
+
+        fixture.accelerate(z = -0.6f, frames = 23)
+
+        assertTrue(fixture.actions.isEmpty())
+        assertEquals(HoldGesturePhase.REARMING, fixture.latest.phase)
+    }
+
+    @Test
+    fun `repeated direction changes invalidate attempt`() {
+        val fixture = Fixture()
+        fixture.holdAtRest()
+
+        fixture.accelerate(z = -0.6f, frames = 4)
+        fixture.accelerate(z = -1.4f, frames = 4)
+        fixture.accelerate(z = -0.6f, frames = 1)
+
+        assertTrue(fixture.actions.isEmpty())
+        assertEquals(HoldGesturePhase.REARMING, fixture.latest.phase)
+    }
+
+    @Test
     fun `lift near twenty five degree tilt still emits like`() {
         val gravityAtTiltLimit = Vector3(0.423f, 0f, -0.906f)
         val fixture = Fixture(

@@ -1,6 +1,7 @@
 package pl.trikimusic.controller.core.gesture
 
 import kotlin.math.abs
+import kotlin.math.max
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.Vector3
 
@@ -14,6 +15,7 @@ enum class HoldGesturePhase {
     HOLDING,
     READY,
     TRACKING,
+    COMPLETING,
     REARMING,
     TRIGGERED,
 }
@@ -47,10 +49,17 @@ class HoldVerticalGestureDetector(
         val linearAccelerationSmoothingAlpha: Float = 0.35f,
         val armingAccelerationToleranceG: Float = 0.18f,
         val armingMaximumAngularRateDps: Float = 45f,
-        val directionConfirmationMillis: Long = 80L,
+        val directionConfirmationMillis: Long = 120L,
+        val minimumDirectionImpulseGSeconds: Float = 0.025f,
+        val minimumDirectionPeakAccelerationG: Float = 0.16f,
+        val maximumCandidateDirectionChanges: Int = 1,
         val brakingAccelerationG: Float = 0.08f,
+        val minimumDisplacementBeforeBrakingMeters: Float = 0.06f,
+        val minimumBrakingImpulseGSeconds: Float = 0.025f,
         val minimumMotionMillis: Long = 220L,
         val directionMismatchToleranceMeters: Float = 0.06f,
+        val maximumTriggerVelocityMetersPerSecond: Float = 0.70f,
+        val maximumTriggerDisplacementMeters: Float = 0.34f,
         val maximumMotionAngularRateDps: Float = 120f,
         val maximumRotationMillis: Long = 80L,
         val rearmQuietMillis: Long = 140L,
@@ -69,13 +78,38 @@ class HoldVerticalGestureDetector(
             require(armingMaximumAngularRateDps.isFinite() && armingMaximumAngularRateDps in 10f..120f)
             require(directionConfirmationMillis in 40L..300L)
             require(
+                minimumDirectionImpulseGSeconds.isFinite() &&
+                    minimumDirectionImpulseGSeconds in 0.005f..0.20f,
+            )
+            require(
+                minimumDirectionPeakAccelerationG.isFinite() &&
+                    minimumDirectionPeakAccelerationG in motionStartAccelerationG..1f,
+            )
+            require(maximumCandidateDirectionChanges in 0..3)
+            require(
                 brakingAccelerationG.isFinite() &&
                     brakingAccelerationG in accelerationDeadZoneG..motionStartAccelerationG,
+            )
+            require(
+                minimumDisplacementBeforeBrakingMeters.isFinite() &&
+                    minimumDisplacementBeforeBrakingMeters in 0.02f..triggerDisplacementMeters,
+            )
+            require(
+                minimumBrakingImpulseGSeconds.isFinite() &&
+                    minimumBrakingImpulseGSeconds in 0.005f..0.20f,
             )
             require(minimumMotionMillis in directionConfirmationMillis..maximumMotionMillis)
             require(
                 directionMismatchToleranceMeters.isFinite() &&
                     directionMismatchToleranceMeters in 0.02f..triggerDisplacementMeters,
+            )
+            require(
+                maximumTriggerVelocityMetersPerSecond.isFinite() &&
+                    maximumTriggerVelocityMetersPerSecond in 0.20f..2f,
+            )
+            require(
+                maximumTriggerDisplacementMeters.isFinite() &&
+                    maximumTriggerDisplacementMeters in triggerDisplacementMeters..MAX_ABSOLUTE_DISPLACEMENT_METERS,
             )
             require(maximumMotionAngularRateDps.isFinite() && maximumMotionAngularRateDps in 60f..360f)
             require(maximumMotionAngularRateDps > armingMaximumAngularRateDps)
@@ -94,7 +128,10 @@ class HoldVerticalGestureDetector(
     private var candidateAction: RatingGestureAction? = null
     private var confirmedAction: RatingGestureAction? = null
     private var directionConfirmationNanos = 0L
-    private var brakingObserved = false
+    private var directionImpulseGSeconds = 0f
+    private var peakDirectionAccelerationG = 0f
+    private var candidateDirectionChanges = 0
+    private var brakingImpulseGSeconds = 0f
     private var excessiveRotationSinceNanos: Long? = null
     private var awaitingQuietRearm = false
     private var quietRearmSinceNanos: Long? = null
@@ -225,20 +262,33 @@ class HoldVerticalGestureDetector(
             }
             val currentAction = actionForAcceleration(effectiveAccelerationG)
             if (currentAction != candidateAction) {
-                startMotion(timestampNanos, currentAction)
+                candidateDirectionChanges += 1
+                if (candidateDirectionChanges > configuration.maximumCandidateDirectionChanges) {
+                    invalidateMotion()
+                    return result(HoldGesturePhase.REARMING, 1f)
+                }
+                startMotion(timestampNanos, currentAction, preserveDirectionChanges = true)
                 motionElapsedNanos = 0L
             } else {
                 directionConfirmationNanos += deltaNanos
+                directionImpulseGSeconds += abs(effectiveAccelerationG) * deltaSeconds
+                peakDirectionAccelerationG = max(peakDirectionAccelerationG, abs(effectiveAccelerationG))
                 if (
                     directionConfirmationNanos >=
-                    configuration.directionConfirmationMillis * NANOS_PER_MILLISECOND
+                    configuration.directionConfirmationMillis * NANOS_PER_MILLISECOND &&
+                    directionImpulseGSeconds >= configuration.minimumDirectionImpulseGSeconds &&
+                    peakDirectionAccelerationG >= configuration.minimumDirectionPeakAccelerationG
                 ) {
                     confirmedAction = currentAction
                 }
             }
         } else if (isAccelerationOppositeTo(effectiveAccelerationG, requireNotNull(confirmedAction))) {
-            if (abs(effectiveAccelerationG) >= configuration.brakingAccelerationG) {
-                brakingObserved = true
+            if (
+                abs(effectiveAccelerationG) >= configuration.brakingAccelerationG &&
+                directionalDisplacement(requireNotNull(confirmedAction)) >=
+                configuration.minimumDisplacementBeforeBrakingMeters
+            ) {
+                brakingImpulseGSeconds += abs(effectiveAccelerationG) * deltaSeconds
             }
         }
 
@@ -262,14 +312,27 @@ class HoldVerticalGestureDetector(
             return result(HoldGesturePhase.REARMING, 1f)
         }
 
+        if (
+            lockedAction != null &&
+            directionalDisplacement(lockedAction) > configuration.maximumTriggerDisplacementMeters
+        ) {
+            invalidateMotion()
+            return result(HoldGesturePhase.REARMING, 1f)
+        }
+
         val action = lockedAction?.takeIf {
-            brakingObserved &&
+            brakingImpulseGSeconds >= configuration.minimumBrakingImpulseGSeconds &&
+                abs(verticalVelocityMetersPerSecond) <= configuration.maximumTriggerVelocityMetersPerSecond &&
                 motionElapsedNanos >= configuration.minimumMotionMillis * NANOS_PER_MILLISECOND &&
                 directionalDisplacement(it) >= configuration.triggerDisplacementMeters
         }
         if (action != null) triggered = true
         return result(
-            phase = if (triggered) HoldGesturePhase.TRIGGERED else HoldGesturePhase.TRACKING,
+            phase = when {
+                triggered -> HoldGesturePhase.TRIGGERED
+                brakingImpulseGSeconds > 0f -> HoldGesturePhase.COMPLETING
+                else -> HoldGesturePhase.TRACKING
+            },
             holdProgress = 1f,
             action = action,
         )
@@ -301,7 +364,10 @@ class HoldVerticalGestureDetector(
         candidateAction = null
         confirmedAction = null
         directionConfirmationNanos = 0L
-        brakingObserved = false
+        directionImpulseGSeconds = 0f
+        peakDirectionAccelerationG = 0f
+        candidateDirectionChanges = 0
+        brakingImpulseGSeconds = 0f
         excessiveRotationSinceNanos = null
     }
 
@@ -311,14 +377,21 @@ class HoldVerticalGestureDetector(
         quietRearmSinceNanos = null
     }
 
-    private fun startMotion(timestampNanos: Long, action: RatingGestureAction) {
+    private fun startMotion(
+        timestampNanos: Long,
+        action: RatingGestureAction,
+        preserveDirectionChanges: Boolean = false,
+    ) {
         motionStartedNanos = timestampNanos
         verticalVelocityMetersPerSecond = 0f
         displacementMeters = 0f
         candidateAction = action
         confirmedAction = null
         directionConfirmationNanos = 0L
-        brakingObserved = false
+        directionImpulseGSeconds = 0f
+        peakDirectionAccelerationG = 0f
+        brakingImpulseGSeconds = 0f
+        if (!preserveDirectionChanges) candidateDirectionChanges = 0
     }
 
     private fun restartArming(timestampNanos: Long, acceleration: Vector3?) {

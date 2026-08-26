@@ -86,6 +86,7 @@ public enum HoldGesturePhase
     Holding,
     Ready,
     Tracking,
+    Completing,
     Rearming,
     Triggered,
 }
