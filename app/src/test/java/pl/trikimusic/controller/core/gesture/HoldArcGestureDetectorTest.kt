@@ -30,18 +30,14 @@ class HoldArcGestureDetectorTest {
     }
 
     @Test
-    fun `one arc emits only one action until button is released`() {
+    fun `one arc emits only one action and rearms after quiet stabilization`() {
         val fixture = Fixture()
         fixture.holdAtRest()
         fixture.parabolicArc(rightward = true)
         fixture.accelerate(fixture.restAcceleration, frames = 30)
         fixture.parabolicArc(rightward = false)
 
-        assertEquals(listOf(RatingGestureAction.LIKE), fixture.actions)
-        assertEquals(HoldGesturePhase.TRIGGERED, fixture.latest.phase)
-
-        fixture.release()
-        assertEquals(HoldGesturePhase.IDLE, fixture.latest.phase)
+        assertEquals(listOf(RatingGestureAction.LIKE, RatingGestureAction.DISLIKE), fixture.actions)
     }
 
     @Test
@@ -125,10 +121,9 @@ class HoldArcGestureDetectorTest {
     fun `movement before full hold cannot rate track`() {
         val fixture = Fixture()
         fixture.parabolicArc(rightward = true)
-        fixture.release()
 
         assertTrue(fixture.actions.isEmpty())
-        assertEquals(HoldGesturePhase.IDLE, fixture.latest.phase)
+        assertEquals(HoldGesturePhase.HOLDING, fixture.latest.phase)
     }
 
     @Test
@@ -140,7 +135,7 @@ class HoldArcGestureDetectorTest {
         assertTrue(fixture.actions.isEmpty())
         assertEquals(HoldGesturePhase.REARMING, fixture.latest.phase)
 
-        fixture.accelerate(fixture.restAcceleration, frames = 12)
+        fixture.accelerate(fixture.restAcceleration, frames = 30)
         fixture.parabolicArc(rightward = false)
 
         assertEquals(listOf(RatingGestureAction.DISLIKE), fixture.actions)
@@ -168,16 +163,15 @@ class HoldArcGestureDetectorTest {
     }
 
     @Test
-    fun `movement without held button is ignored`() {
-        val fixture = Fixture(buttonPressed = false)
+    fun `rating gesture does not need a button signal`() {
+        val fixture = Fixture()
+        fixture.holdAtRest()
         fixture.parabolicArc(rightward = true)
 
-        assertTrue(fixture.actions.isEmpty())
-        assertEquals(HoldGesturePhase.IDLE, fixture.latest.phase)
+        assertEquals(listOf(RatingGestureAction.LIKE), fixture.actions)
     }
 
     private class Fixture(
-        private var buttonPressed: Boolean = true,
         configuration: HoldArcGestureDetector.Configuration = HoldArcGestureDetector.Configuration(
             holdMillis = 400L,
             motionStartAccelerationG = 0.10f,
@@ -192,7 +186,7 @@ class HoldArcGestureDetectorTest {
         private val detector = HoldArcGestureDetector(configuration)
         private var timestampNanos = 0L
         val actions = mutableListOf<RatingGestureAction>()
-        var latest = detector.process(sample(timestampNanos, restAcceleration), buttonPressed)
+        var latest = detector.process(sample(timestampNanos, restAcceleration))
             private set
 
         fun holdAtRest(expectReady: Boolean = true) {
@@ -226,15 +220,9 @@ class HoldArcGestureDetectorTest {
         fun accelerate(acceleration: Vector3, frames: Int, gyroscopeZ: Float = 0f) {
             repeat(frames) {
                 timestampNanos += SAMPLE_PERIOD_NANOS
-                latest = detector.process(sample(timestampNanos, acceleration, gyroscopeZ), buttonPressed)
+                latest = detector.process(sample(timestampNanos, acceleration, gyroscopeZ))
                 latest.action?.let(actions::add)
             }
-        }
-
-        fun release() {
-            buttonPressed = false
-            timestampNanos += SAMPLE_PERIOD_NANOS
-            latest = detector.process(sample(timestampNanos, restAcceleration), buttonPressed)
         }
     }
 

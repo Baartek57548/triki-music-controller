@@ -129,7 +129,7 @@ fun ControlsScreen(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("Przytrzymaj + łuk odwróconym kapslem", style = MaterialTheme.typography.titleLarge)
+                    Text("Łuk odwróconym kapslem", style = MaterialTheme.typography.titleLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text("Łuk w prawo → polub utwór", Modifier.weight(1f))
@@ -139,22 +139,22 @@ fun ControlsScreen(
                         Text("Łuk w lewo → odrzuć utwór", Modifier.weight(1f))
                     }
                     Text(
-                        "Ustaw odwrócony kapsel znacznikiem od siebie, przytrzymaj przycisk 0,5 s i poprowadź płytki łuk 20–30 cm.",
+                        "Ustaw odwrócony kapsel znacznikiem od siebie, ustabilizuj go przez 0,5 s i poprowadź płytki łuk 20–30 cm.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     HorizontalDivider()
                     Text(
                         when (state.runtime.ratingGesturePhase) {
-                            HoldGesturePhase.IDLE -> "Gotowe — odwróć kapsel i przytrzymaj przycisk."
+                            HoldGesturePhase.IDLE -> "Gotowe — odwróć kapsel i odczekaj 0,5 s."
                             HoldGesturePhase.HOLDING -> if (state.runtime.ratingGestureFaceDown) {
-                                "Odwrócenie potwierdzone · przytrzymanie %.0f%%".format(
+                                "Odwrócenie potwierdzone · stabilizacja %.0f%%".format(
                                     state.runtime.ratingGestureHoldProgress * 100f,
                                 )
                             } else {
                                 "Odwróć kapsel górą w dół i uspokój go przed ruchem."
                             }
-                            HoldGesturePhase.READY -> "Przycisk przytrzymany — wykonaj płytki łuk w lewo lub w prawo."
+                            HoldGesturePhase.READY -> "Stabilizacja gotowa — wykonaj płytki łuk w lewo lub w prawo."
                             HoldGesturePhase.TRACKING -> when (state.runtime.ratingGestureDirection) {
                                 RatingGestureAction.LIKE -> "Łuk w prawo: %.0f cm · głębokość %.0f cm".format(
                                     abs(state.runtime.ratingGestureHorizontalCentimeters),
@@ -172,7 +172,7 @@ fun ControlsScreen(
                                 null -> "Dokończ łuk i łagodnie wyhamuj."
                             }
                             HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
-                            HoldGesturePhase.TRIGGERED -> "Ocena wysłana — puść przycisk przed następną akcją."
+                            HoldGesturePhase.TRIGGERED -> "Ocena wysłana — uspokój kapsel przed następną akcją."
                         },
                         style = MaterialTheme.typography.labelLarge,
                     )

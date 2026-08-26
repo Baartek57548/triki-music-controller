@@ -104,9 +104,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string GestureStatus => _lastRuntime.Gesture.Phase switch
     {
         HoldGesturePhase.Holding => _lastRuntime.Gesture.FaceDown
-            ? $"Odwrócenie potwierdzone • przytrzymanie {_lastRuntime.Gesture.HoldProgress * 100:0}%"
+            ? $"Odwrócenie potwierdzone • stabilizacja {_lastRuntime.Gesture.HoldProgress * 100:0}%"
             : "Odwróć kapsel górą w dół i uspokój go przed ruchem",
-        HoldGesturePhase.Ready => "Przycisk przytrzymany — wykonaj płytki łuk w lewo lub w prawo",
+        HoldGesturePhase.Ready => "Stabilizacja gotowa — wykonaj płytki łuk w lewo lub w prawo",
         HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction switch
         {
             RatingGestureAction.Like => $"Łuk w prawo: {Math.Abs(_lastRuntime.Gesture.EstimatedHorizontalDisplacementMeters * 100):0.0} cm • głębokość {_lastRuntime.Gesture.EstimatedArcDepthMeters * 100:0.0} cm",
@@ -121,7 +121,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         },
         HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
         HoldGesturePhase.Triggered => "Gest oceny rozpoznany",
-        _ => "Odwróć kapsel, przytrzymaj 0,5 s i wykonaj łuk 20–30 cm: lewo Dislike, prawo Like",
+        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i wykonaj łuk 20–30 cm: lewo Dislike, prawo Like",
     };
     public string LastActionStatus => _lastRuntime.LastActionStatus;
     public string SensorDetails => _lastRuntime.LatestSample is { } sample

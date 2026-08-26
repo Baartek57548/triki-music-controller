@@ -24,7 +24,7 @@ public sealed class HoldArcGestureDetectorTests
     }
 
     [Fact]
-    public void OneArc_EmitsOnlyOneActionUntilButtonIsReleased()
+    public void OneArc_EmitsOnlyOneActionAndRearmsAfterQuietStabilization()
     {
         var fixture = new Fixture();
         fixture.HoldAtRest();
@@ -32,11 +32,7 @@ public sealed class HoldArcGestureDetectorTests
         fixture.Accelerate(fixture.RestAcceleration, 30);
         fixture.ParabolicArc(rightward: false);
 
-        Assert.Equal([RatingGestureAction.Like], fixture.Actions);
-        Assert.Equal(HoldGesturePhase.Triggered, fixture.Latest.Phase);
-
-        fixture.Release();
-        Assert.Equal(HoldGesturePhase.Idle, fixture.Latest.Phase);
+        Assert.Equal([RatingGestureAction.Like, RatingGestureAction.Dislike], fixture.Actions);
     }
 
     [Fact]
@@ -128,10 +124,9 @@ public sealed class HoldArcGestureDetectorTests
     {
         var fixture = new Fixture();
         fixture.ParabolicArc(rightward: true);
-        fixture.Release();
 
         Assert.Empty(fixture.Actions);
-        Assert.Equal(HoldGesturePhase.Idle, fixture.Latest.Phase);
+        Assert.Equal(HoldGesturePhase.Holding, fixture.Latest.Phase);
     }
 
     [Fact]
@@ -144,7 +139,7 @@ public sealed class HoldArcGestureDetectorTests
         Assert.Empty(fixture.Actions);
         Assert.Equal(HoldGesturePhase.Rearming, fixture.Latest.Phase);
 
-        fixture.Accelerate(fixture.RestAcceleration, 12);
+        fixture.Accelerate(fixture.RestAcceleration, 30);
         fixture.ParabolicArc(rightward: false);
 
         Assert.Equal([RatingGestureAction.Dislike], fixture.Actions);
@@ -168,28 +163,25 @@ public sealed class HoldArcGestureDetectorTests
     }
 
     [Fact]
-    public void MovementWithoutHeldButton_IsIgnored()
+    public void RatingGesture_DoesNotNeedButtonSignal()
     {
-        var fixture = new Fixture(buttonPressed: false);
+        var fixture = new Fixture();
+        fixture.HoldAtRest();
         fixture.ParabolicArc(rightward: true);
 
-        Assert.Empty(fixture.Actions);
-        Assert.Equal(HoldGesturePhase.Idle, fixture.Latest.Phase);
+        Assert.Equal([RatingGestureAction.Like], fixture.Actions);
     }
 
     private sealed class Fixture
     {
         private const long SamplePeriodNanos = 20_000_000;
         private readonly HoldArcGestureDetector _detector;
-        private bool _buttonPressed;
         private long _timestampNanos;
 
         public Fixture(
             HoldGestureConfiguration? configuration = null,
-            bool buttonPressed = true,
             Vector3f? restAcceleration = null)
         {
-            _buttonPressed = buttonPressed;
             RestAcceleration = restAcceleration ?? new Vector3f(0, 0, 1);
             _detector = new HoldArcGestureDetector(configuration ?? new HoldGestureConfiguration(
                 HoldMillis: 400,
@@ -199,7 +191,7 @@ public sealed class HoldArcGestureDetectorTests
                 LinearAccelerationSmoothingAlpha: 1,
                 MinimumArcImpulseEachDirectionGSeconds: 0.006f,
                 MinimumArcDepthMeters: 0.015f));
-            Latest = _detector.Process(SensorTestData.Filtered(0, RestAcceleration), _buttonPressed);
+            Latest = _detector.Process(SensorTestData.Filtered(0, RestAcceleration));
         }
 
         public Vector3f RestAcceleration { get; }
@@ -244,17 +236,9 @@ public sealed class HoldArcGestureDetectorTests
                     SensorTestData.Filtered(
                         _timestampNanos,
                         acceleration,
-                        new Vector3f(0, 0, gyroscopeZ)),
-                    _buttonPressed);
+                        new Vector3f(0, 0, gyroscopeZ)));
                 if (Latest.Action is RatingGestureAction action) Actions.Add(action);
             }
-        }
-
-        public void Release()
-        {
-            _buttonPressed = false;
-            _timestampNanos += SamplePeriodNanos;
-            Latest = _detector.Process(SensorTestData.Filtered(_timestampNanos, RestAcceleration), _buttonPressed);
         }
     }
 }

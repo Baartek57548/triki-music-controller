@@ -157,7 +157,7 @@ fun HomeScreen(
                             Text(
                                 when {
                                     buttonIsLatest -> buttonClick!!.type.displayName
-                                    ratingIsLatest -> "Przytrzymanie + łuk lewo/prawo"
+                                    ratingIsLatest -> "Łuk Like/Dislike lewo/prawo"
                                     else -> "Obrót kapsla · oś Z"
                                 },
                                 style = MaterialTheme.typography.titleMedium,

@@ -70,7 +70,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
         {
             var filtered = _sensorFilter.Process(sample, _settings.Current.Calibration);
             var buttonEvent = _buttonInterpreter.Process(sample);
-            var gesture = _ratingGestureDetector.Process(filtered, _buttonInterpreter.IsPressed);
+            var gesture = _ratingGestureDetector.Process(filtered);
             var explicitConnectionActivity = buttonEvent is not null ||
                 _buttonInterpreter.IsPressed ||
                 gesture.Phase is HoldGesturePhase.Holding or
@@ -83,7 +83,6 @@ public sealed class TrikiRuntimeEngine : IDisposable
 
             if (gesture.Action is RatingGestureAction ratingAction)
             {
-                _buttonInterpreter.ConsumeCurrentHold();
                 _volumeController.Reset();
                 ratingFeedback = ratingAction;
                 actionToExecute = ratingAction == RatingGestureAction.Like ? MediaAction.Like : MediaAction.Dislike;

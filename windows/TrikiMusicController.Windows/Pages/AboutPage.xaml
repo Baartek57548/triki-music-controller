@@ -22,7 +22,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Like i Dislike" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Odwróć kapsel górą w dół i ustaw jego znacznik od siebie. Przytrzymaj przycisk około pół sekundy, a następnie poprowadź płytki łuk 20–30 cm: w prawo dla Like albo w lewo dla Dislike. Akcja wymaga pionowego przebiegu łuku i łagodnego wyhamowania; prosty ruch, szarpnięcie, silny obrót i zejście z osi są odrzucane." TextWrapping="Wrap" />
+                    <TextBlock Text="Odwróć kapsel górą w dół i ustaw jego znacznik od siebie. Ustabilizuj go przez około pół sekundy, a następnie bez wciskania przycisku poprowadź płytki łuk 20–30 cm: w prawo dla Like albo w lewo dla Dislike. Akcja wymaga pionowego przebiegu łuku i łagodnego wyhamowania; prosty ruch, szarpnięcie, silny obrót i zejście z osi są odrzucane." TextWrapping="Wrap" />
                     <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Ograniczenie Windows" Message="Systemowe Media Control nie udostępnia standardowej akcji Like/Dislike. Gest jest rozpoznawany, ale wymaga odtwarzacza z osobną integracją oceniania." />
                 </StackPanel>
             </Border>
@@ -35,7 +35,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Wersja 2.5.0 • Windows x64" />
+                    <TextBlock Text="Wersja 2.5.1 • Windows x64" />
                     <TextBlock Text="Natywna aplikacja WinUI 3 sterująca globalną sesją multimedialną i głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="Sprawdź aktualizacje" Click="CheckUpdates_Click" />

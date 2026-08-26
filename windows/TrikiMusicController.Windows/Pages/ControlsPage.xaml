@@ -20,7 +20,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Like i Dislike łukiem" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Ustaw odwrócony kapsel znacznikiem od siebie. Przytrzymaj przycisk 0,5 s; płytki łuk 20–30 cm w lewo odrzuca utwór, a w prawo go lubi." TextWrapping="Wrap" Opacity="0.75" />
+                    <TextBlock Text="Ustaw odwrócony kapsel znacznikiem od siebie i ustabilizuj go przez 0,5 s. Bez wciskania przycisku wykonaj płytki łuk 20–30 cm: w lewo odrzuca utwór, a w prawo go lubi." TextWrapping="Wrap" Opacity="0.75" />
                     <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>

@@ -107,7 +107,7 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "2.5.0";
+    public const string Version = "2.5.1";
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }

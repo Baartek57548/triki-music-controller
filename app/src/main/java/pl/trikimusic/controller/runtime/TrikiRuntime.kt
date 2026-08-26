@@ -151,7 +151,7 @@ class TrikiRuntime(
     private fun consume(sample: TrikiSensorData) {
         val filtered = sensorFilter.process(sample, settings.calibration)
         val buttonEvent = buttonInterpreter.process(sample)
-        val ratingGestureResult = ratingGestureDetector.process(filtered, buttonInterpreter.isPressed)
+        val ratingGestureResult = ratingGestureDetector.process(filtered)
         val explicitConnectionActivity =
             buttonEvent != null ||
                 buttonInterpreter.isPressed ||
@@ -197,7 +197,6 @@ class TrikiRuntime(
             )
         }
         ratingGestureResult.action?.let { gestureAction ->
-            buttonInterpreter.consumeCurrentHold()
             volumeController.reset()
             val mediaAction = when (gestureAction) {
                 RatingGestureAction.LIKE -> MediaAction.LIKE

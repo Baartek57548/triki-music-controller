@@ -25,7 +25,7 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
 - bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa przechodzą do następnego utworu, trzy do poprzedniego; każde mapowanie można zmienić w profilu;
 - konfigurowalne mapowania przycisku zapisywane w Preferences DataStore;
-- przytrzymanie przycisku i paraboliczny łuk odwróconym kapslem 20–30 cm: ruch w prawo wysyła Like, ruch w lewo Dislike; detektor wymaga odwrócenia (Z dodatnie), pionowej fazy łuku, trwałego impulsu i potwierdzonego wyhamowania;
+- paraboliczny łuk odwróconym kapslem 20–30 cm bez wciskania przycisku: ruch w prawo wysyła Like, ruch w lewo Dislike; detektor wymaga odwrócenia (Z dodatnie), 0,5 s stabilizacji, pionowej fazy łuku, trwałego impulsu i potwierdzonego wyhamowania;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Like, Dislike, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i informacją o odtwarzanym utworze;
 - uproszczone ekrany robocze i wspólny ekran **Informacje**, otwierany ikoną w prawym górnym rogu aplikacji Android i Windows;
@@ -60,7 +60,7 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 7. Naciśnij przycisk Triki, wybierz **Urządzenie → Skanuj urządzenia**, a następnie **Połącz i zapamiętaj**. Adres jest zapisywany dopiero po pełnym uruchomieniu strumienia IMU.
 8. Po stanie **Gotowe** otwórz **Sterowanie**, sprawdź status regulatora Z i ustaw akcje dla jednego, dwóch oraz trzech kliknięć.
 9. Uruchom muzykę i utrzymuj kapsel górą do góry w przechyle 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć; gwałtowne przyspieszenie ponownie uruchamia 2-sekundową stabilizację. Gdy UI pokaże „Regulator gotowy”, obracaj go łagodnie: dodatnia wartość Z podgłaśnia, ujemna ścisza.
-10. Aby ocenić utwór, odwróć kapsel górą w dół i ustaw znacznik od siebie. Przytrzymaj przycisk około pół sekundy, następnie poprowadź płytki łuk 20–30 cm w prawo dla Like albo w lewo dla Dislike i łagodnie wyhamuj. Sygnał potwierdzi wysłanie akcji; sygnał błędu oznacza brak obsługi przez aktywny odtwarzacz.
+10. Aby ocenić utwór, odwróć kapsel górą w dół i ustaw znacznik od siebie. Odczekaj około pół sekundy stabilizacji, następnie bez wciskania przycisku poprowadź płytki łuk 20–30 cm w prawo dla Like albo w lewo dla Dislike i łagodnie wyhamuj. Sygnał potwierdzi wysłanie akcji; sygnał błędu oznacza brak obsługi przez aktywny odtwarzacz.
 11. Gdy Triki uśnie i rozłączy BLE, naciśnij jego fizyczny przycisk. Przy włączonym **Sterowaniu w tle** Android automatycznie dokończy oczekujące połączenie z zapamiętanym kapslem — bez ponownego wybierania urządzenia.
 12. Opcjonalnie włącz **Ustawienia → Łącz tylko podczas użycia**. Aplikacja zamknie aktywne połączenie po 12 sekundach bezczynności; po komunikacie o uzbrojonym nasłuchu kolejne naciśnięcie przycisku ponownie połączy zapamiętany kapsel.
 
@@ -115,7 +115,7 @@ SensorFilter + calibration + complementary orientation
     ↓
 GyroscopeVolumeController + bramka 0,80–1,20 g + 2 s stabilizacji przechyłu 0–25°
     ↓
-HoldArcGestureDetector + przycisk/łuk lewo–prawo na odwróconym kapslu
+HoldArcGestureDetector + łuk lewo–prawo na odwróconym kapslu
     ↓
 ActionMapper + mapowanie przycisku i rating MediaSession
     ↓
@@ -169,7 +169,7 @@ Martwa strefa osi Z 22°/s, próg zwolnienia 12°/s, zerowanie po zmianie kierun
 
 Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
 
-`HoldArcGestureDetector` uruchamia się dopiero po około 500 ms potwierdzonego przytrzymania odwróconego kapsla. Zapamiętuje lokalny wektor grawitacji, wyznacza z niego płaszczyznę ruchu oraz odejmuje grawitację od kolejnych próbek. Ruch w osi X w prawo daje Like, a w lewo Dislike; kierunek zostaje zablokowany dopiero po co najmniej 120 ms spójnego impulsu. Akcja wymaga 20–30 cm przemieszczenia poziomego, wyraźnej pionowej fazy parabolicznej (oba kierunki przyspieszenia), rozpoczętego po 6 cm hamowania i obniżenia prędkości. Ruch prosty, zbyt głęboki, dłuższy niż około 34 cm, silnie obrotowy albo poza osią jest odrzucany; po akcji przytrzymanie jest konsumowane, więc puszczenie nie generuje dodatkowego pojedynczego kliknięcia. `AndroidMediaControllerGateway` korzysta ze standardowego `ACTION_SET_RATING` lub akcji niestandardowej jawnie wystawionej przez aktywną MediaSession.
+`HoldArcGestureDetector` uruchamia się po około 500 ms stabilizacji odwróconego kapsla — przycisk nie jest wymagany. Zapamiętuje lokalny wektor grawitacji, wyznacza z niego płaszczyznę ruchu oraz odejmuje grawitację od kolejnych próbek. Ruch w osi X w prawo daje Like, a w lewo Dislike; kierunek zostaje zablokowany dopiero po co najmniej 120 ms spójnego impulsu. Akcja wymaga 20–30 cm przemieszczenia poziomego, wyraźnej pionowej fazy parabolicznej (oba kierunki przyspieszenia), rozpoczętego po 6 cm hamowania i obniżenia prędkości. Ruch prosty, zbyt głęboki, dłuższy niż około 34 cm, silnie obrotowy albo poza osią jest odrzucany; po akcji detektor czeka na krótkie uspokojenie ruchu i samoczynnie uzbraja się ponownie. `AndroidMediaControllerGateway` korzysta ze standardowego `ACTION_SET_RATING` lub akcji niestandardowej jawnie wystawionej przez aktywną MediaSession.
 
 ## Diagnostyka
 
@@ -190,7 +190,7 @@ Testy automatyczne JVM i xUnit obejmują:
 - autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
 - dodatni i ujemny kierunek regulatora Z, pełne 2 sekundy w przechyle 0–25°, tolerancję ruchu 0,80–1,20 g, reset po gwałtownym przyspieszeniu, łagodniejsze wygładzenie Z, limit kroków, blokadę powyżej 25°, położenie 90°/180° oraz reset po przerwie strumienia;
-- przytrzymanie konsumujące zwykły klik, symetryczną estymację łuku lewo/prawo, wymóg odwróconego kapsla i pionowej fazy, korektę pojedynczego początkowego impulsu, potwierdzenie kierunku i hamowania, odrzucanie ruchu prostego, zbyt głębokiego, zbyt długiego lub naprzemiennego, pojedyncze Like/Dislike na jedno przytrzymanie oraz bezpieczne dopasowanie niestandardowych akcji ratingu;
+- stabilizację bez przycisku, symetryczną estymację łuku lewo/prawo, wymóg odwróconego kapsla i pionowej fazy, korektę pojedynczego początkowego impulsu, potwierdzenie kierunku i hamowania, odrzucanie ruchu prostego, zbyt głębokiego, zbyt długiego lub naprzemiennego, pojedyncze Like/Dislike na jeden łuk oraz automatyczne ponowne uzbrajanie po uspokojeniu ruchu;
 - mapowanie przycisk → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, mapowań przycisku i kalibracji, migrację starszej konwencji osi oraz bezpieczne ignorowanie pól poprzedniego systemu sterowania;
 - parsowanie i numeryczne porównywanie wersji semantycznych używanych przez aktualizator;

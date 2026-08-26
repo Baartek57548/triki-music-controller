@@ -33,7 +33,7 @@ data class HoldArcGestureResult(
 )
 
 /**
- * Recognizes a short left/right arc while the inverted capsule's button is held.
+ * Recognizes a short left/right arc after the inverted capsule has stabilized.
  *
  * The fixed face-down pose makes the device X axis the repeatable horizontal reference. A valid
  * attempt needs a directional impulse, a shallow vertical excursion with both acceleration phases,
@@ -143,7 +143,7 @@ class HoldArcGestureDetector(
         }
     }
 
-    private var pressedSinceNanos: Long? = null
+    private var stabilizationSinceNanos: Long? = null
     private var previousTimestampNanos: Long? = null
     private var gravityBaseline: Vector3? = null
     private var motionStartedNanos: Long? = null
@@ -174,7 +174,7 @@ class HoldArcGestureDetector(
     private var triggered = false
 
     fun reset() {
-        pressedSinceNanos = null
+        stabilizationSinceNanos = null
         previousTimestampNanos = null
         gravityBaseline = null
         faceDown = false
@@ -182,15 +182,8 @@ class HoldArcGestureDetector(
         triggered = false
     }
 
-    fun process(sample: FilteredSensorData, buttonPressed: Boolean): HoldArcGestureResult {
-        if (!buttonPressed) {
-            reset()
-            return result(HoldGesturePhase.IDLE, 0f)
-        }
-
+    fun process(sample: FilteredSensorData): HoldArcGestureResult {
         val timestampNanos = sample.source.timestampNanos
-        if (triggered) return result(HoldGesturePhase.TRIGGERED, 1f)
-
         val acceleration = sample.accelerometerG
         if (!isUsableAcceleration(acceleration)) {
             restartArming(timestampNanos, null)
@@ -198,8 +191,8 @@ class HoldArcGestureDetector(
         }
         faceDown = isFaceDown(acceleration)
 
-        if (pressedSinceNanos == null) {
-            pressedSinceNanos = timestampNanos
+        if (stabilizationSinceNanos == null) {
+            stabilizationSinceNanos = timestampNanos
             previousTimestampNanos = timestampNanos
             gravityBaseline = acceleration
             return result(HoldGesturePhase.HOLDING, 0f)
@@ -218,11 +211,11 @@ class HoldArcGestureDetector(
         val deltaSeconds = deltaNanos / NANOS_PER_SECOND
         previousTimestampNanos = timestampNanos
 
-        val pressStart = requireNotNull(pressedSinceNanos)
-        val holdNanos = configuration.holdMillis * NANOS_PER_MILLISECOND
-        val heldNanos = (timestampNanos - pressStart).coerceAtLeast(0L)
-        val holdProgress = (heldNanos.toDouble() / holdNanos).toFloat().coerceIn(0f, 1f)
-        if (heldNanos < holdNanos) {
+        val stabilizationStart = requireNotNull(stabilizationSinceNanos)
+        val stabilizationNanos = configuration.holdMillis * NANOS_PER_MILLISECOND
+        val stabilizedNanos = (timestampNanos - stabilizationStart).coerceAtLeast(0L)
+        val holdProgress = (stabilizedNanos.toDouble() / stabilizationNanos).toFloat().coerceIn(0f, 1f)
+        if (stabilizedNanos < stabilizationNanos) {
             if (!isStableForArming(sample)) {
                 restartArming(timestampNanos, acceleration)
                 return result(HoldGesturePhase.HOLDING, 0f)
@@ -261,7 +254,7 @@ class HoldArcGestureDetector(
                 val quietSince = quietRearmSinceNanos ?: timestampNanos.also { quietRearmSinceNanos = it }
                 gravityBaseline = lowPass(gravityBaseline, acceleration, BASELINE_TRACKING_ALPHA)
                 if (timestampNanos - quietSince >= configuration.rearmQuietMillis * NANOS_PER_MILLISECOND) {
-                    resetMotion()
+                    restartArming(timestampNanos, acceleration)
                 }
             } else {
                 quietRearmSinceNanos = null
@@ -379,7 +372,11 @@ class HoldArcGestureDetector(
                 motionElapsedNanos >= configuration.minimumMotionMillis * NANOS_PER_MILLISECOND &&
                 directionalDisplacement(it) >= configuration.triggerDisplacementMeters
         }
-        if (action != null) triggered = true
+        if (action != null) {
+            triggered = true
+            awaitingQuietRearm = true
+            quietRearmSinceNanos = null
+        }
         return result(
             phase = when {
                 triggered -> HoldGesturePhase.TRIGGERED
@@ -443,6 +440,7 @@ class HoldArcGestureDetector(
         clearMotionState()
         awaitingQuietRearm = false
         quietRearmSinceNanos = null
+        triggered = false
     }
 
     private fun clearMotionState() {
@@ -495,12 +493,11 @@ class HoldArcGestureDetector(
     }
 
     private fun restartArming(timestampNanos: Long, acceleration: Vector3?) {
-        pressedSinceNanos = timestampNanos
+        stabilizationSinceNanos = timestampNanos
         previousTimestampNanos = timestampNanos
         gravityBaseline = acceleration
         faceDown = acceleration?.let(::isFaceDown) ?: false
         resetMotion()
-        triggered = false
     }
 
     private fun isStableForArming(sample: FilteredSensorData): Boolean =

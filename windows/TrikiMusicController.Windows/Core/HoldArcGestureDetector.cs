@@ -47,7 +47,7 @@ public sealed class HoldArcGestureDetector
     private const float MaximumAbsoluteDisplacementMeters = 0.60f;
     private const float VelocityDampingWhenQuiet = 0.92f;
     private readonly HoldGestureConfiguration _configuration;
-    private long? _pressedSinceNanos;
+    private long? _stabilizationSinceNanos;
     private long? _previousTimestampNanos;
     private Vector3f? _gravityBaseline;
     private long? _motionStartedNanos;
@@ -85,7 +85,7 @@ public sealed class HoldArcGestureDetector
 
     public void Reset()
     {
-        _pressedSinceNanos = null;
+        _stabilizationSinceNanos = null;
         _previousTimestampNanos = null;
         _gravityBaseline = null;
         _faceDown = false;
@@ -93,17 +93,9 @@ public sealed class HoldArcGestureDetector
         _triggered = false;
     }
 
-    public HoldArcGestureResult Process(FilteredSensorData sample, bool buttonPressed)
+    public HoldArcGestureResult Process(FilteredSensorData sample)
     {
-        if (!buttonPressed)
-        {
-            Reset();
-            return Result(HoldGesturePhase.Idle, 0);
-        }
-
         var timestamp = sample.Source.TimestampNanos;
-        if (_triggered) return Result(HoldGesturePhase.Triggered, 1);
-
         var acceleration = sample.AccelerometerG;
         if (!IsUsableAcceleration(acceleration))
         {
@@ -112,9 +104,9 @@ public sealed class HoldArcGestureDetector
         }
         _faceDown = IsFaceDown(acceleration);
 
-        if (_pressedSinceNanos is null)
+        if (_stabilizationSinceNanos is null)
         {
-            _pressedSinceNanos = timestamp;
+            _stabilizationSinceNanos = timestamp;
             _previousTimestampNanos = timestamp;
             _gravityBaseline = acceleration;
             return Result(HoldGesturePhase.Holding, 0);
@@ -131,11 +123,11 @@ public sealed class HoldArcGestureDetector
         var deltaSeconds = deltaNanos / 1_000_000_000f;
         _previousTimestampNanos = timestamp;
 
-        var pressStart = _pressedSinceNanos.Value;
-        var holdNanos = _configuration.HoldMillis * 1_000_000;
-        var heldNanos = Math.Max(0, timestamp - pressStart);
-        var holdProgress = Math.Clamp((float)((double)heldNanos / holdNanos), 0, 1);
-        if (heldNanos < holdNanos)
+        var stabilizationStart = _stabilizationSinceNanos.Value;
+        var stabilizationNanos = _configuration.HoldMillis * 1_000_000;
+        var stabilizedNanos = Math.Max(0, timestamp - stabilizationStart);
+        var holdProgress = Math.Clamp((float)((double)stabilizedNanos / stabilizationNanos), 0, 1);
+        if (stabilizedNanos < stabilizationNanos)
         {
             if (!IsStableForArming(sample))
             {
@@ -301,7 +293,12 @@ public sealed class HoldArcGestureDetector
                                       DirectionalDisplacement(locked) >= _configuration.TriggerDisplacementMeters
             ? locked
             : null;
-        if (action is not null) _triggered = true;
+        if (action is not null)
+        {
+            _triggered = true;
+            _awaitingQuietRearm = true;
+            _quietRearmSinceNanos = null;
+        }
         var phase = _triggered
             ? HoldGesturePhase.Triggered
             : _brakingImpulseGSeconds > 0
@@ -356,6 +353,7 @@ public sealed class HoldArcGestureDetector
         ClearMotionState();
         _awaitingQuietRearm = false;
         _quietRearmSinceNanos = null;
+        _triggered = false;
     }
 
     private void ClearMotionState()
@@ -408,12 +406,11 @@ public sealed class HoldArcGestureDetector
 
     private void RestartArming(long timestamp, Vector3f? acceleration)
     {
-        _pressedSinceNanos = timestamp;
+        _stabilizationSinceNanos = timestamp;
         _previousTimestampNanos = timestamp;
         _gravityBaseline = acceleration;
         _faceDown = acceleration is Vector3f value && IsFaceDown(value);
         ResetMotion();
-        _triggered = false;
     }
 
     private bool IsStableForArming(FilteredSensorData sample) =>
