@@ -18,9 +18,9 @@ public sealed class HoldArcGestureDetectorTests
 
         Assert.Equal([RatingGestureAction.Like], right.Actions);
         Assert.Equal([RatingGestureAction.Dislike], left.Actions);
-        Assert.True(right.Latest.EstimatedHorizontalDisplacementMeters >= 0.10f);
+        Assert.True(right.Latest.EstimatedHorizontalDisplacementMeters >= 0.09f);
         Assert.True(right.Latest.EstimatedHorizontalDisplacementMeters <= 0.16f);
-        Assert.True(left.Latest.EstimatedHorizontalDisplacementMeters <= -0.10f);
+        Assert.True(left.Latest.EstimatedHorizontalDisplacementMeters <= -0.09f);
         Assert.True(left.Latest.EstimatedHorizontalDisplacementMeters >= -0.16f);
         Assert.True(right.Latest.EstimatedArcDepthMeters >= 0.020f);
     }
@@ -174,6 +174,50 @@ public sealed class HoldArcGestureDetectorTests
         Assert.Equal([RatingGestureAction.Like], fixture.Actions);
     }
 
+    [Fact]
+    public void GentleTenCentimeterArc_IsAccepted()
+    {
+        var fixture = new Fixture();
+        fixture.HoldAtRest();
+        fixture.ParabolicArc(
+            rightward: true,
+            horizontalAccelerationG: 0.22f,
+            verticalAccelerationG: 0.18f,
+            quarterFrames: 7);
+
+        Assert.Equal([RatingGestureAction.Like], fixture.Actions);
+    }
+
+    [Fact]
+    public void SensorFilter_PreservesGentleTenCentimeterArc()
+    {
+        var detector = new HoldArcGestureDetector();
+        var filter = new SensorFilter();
+        var actions = new List<RatingGestureAction>();
+        var timestampNanos = 0L;
+        HoldArcGestureResult? latest = null;
+
+        void Feed(Vector3f acceleration, int frames)
+        {
+            for (var index = 0; index < frames; index++)
+            {
+                timestampNanos += SensorTestData.SamplePeriodNanos;
+                var raw = SensorTestData.Filtered(timestampNanos, acceleration).Source;
+                latest = detector.Process(filter.Process(raw, new CalibrationProfile()));
+                if (latest.Action is RatingGestureAction action) actions.Add(action);
+            }
+        }
+
+        Feed(new Vector3f(0, 0, 1), 30);
+        Feed(new Vector3f(0.22f, 0, 1.18f), 7);
+        Feed(new Vector3f(0.22f, 0, 0.82f), 7);
+        Feed(new Vector3f(-0.22f, 0, 0.82f), 7);
+        Feed(new Vector3f(-0.22f, 0, 1.18f), 7);
+
+        Assert.Equal([RatingGestureAction.Like], actions);
+        Assert.NotNull(latest);
+    }
+
     private sealed class Fixture
     {
         private const long SamplePeriodNanos = 20_000_000;
@@ -188,6 +232,7 @@ public sealed class HoldArcGestureDetectorTests
             _detector = new HoldArcGestureDetector(configuration ?? new HoldGestureConfiguration(
                 HoldMillis: 400,
                 MotionStartAccelerationG: 0.10f,
+                MinimumDirectionPeakAccelerationG: 0.10f,
                 AccelerationDeadZoneG: 0.03f,
                 VerticalAccelerationDeadZoneG: 0.02f,
                 LinearAccelerationSmoothingAlpha: 1,

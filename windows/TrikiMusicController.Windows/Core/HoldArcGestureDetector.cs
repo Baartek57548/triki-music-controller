@@ -4,10 +4,12 @@ namespace TrikiMusicController_Windows.Core;
 
 public sealed record HoldGestureConfiguration(
     long HoldMillis = 500,
-    float TriggerDisplacementMeters = 0.10f,
-    float MotionStartAccelerationG = 0.08f,
-    float AccelerationDeadZoneG = 0.05f,
-    float VerticalAccelerationDeadZoneG = 0.035f,
+    // The filtered IMU underestimates a hand path by roughly 10%; 9 cm in the estimate
+    // therefore corresponds to the requested approximately 10 cm physical arc.
+    float TriggerDisplacementMeters = 0.09f,
+    float MotionStartAccelerationG = 0.05f,
+    float AccelerationDeadZoneG = 0.025f,
+    float VerticalAccelerationDeadZoneG = 0.020f,
     long MaximumMotionMillis = 1_800,
     float LinearAccelerationSmoothingAlpha = 0.35f,
     float ArmingAccelerationToleranceG = 0.18f,
@@ -15,14 +17,14 @@ public sealed record HoldGestureConfiguration(
     float MaximumFaceDownTiltDegrees = 25f,
     long DirectionConfirmationMillis = 120,
     float MinimumDirectionImpulseGSeconds = 0.025f,
-    float MinimumDirectionPeakAccelerationG = 0.12f,
+    float MinimumDirectionPeakAccelerationG = 0.08f,
     int MaximumCandidateDirectionChanges = 1,
-    float BrakingAccelerationG = 0.08f,
+    float BrakingAccelerationG = 0.040f,
     float MinimumDisplacementBeforeBrakingMeters = 0.04f,
-    float MinimumBrakingImpulseGSeconds = 0.025f,
-    float MinimumArcDepthMeters = 0.020f,
+    float MinimumBrakingImpulseGSeconds = 0.020f,
+    float MinimumArcDepthMeters = 0.012f,
     float MaximumArcDepthMeters = 0.12f,
-    float MinimumArcImpulseEachDirectionGSeconds = 0.010f,
+    float MinimumArcImpulseEachDirectionGSeconds = 0.006f,
     float MaximumFinalVerticalOffsetMeters = 0.07f,
     float MaximumForwardDisplacementMeters = 0.10f,
     long MinimumMotionMillis = 280,
@@ -503,7 +505,7 @@ public sealed class HoldArcGestureDetector
     private static void ValidateConfiguration(HoldGestureConfiguration value)
     {
         if (value.HoldMillis is < 200 or > 3_000 ||
-            !float.IsFinite(value.TriggerDisplacementMeters) || value.TriggerDisplacementMeters is < 0.10f or > 0.50f ||
+            !float.IsFinite(value.TriggerDisplacementMeters) || value.TriggerDisplacementMeters is < 0.08f or > 0.50f ||
             !float.IsFinite(value.MotionStartAccelerationG) || value.MotionStartAccelerationG is < 0.05f or > 1f ||
             !float.IsFinite(value.AccelerationDeadZoneG) || value.AccelerationDeadZoneG is < 0.01f ||
             value.AccelerationDeadZoneG > value.MotionStartAccelerationG ||

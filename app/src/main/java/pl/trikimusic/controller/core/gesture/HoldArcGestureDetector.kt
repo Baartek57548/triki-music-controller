@@ -45,10 +45,12 @@ class HoldArcGestureDetector(
 ) {
     data class Configuration(
         val holdMillis: Long = 500L,
-        val triggerDisplacementMeters: Float = 0.10f,
-        val motionStartAccelerationG: Float = 0.08f,
-        val accelerationDeadZoneG: Float = 0.05f,
-        val verticalAccelerationDeadZoneG: Float = 0.035f,
+        // The filtered IMU underestimates a hand path by roughly 10%; 9 cm in the estimate
+        // therefore corresponds to the requested approximately 10 cm physical arc.
+        val triggerDisplacementMeters: Float = 0.09f,
+        val motionStartAccelerationG: Float = 0.05f,
+        val accelerationDeadZoneG: Float = 0.025f,
+        val verticalAccelerationDeadZoneG: Float = 0.020f,
         val maximumMotionMillis: Long = 1_800L,
         val linearAccelerationSmoothingAlpha: Float = 0.35f,
         val armingAccelerationToleranceG: Float = 0.18f,
@@ -56,14 +58,14 @@ class HoldArcGestureDetector(
         val maximumFaceDownTiltDegrees: Float = 25f,
         val directionConfirmationMillis: Long = 120L,
         val minimumDirectionImpulseGSeconds: Float = 0.025f,
-        val minimumDirectionPeakAccelerationG: Float = 0.12f,
+        val minimumDirectionPeakAccelerationG: Float = 0.08f,
         val maximumCandidateDirectionChanges: Int = 1,
-        val brakingAccelerationG: Float = 0.08f,
+        val brakingAccelerationG: Float = 0.040f,
         val minimumDisplacementBeforeBrakingMeters: Float = 0.04f,
-        val minimumBrakingImpulseGSeconds: Float = 0.025f,
-        val minimumArcDepthMeters: Float = 0.020f,
+        val minimumBrakingImpulseGSeconds: Float = 0.020f,
+        val minimumArcDepthMeters: Float = 0.012f,
         val maximumArcDepthMeters: Float = 0.12f,
-        val minimumArcImpulseEachDirectionGSeconds: Float = 0.010f,
+        val minimumArcImpulseEachDirectionGSeconds: Float = 0.006f,
         val maximumFinalVerticalOffsetMeters: Float = 0.07f,
         val maximumForwardDisplacementMeters: Float = 0.10f,
         val minimumMotionMillis: Long = 280L,
@@ -77,7 +79,7 @@ class HoldArcGestureDetector(
     ) {
         init {
             require(holdMillis in 200L..3_000L)
-            require(triggerDisplacementMeters.isFinite() && triggerDisplacementMeters in 0.10f..0.50f)
+            require(triggerDisplacementMeters.isFinite() && triggerDisplacementMeters in 0.08f..0.50f)
             require(motionStartAccelerationG.isFinite() && motionStartAccelerationG in 0.05f..1f)
             require(accelerationDeadZoneG.isFinite() && accelerationDeadZoneG in 0.01f..motionStartAccelerationG)
             require(

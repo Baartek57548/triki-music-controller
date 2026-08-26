@@ -35,7 +35,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Wersja 2.5.3 • Windows x64" />
+                    <TextBlock Text="Wersja 2.5.4 • Windows x64" />
                     <TextBlock Text="Natywna aplikacja WinUI 3 sterująca globalną sesją multimedialną i głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="Sprawdź aktualizacje" Click="CheckUpdates_Click" />

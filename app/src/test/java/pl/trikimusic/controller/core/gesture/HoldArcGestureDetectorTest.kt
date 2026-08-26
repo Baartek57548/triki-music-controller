@@ -5,11 +5,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.OrientationData
 import pl.trikimusic.controller.domain.model.RawVector3
 import pl.trikimusic.controller.domain.model.TrikiSensorData
 import pl.trikimusic.controller.domain.model.Vector3
+import pl.trikimusic.controller.core.sensor.SensorFilter
 
 class HoldArcGestureDetectorTest {
     @Test
@@ -24,9 +26,9 @@ class HoldArcGestureDetectorTest {
 
         assertEquals(listOf(RatingGestureAction.LIKE), right.actions)
         assertEquals(listOf(RatingGestureAction.DISLIKE), left.actions)
-        assertTrue(right.latest.estimatedHorizontalDisplacementMeters >= 0.10f)
+        assertTrue(right.latest.estimatedHorizontalDisplacementMeters >= 0.09f)
         assertTrue(right.latest.estimatedHorizontalDisplacementMeters <= 0.16f)
-        assertTrue(left.latest.estimatedHorizontalDisplacementMeters <= -0.10f)
+        assertTrue(left.latest.estimatedHorizontalDisplacementMeters <= -0.09f)
         assertTrue(left.latest.estimatedHorizontalDisplacementMeters >= -0.16f)
         assertTrue(right.latest.estimatedArcDepthMeters >= 0.020f)
     }
@@ -173,10 +175,48 @@ class HoldArcGestureDetectorTest {
         assertEquals(listOf(RatingGestureAction.LIKE), fixture.actions)
     }
 
+    @Test
+    fun `gentle ten centimeter arc is accepted`() {
+        val fixture = Fixture()
+        fixture.holdAtRest()
+        fixture.parabolicArc(
+            rightward = true,
+            horizontalAccelerationG = 0.22f,
+            verticalAccelerationG = 0.18f,
+            quarterFrames = 7,
+        )
+
+        assertEquals(listOf(RatingGestureAction.LIKE), fixture.actions)
+    }
+
+    @Test
+    fun `sensor filter preserves gentle ten centimeter arc`() {
+        val detector = HoldArcGestureDetector()
+        val filter = SensorFilter()
+        val actions = mutableListOf<RatingGestureAction>()
+        var timestampNanos = 0L
+        fun feed(acceleration: Vector3, frames: Int) {
+            repeat(frames) {
+                timestampNanos += SAMPLE_PERIOD_NANOS
+                val raw = sample(timestampNanos, acceleration).source
+                val filtered = filter.process(raw, CalibrationProfile())
+                detector.process(filtered).action?.let(actions::add)
+            }
+        }
+        feed(Vector3(0f, 0f, 1f), 30)
+        feed(Vector3(0.22f, 0f, 1.18f), 7)
+        feed(Vector3(0.22f, 0f, 0.82f), 7)
+        feed(Vector3(-0.22f, 0f, 0.82f), 7)
+        feed(Vector3(-0.22f, 0f, 1.18f), 7)
+
+        assertEquals(listOf(RatingGestureAction.LIKE), actions)
+    }
+
     private class Fixture(
         configuration: HoldArcGestureDetector.Configuration = HoldArcGestureDetector.Configuration(
             holdMillis = 400L,
             motionStartAccelerationG = 0.10f,
+            minimumDirectionPeakAccelerationG = 0.10f,
             accelerationDeadZoneG = 0.03f,
             verticalAccelerationDeadZoneG = 0.02f,
             linearAccelerationSmoothingAlpha = 1f,
