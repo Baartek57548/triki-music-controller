@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Win32;
 using TrikiMusicController_Windows.Models;
 
@@ -38,16 +40,13 @@ public sealed class SettingsService
             try
             {
                 await using var stream = File.OpenRead(path);
-                Current = await JsonSerializer.DeserializeAsync<AppSettings>(stream, _jsonOptions).ConfigureAwait(false)
-                    ?? new AppSettings();
+                var loaded = await JsonSerializer.DeserializeAsync<AppSettings>(stream, _jsonOptions).ConfigureAwait(false);
+                Current = Normalize(loaded ?? new AppSettings());
             }
             catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException)
             {
-                var backup = Path.Combine(
-                    _settingsDirectory,
-                    $"settings-corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}.json");
-                File.Copy(path, backup, overwrite: false);
-                Current = new AppSettings();
+                TryBackUpCorruptSettings(path, error);
+                Current = new AppSettings { StartWithWindows = IsStartupRegistered() };
             }
         }
         finally
@@ -92,6 +91,81 @@ public sealed class SettingsService
     }
 
     private string SettingsPath => Path.Combine(_settingsDirectory, "settings.json");
+
+    private static AppSettings Normalize(AppSettings settings)
+    {
+        settings.Theme = settings.Theme is "System" or "Light" or "Dark" ? settings.Theme : "System";
+        settings.SingleClickAction = NormalizeAction(settings.SingleClickAction, MediaAction.PlayPause);
+        settings.DoubleClickAction = NormalizeAction(settings.DoubleClickAction, MediaAction.Next);
+        settings.TripleClickAction = NormalizeAction(settings.TripleClickAction, MediaAction.Previous);
+        if (settings.ConnectOnlyWhenNeeded) settings.AutoReconnect = true;
+
+        if (!ulong.TryParse(settings.KnownDeviceAddressHex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var address) ||
+            address is 0 or > 0xFFFFFFFFFFFF)
+        {
+            settings.KnownDeviceAddressHex = null;
+            settings.KnownDeviceName = null;
+        }
+        else
+        {
+            settings.KnownDeviceAddressHex = address.ToString("X12", CultureInfo.InvariantCulture);
+            settings.KnownDeviceName = string.IsNullOrWhiteSpace(settings.KnownDeviceName) ? "Triki" : settings.KnownDeviceName.Trim();
+        }
+
+        settings.Calibration = NormalizeCalibration(settings.Calibration);
+        return settings;
+    }
+
+    private static MediaAction NormalizeAction(MediaAction action, MediaAction fallback) =>
+        Enum.IsDefined(action) ? action : fallback;
+
+    private static CalibrationProfile NormalizeCalibration(CalibrationProfile? calibration)
+    {
+        if (calibration is null ||
+            !InRange(calibration.AccelerometerBiasX, 4f) ||
+            !InRange(calibration.AccelerometerBiasY, 4f) ||
+            !InRange(calibration.AccelerometerBiasZ, 4f) ||
+            !InRange(calibration.GyroscopeBiasX, 2_000f) ||
+            !InRange(calibration.GyroscopeBiasY, 2_000f) ||
+            !InRange(calibration.GyroscopeBiasZ, 2_000f) ||
+            !InRange(calibration.AccelerometerNoise, 4f, minimum: 0f) ||
+            !InRange(calibration.GyroscopeNoise, 2_000f, minimum: 0f) ||
+            calibration.SampleCount < 0)
+        {
+            return new CalibrationProfile();
+        }
+
+        return calibration with
+        {
+            NeutralPitch = NormalizeDegrees(calibration.NeutralPitch),
+            NeutralRoll = NormalizeDegrees(calibration.NeutralRoll),
+        };
+    }
+
+    private static bool InRange(float value, float maximum, float minimum = float.NegativeInfinity) =>
+        float.IsFinite(value) && value >= minimum && value <= maximum && value >= -maximum;
+
+    private static float NormalizeDegrees(float value)
+    {
+        if (!float.IsFinite(value)) return 0f;
+        var normalized = MathF.IEEERemainder(value, 360f);
+        return normalized == -180f ? 180f : normalized;
+    }
+
+    private void TryBackUpCorruptSettings(string path, Exception originalError)
+    {
+        try
+        {
+            var backup = Path.Combine(
+                _settingsDirectory,
+                $"settings-corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}.json");
+            File.Copy(path, backup, overwrite: false);
+        }
+        catch (Exception backupError) when (backupError is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"Nie udało się zachować uszkodzonych ustawień. Odczyt: {originalError}; kopia: {backupError}");
+        }
+    }
 
     private void ApplyStartupPreference()
     {

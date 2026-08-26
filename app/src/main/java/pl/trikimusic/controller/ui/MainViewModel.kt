@@ -96,6 +96,7 @@ class MainViewModel(
     private var downloadedUpdateFile: File? = null
     private var automaticUpdateCheckStarted = false
     private var autoConnectRequested = false
+    private var autoConnectConfiguration: Pair<String?, Boolean>? = null
     private var rawRecordingStartedAtMillis: Long? = null
     private var frozenRawCapture: List<RawBlePacket>? = null
 
@@ -131,7 +132,13 @@ class MainViewModel(
     init {
         viewModelScope.launch {
             container.settingsRepository.settings.collectLatest { settings ->
+                val configuration = settings.knownDeviceAddress to settings.connectOnlyWhenNeeded
+                if (configuration != autoConnectConfiguration) {
+                    autoConnectConfiguration = configuration
+                    autoConnectRequested = false
+                }
                 mutableSettings.value = settings
+                container.bleManager.setConnectOnlyWhenNeeded(settings.connectOnlyWhenNeeded)
                 if (settings.knownDeviceAddress != null) autoConnectIfPossible()
                 if (
                     settings.onboardingComplete &&
@@ -162,7 +169,10 @@ class MainViewModel(
     }
 
     fun refreshSystemState() {
-        mutablePermissions.value = container.permissionManager.state()
+        val previous = mutablePermissions.value
+        val current = container.permissionManager.state()
+        mutablePermissions.value = current
+        if (!previous.bluetoothEnabled && current.bluetoothEnabled) autoConnectRequested = false
         container.mediaController.refresh()
         autoConnectIfPossible()
         resumePendingUpdateInstallation()
@@ -213,11 +223,19 @@ class MainViewModel(
         val settings = currentSettings()
         if (enabled && settings.knownDeviceAddress != null) {
             startBackgroundService(showErrorToUser = true)
-            container.bleManager.autoConnectKnown(settings.knownDeviceAddress, settings.knownDeviceName)
-            autoConnectRequested = true
+            val result = if (settings.connectOnlyWhenNeeded) {
+                container.bleManager.waitForWake(settings.knownDeviceAddress, settings.knownDeviceName)
+            } else {
+                container.bleManager.autoConnectKnown(settings.knownDeviceAddress, settings.knownDeviceName)
+            }
+            result.onSuccess { autoConnectRequested = true }.onFailure(::showError)
         } else if (!enabled) {
             TrikiForegroundService.stop(getApplication())
         }
+    }
+
+    fun setConnectOnlyWhenNeeded(enabled: Boolean) = launchHandled {
+        container.settingsRepository.setConnectOnlyWhenNeeded(enabled)
     }
 
     fun setTheme(theme: ThemePreference) = launchHandled { container.settingsRepository.setTheme(theme) }
@@ -473,9 +491,21 @@ class MainViewModel(
             !mutablePermissions.value.bluetoothEnabled ||
             !mutablePermissions.value.bluetoothSupported
         ) return
+        if (
+            settings.connectOnlyWhenNeeded &&
+            (!mutablePermissions.value.scanGranted || !mutablePermissions.value.legacyLocationServicesEnabled)
+        ) return
         autoConnectRequested = true
         if (settings.backgroundEnabled) startBackgroundService(showErrorToUser = false)
-        container.bleManager.autoConnectKnown(address, settings.knownDeviceName)
+        val result = if (settings.connectOnlyWhenNeeded) {
+            container.bleManager.waitForWake(address, settings.knownDeviceName)
+        } else {
+            container.bleManager.autoConnectKnown(address, settings.knownDeviceName)
+        }
+        result.onFailure {
+            autoConnectRequested = false
+            showError(it)
+        }
     }
 
     private fun startBackgroundService(showErrorToUser: Boolean) {

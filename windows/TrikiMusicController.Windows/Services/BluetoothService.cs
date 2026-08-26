@@ -14,6 +14,7 @@ public sealed class BluetoothService : IDisposable
     private readonly object _stateLock = new();
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly TrikiProtocolDecoder _decoder = new();
+    private readonly WakeAdvertisementGate _wakeAdvertisementGate = new();
     private readonly Dictionary<ulong, TrikiDeviceInfo> _discovered = [];
     private readonly Queue<long> _sampleTimestamps = new();
     private BluetoothLEAdvertisementWatcher? _watcher;
@@ -22,9 +23,13 @@ public sealed class BluetoothService : IDisposable
     private GattCharacteristic? _txCharacteristic;
     private GattCharacteristic? _rxCharacteristic;
     private GattCharacteristic? _ledCharacteristic;
+    private CancellationTokenSource? _wakeArmCancellation;
     private ulong? _knownAddress;
     private string? _knownName;
     private bool _autoReconnect = true;
+    private volatile bool _connectOnlyWhenNeeded;
+    private volatile bool _waitingForWake;
+    private volatile bool _wakeWatcherArmed;
     private bool _manualDisconnect;
     private bool _disposed;
 
@@ -32,12 +37,38 @@ public sealed class BluetoothService : IDisposable
     public event EventHandler<TrikiSensorData>? SampleReceived;
     public BluetoothSnapshot State { get; private set; } = BluetoothSnapshot.Initial;
 
-    public void ConfigureRememberedDevice(ulong? address, string? name, bool autoReconnect)
+    public void ConfigureRememberedDevice(
+        ulong? address,
+        string? name,
+        bool autoReconnect,
+        bool connectOnlyWhenNeeded)
     {
+        var configurationChanged = _knownAddress != address ||
+            _autoReconnect != autoReconnect ||
+            _connectOnlyWhenNeeded != connectOnlyWhenNeeded;
         _knownAddress = address;
         _knownName = string.IsNullOrWhiteSpace(name) ? "Triki" : name;
         _autoReconnect = autoReconnect;
+        _connectOnlyWhenNeeded = connectOnlyWhenNeeded;
         _manualDisconnect = false;
+        if (!configurationChanged) return;
+        if (!autoReconnect || address is null)
+        {
+            CancelWakeWatcher();
+            if (State.ConnectionState is not TrikiConnectionState.Ready and not TrikiConnectionState.Connecting)
+                UpdateState(state => state with { ConnectionState = TrikiConnectionState.Disconnected, WakeWatcherArmed = false });
+            return;
+        }
+        if (connectOnlyWhenNeeded && State.ConnectionState is not TrikiConnectionState.Ready and not TrikiConnectionState.Connecting)
+        {
+            BeginWaitingForWake();
+        }
+        else if (!connectOnlyWhenNeeded)
+        {
+            CancelWakeWatcher();
+            if (_knownAddress is not null && _autoReconnect)
+                UpdateState(state => state with { ConnectionState = TrikiConnectionState.WaitingForDevice, WakeWatcherArmed = false });
+        }
     }
 
     public Task StartAsync()
@@ -48,13 +79,15 @@ public sealed class BluetoothService : IDisposable
         EnsureWatcher();
         if (_watcher!.Status is BluetoothLEAdvertisementWatcherStatus.Created or BluetoothLEAdvertisementWatcherStatus.Stopped)
             _watcher.Start();
-        Publish(State with
+        UpdateState(state => state with
         {
             ConnectionState = _knownAddress is not null && _autoReconnect
-                ? TrikiConnectionState.WaitingForDevice
+                ? (_connectOnlyWhenNeeded ? TrikiConnectionState.WaitingForWake : TrikiConnectionState.WaitingForDevice)
                 : TrikiConnectionState.Scanning,
+            WakeWatcherArmed = false,
             ErrorMessage = null,
         });
+        if (_knownAddress is not null && _autoReconnect && _connectOnlyWhenNeeded) BeginWaitingForWake();
         return Task.CompletedTask;
     }
 
@@ -66,7 +99,14 @@ public sealed class BluetoothService : IDisposable
         {
             if (_device?.BluetoothAddress == target.BluetoothAddress && State.ConnectionState == TrikiConnectionState.Ready) return;
             _manualDisconnect = false;
-            Publish(State with { ConnectionState = TrikiConnectionState.Connecting, ConnectedDevice = target, ErrorMessage = null });
+            CancelWakeWatcher();
+            UpdateState(state => state with
+            {
+                ConnectionState = TrikiConnectionState.Connecting,
+                ConnectedDevice = target,
+                WakeWatcherArmed = false,
+                ErrorMessage = null,
+            });
             CleanupConnection();
             _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
@@ -107,7 +147,7 @@ public sealed class BluetoothService : IDisposable
                 _knownAddress = connected.BluetoothAddress;
                 _knownName = connected.Name;
             }
-            Publish(State with
+            UpdateState(state => state with
             {
                 ConnectionState = TrikiConnectionState.Ready,
                 ConnectedDevice = connected,
@@ -115,6 +155,7 @@ public sealed class BluetoothService : IDisposable
                 DecodedFrames = 0,
                 DiscardedStartupFrames = 0,
                 DroppedProtocolBytes = 0,
+                WakeWatcherArmed = false,
             });
             _ = RefreshBatteryAsync(_device);
         }
@@ -122,11 +163,19 @@ public sealed class BluetoothService : IDisposable
         {
             CleanupConnection();
             var shouldWait = !_manualDisconnect && _autoReconnect && _knownAddress is not null;
-            Publish(State with
+            if (shouldWait && _connectOnlyWhenNeeded)
             {
-                ConnectionState = shouldWait ? TrikiConnectionState.WaitingForDevice : TrikiConnectionState.Error,
-                ErrorMessage = error.Message,
-            });
+                BeginWaitingForWake(error.Message);
+            }
+            else
+            {
+                UpdateState(state => state with
+                {
+                    ConnectionState = shouldWait ? TrikiConnectionState.WaitingForDevice : TrikiConnectionState.Error,
+                    WakeWatcherArmed = false,
+                    ErrorMessage = error.Message,
+                });
+            }
             if (userInitiated) throw;
         }
         finally
@@ -142,6 +191,7 @@ public sealed class BluetoothService : IDisposable
         try
         {
             _manualDisconnect = true;
+            CancelWakeWatcher();
             if (forgetDevice)
             {
                 _knownAddress = null;
@@ -150,11 +200,31 @@ public sealed class BluetoothService : IDisposable
             CleanupConnection();
             _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
-            Publish(BluetoothSnapshot.Initial with
+            PublishSnapshot(BluetoothSnapshot.Initial with
             {
                 ConnectionState = TrikiConnectionState.Disconnected,
                 DiscoveredDevices = SnapshotDiscoveredDevices(),
             });
+        }
+        finally
+        {
+            _connectionGate.Release();
+        }
+    }
+
+    public async Task ParkUntilWakeAsync()
+    {
+        ThrowIfDisposed();
+        if (!_connectOnlyWhenNeeded || !_autoReconnect || _knownAddress is null) return;
+        await _connectionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (State.ConnectionState != TrikiConnectionState.Ready) return;
+            _manualDisconnect = false;
+            CleanupConnection();
+            _decoder.Reset();
+            lock (_stateLock) _sampleTimestamps.Clear();
+            BeginWaitingForWake();
         }
         finally
         {
@@ -197,31 +267,64 @@ public sealed class BluetoothService : IDisposable
             string.IsNullOrWhiteSpace(advertisedName) ? _knownName ?? "Triki" : advertisedName,
             args.RawSignalStrengthInDBm);
         lock (_stateLock) _discovered[device.BluetoothAddress] = device;
-        Publish(State with { DiscoveredDevices = SnapshotDiscoveredDevices() });
+        UpdateState(state => state with { DiscoveredDevices = SnapshotDiscoveredDevices() });
 
-        if (knownMatch && _autoReconnect && !_manualDisconnect && State.ConnectionState is not TrikiConnectionState.Connecting and not TrikiConnectionState.Ready)
-            _ = ConnectAsync(device, userInitiated: false);
+        if (!knownMatch || !_autoReconnect || _manualDisconnect ||
+            State.ConnectionState is TrikiConnectionState.Connecting or TrikiConnectionState.Ready) return;
+
+        if (_connectOnlyWhenNeeded && _waitingForWake)
+        {
+            if (!_wakeAdvertisementGate.ObserveAdvertisement(TimestampNanos())) return;
+            CancelWakeWatcher();
+        }
+        _ = ConnectAsync(device, userInitiated: false);
     }
 
     private void WatcherOnStopped(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementWatcherStoppedEventArgs args)
     {
         if (_disposed || args.Error == BluetoothError.Success) return;
-        Publish(State with { ConnectionState = TrikiConnectionState.Error, ErrorMessage = $"Skaner Bluetooth zatrzymał się: {args.Error}. Ponawianie…" });
+        UpdateState(state => state with { ConnectionState = TrikiConnectionState.Error, ErrorMessage = $"Skaner Bluetooth zatrzymał się: {args.Error}. Ponawianie…" });
         _ = RestartWatcherAsync();
     }
 
     private void DeviceOnConnectionStatusChanged(BluetoothLEDevice sender, object args)
     {
         if (_disposed || sender.ConnectionStatus == BluetoothConnectionStatus.Connected) return;
-        CleanupConnection();
-        Publish(State with
+        _ = HandleUnexpectedDisconnectAsync(sender);
+    }
+
+    private async Task HandleUnexpectedDisconnectAsync(BluetoothLEDevice sender)
+    {
+        await _connectionGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            ConnectionState = !_manualDisconnect && _autoReconnect && _knownAddress is not null
-                ? TrikiConnectionState.WaitingForDevice
-                : TrikiConnectionState.Disconnected,
-            ConnectedDevice = null,
-            ErrorMessage = null,
-        });
+            if (_disposed || !ReferenceEquals(sender, _device)) return;
+            CleanupConnection();
+            if (!_manualDisconnect && _autoReconnect && _knownAddress is not null && _connectOnlyWhenNeeded)
+            {
+                BeginWaitingForWake();
+            }
+            else
+            {
+                UpdateState(state => state with
+                {
+                    ConnectionState = !_manualDisconnect && _autoReconnect && _knownAddress is not null
+                        ? TrikiConnectionState.WaitingForDevice
+                        : TrikiConnectionState.Disconnected,
+                    ConnectedDevice = null,
+                    WakeWatcherArmed = false,
+                    ErrorMessage = null,
+                });
+            }
+        }
+        catch (Exception error)
+        {
+            if (!_disposed) UpdateState(state => state with { ConnectionState = TrikiConnectionState.Error, ErrorMessage = error.Message });
+        }
+        finally
+        {
+            _connectionGate.Release();
+        }
     }
 
     private void TxCharacteristicOnValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
@@ -243,7 +346,7 @@ public sealed class BluetoothService : IDisposable
                 SampleReceived?.Invoke(this, sample);
             }
             var statistics = _decoder.Statistics;
-            Publish(State with
+            UpdateState(state => state with
             {
                 SampleRateHz = CalculateSampleRate(),
                 DecodedFrames = statistics.DecodedFrames,
@@ -253,7 +356,7 @@ public sealed class BluetoothService : IDisposable
         }
         catch (Exception error)
         {
-            Publish(State with { ErrorMessage = $"Błąd dekodowania strumienia Triki: {error.Message}" });
+            UpdateState(state => state with { ErrorMessage = $"Błąd dekodowania strumienia Triki: {error.Message}" });
         }
     }
 
@@ -270,7 +373,7 @@ public sealed class BluetoothService : IDisposable
             if (read.Status != GattCommunicationStatus.Success || read.Value.Length == 0) return;
             using var reader = DataReader.FromBuffer(read.Value);
             var percent = reader.ReadByte();
-            if (percent <= 100) Publish(State with { BatteryPercent = percent });
+            if (percent <= 100) UpdateState(state => state with { BatteryPercent = percent });
         }
         catch (Exception error)
         {
@@ -310,6 +413,61 @@ public sealed class BluetoothService : IDisposable
             return _discovered.Values.OrderByDescending(device => device.BluetoothAddress == _knownAddress).ThenByDescending(device => device.Rssi).ToArray();
     }
 
+    private void BeginWaitingForWake(string? errorMessage = null)
+    {
+        if (_disposed || _knownAddress is null || !_autoReconnect || !_connectOnlyWhenNeeded) return;
+        CancelWakeWatcher();
+        _waitingForWake = true;
+        _wakeWatcherArmed = false;
+        _wakeAdvertisementGate.Reset(TimestampNanos());
+        var cancellation = new CancellationTokenSource();
+        _wakeArmCancellation = cancellation;
+        UpdateState(state => state with
+        {
+            ConnectionState = TrikiConnectionState.WaitingForWake,
+            ConnectedDevice = null,
+            SampleRateHz = null,
+            DecodedFrames = 0,
+            DiscardedStartupFrames = 0,
+            DroppedProtocolBytes = 0,
+            WakeWatcherArmed = false,
+            ErrorMessage = errorMessage,
+        });
+        _ = ArmWakeWatcherAfterSilenceAsync(cancellation.Token);
+    }
+
+    private async Task ArmWakeWatcherAfterSilenceAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested && _waitingForWake && !_wakeWatcherArmed)
+            {
+                await Task.Delay(WakeArmPollInterval, cancellationToken).ConfigureAwait(false);
+                if (!_wakeAdvertisementGate.TryArm(TimestampNanos())) continue;
+                _wakeWatcherArmed = true;
+                UpdateState(state => state with
+                {
+                    ConnectionState = TrikiConnectionState.WaitingForWake,
+                    WakeWatcherArmed = true,
+                    ErrorMessage = null,
+                });
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void CancelWakeWatcher()
+    {
+        _waitingForWake = false;
+        _wakeWatcherArmed = false;
+        var cancellation = Interlocked.Exchange(ref _wakeArmCancellation, null);
+        if (cancellation is null) return;
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
     private void CleanupConnection()
     {
         if (_txCharacteristic is not null) _txCharacteristic.ValueChanged -= TxCharacteristicOnValueChanged;
@@ -335,7 +493,7 @@ public sealed class BluetoothService : IDisposable
         catch (Exception error)
         {
             if (_disposed) return;
-            Publish(State with
+            UpdateState(state => state with
             {
                 ConnectionState = TrikiConnectionState.Error,
                 ErrorMessage = $"Nie udało się ponownie uruchomić skanera Bluetooth: {error.Message}",
@@ -352,7 +510,18 @@ public sealed class BluetoothService : IDisposable
         _watcher = null;
     }
 
-    private void Publish(BluetoothSnapshot state)
+    private void UpdateState(Func<BluetoothSnapshot, BluetoothSnapshot> update)
+    {
+        BluetoothSnapshot state;
+        lock (_stateLock)
+        {
+            State = update(State);
+            state = State;
+        }
+        StateChanged?.Invoke(this, state);
+    }
+
+    private void PublishSnapshot(BluetoothSnapshot state)
     {
         lock (_stateLock) State = state;
         StateChanged?.Invoke(this, state);
@@ -365,8 +534,10 @@ public sealed class BluetoothService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        CancelWakeWatcher();
         DisposeWatcher();
         CleanupConnection();
-        _connectionGate.Dispose();
     }
+
+    private static readonly TimeSpan WakeArmPollInterval = TimeSpan.FromMilliseconds(250);
 }

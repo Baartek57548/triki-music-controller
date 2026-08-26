@@ -7,6 +7,7 @@ enum class TrikiConnectionState {
     CONNECTING,
     CONNECTED,
     READY,
+    WAITING_FOR_WAKE,
     RECONNECTING,
     ERROR,
 }
@@ -82,5 +83,6 @@ data class TrikiBleState(
     val discardedStartupFrames: Long = 0L,
     val droppedProtocolBytes: Long = 0L,
     val lastPacketId: Int? = null,
+    val wakeWatcherArmed: Boolean = false,
     val errorMessage: String? = null,
 )

@@ -5,7 +5,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
         <StackPanel MaxWidth="900" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
-            <TextBlock Text="Sterowanie" Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Spacing="4">
+                <TextBlock Text="Sterowanie" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Regulacja głośności i mapowanie fizycznego przycisku" Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Płynna regulacja głośności" Style="{StaticResource SectionTitleStyle}" />
@@ -16,23 +19,16 @@
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="Polubienie i dislike ruchem" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="Like i Dislike ruchem" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="12">
                     <TextBlock Text="Akcje przycisku" Style="{StaticResource SectionTitleStyle}" />
-                    <Grid ColumnSpacing="14" RowSpacing="10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                        <TextBlock Text="Jeden klik" VerticalAlignment="Center" />
-                        <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding SingleClickAction, Mode=TwoWay}" />
-                        <TextBlock Grid.Row="1" Text="Dwa kliknięcia" VerticalAlignment="Center" />
-                        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding DoubleClickAction, Mode=TwoWay}" />
-                        <TextBlock Grid.Row="2" Text="Trzy kliknięcia" VerticalAlignment="Center" />
-                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding TripleClickAction, Mode=TwoWay}" />
-                    </Grid>
+                    <ComboBox Header="Jeden klik" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding SingleClickAction, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                    <ComboBox Header="Dwa kliknięcia" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding DoubleClickAction, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                    <ComboBox Header="Trzy kliknięcia" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding TripleClickAction, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                 </StackPanel>
             </Border>
         </StackPanel>

@@ -15,6 +15,7 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import java.nio.charset.StandardCharsets
 import java.util.ArrayDeque
 import java.util.UUID
@@ -62,6 +63,7 @@ class TrikiBleManager(
     private val metadataQueue = ArrayDeque<BluetoothGattCharacteristic>()
     private val metadataValues = mutableMapOf<UUID, ByteArray>()
     private val sampleRateWindow = ArrayDeque<Long>()
+    private val wakeAdvertisementGate = WakeAdvertisementGate()
 
     val state: StateFlow<TrikiBleState> = mutableState.asStateFlow()
     val samples: SharedFlow<TrikiSensorData> = mutableSamples.asSharedFlow()
@@ -72,11 +74,16 @@ class TrikiBleManager(
     private var scanTimeoutJob: Job? = null
     private var reconnectJob: Job? = null
     private var rssiJob: Job? = null
+    private var wakeArmJob: Job? = null
     @Volatile private var autoConnectAddress: String? = null
     @Volatile private var gattUsesAutoConnect = false
     @Volatile private var autoReconnectAuthorized = false
     @Volatile private var manualDisconnect = false
     @Volatile private var reconnectAttempt = 0
+    @Volatile private var connectOnlyWhenNeeded = false
+    @Volatile private var waitingForWake = false
+    @Volatile private var wakeWatcherArmed = false
+    @Volatile private var rawCaptureEnabled = false
 
     fun startScan(knownAddress: String? = null, reconnecting: Boolean = false): Result<Unit> = runCatching {
         val permission = permissionManager.state()
@@ -87,6 +94,7 @@ class TrikiBleManager(
             "Android 8–11 wymaga włączonej usługi lokalizacji podczas skanowania BLE."
         }
         stopScanInternal()
+        cancelWakeWatcher()
         manualDisconnect = false
         if (knownAddress != null) autoConnectAddress = knownAddress
         mutableState.update {
@@ -124,6 +132,9 @@ class TrikiBleManager(
         autoConnectAddress = address
         autoReconnectAuthorized = true
         manualDisconnect = false
+        val wasWaitingForWake = waitingForWake
+        cancelWakeWatcher()
+        if (wasWaitingForWake) stopScanInternal()
         if (bluetoothGatt != null || scanCallback != null) return@runCatching
 
         val permission = permissionManager.state()
@@ -162,6 +173,7 @@ class TrikiBleManager(
         val remoteDevice = adapter.getRemoteDevice(device.address)
         autoConnectAddress = device.address
         autoReconnectAuthorized = device.isKnown
+        cancelWakeWatcher()
         connect(remoteDevice, device, useAutoConnect = false)
     }.onFailure { error -> fail(error.message ?: "Połączenie nie powiodło się.", error) }
 
@@ -175,6 +187,7 @@ class TrikiBleManager(
         reconnectJob?.cancel()
         reconnectJob = null
         reconnectAttempt = 0
+        cancelWakeWatcher()
         stopScanInternal()
         rssiJob?.cancel()
         rssiJob = null
@@ -194,9 +207,91 @@ class TrikiBleManager(
                 discardedStartupFrames = 0L,
                 droppedProtocolBytes = 0L,
                 lastPacketId = null,
+                wakeWatcherArmed = false,
             )
         }
         logger.log(LogCategory.BLE, "Rozłączono Triki.")
+    }
+
+    fun setConnectOnlyWhenNeeded(enabled: Boolean) {
+        connectOnlyWhenNeeded = enabled
+        if (!enabled) {
+            val wasWaitingForWake = waitingForWake
+            cancelWakeWatcher()
+            if (wasWaitingForWake) stopScanInternal()
+        }
+    }
+
+    fun waitForWake(address: String, rememberedName: String? = null): Result<Unit> =
+        prepareWakeWatcher(address, rememberedName, disconnectCurrent = false)
+
+    fun parkUntilWake(): Result<Unit> {
+        val selected = mutableState.value.selectedDevice
+        val address = selected?.address ?: autoConnectAddress
+            ?: return Result.failure(IllegalStateException("Brak zapamiętanego Triki."))
+        return prepareWakeWatcher(address, selected?.name, disconnectCurrent = true)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun prepareWakeWatcher(
+        address: String,
+        rememberedName: String?,
+        disconnectCurrent: Boolean,
+    ): Result<Unit> = runCatching {
+        require(connectOnlyWhenNeeded) { "Tryb połączenia na żądanie nie jest włączony." }
+        require(address.isNotBlank()) { "Adres zapamiętanego Triki jest pusty." }
+        val permission = permissionManager.state()
+        require(permission.bluetoothSupported) { "Telefon nie obsługuje Bluetooth LE." }
+        require(permission.bluetoothPermissionsGranted) { "Brak uprawnień Bluetooth." }
+        require(permission.bluetoothEnabled) { "Bluetooth jest wyłączony." }
+        require(permission.legacyLocationServicesEnabled) {
+            "Android 8–11 wymaga włączonej usługi lokalizacji podczas nasłuchu BLE."
+        }
+        if (!disconnectCurrent && mutableState.value.connectionState == TrikiConnectionState.READY) return@runCatching
+
+        autoConnectAddress = address
+        autoReconnectAuthorized = true
+        manualDisconnect = false
+        reconnectJob?.cancel()
+        reconnectJob = null
+        rssiJob?.cancel()
+        rssiJob = null
+        stopScanInternal()
+        bluetoothGatt?.runCatching { disconnect() }
+        closeGatt()
+        decoder.reset()
+        sampleRateWindow.clear()
+
+        val previous = mutableState.value.selectedDevice?.takeIf { it.address.equals(address, ignoreCase = true) }
+        val device = TrikiDevice(
+            name = rememberedName?.takeIf(String::isNotBlank) ?: previous?.name ?: "Triki",
+            address = address,
+            rssi = previous?.rssi,
+            isKnown = true,
+        )
+        waitingForWake = true
+        wakeWatcherArmed = false
+        wakeAdvertisementGate.reset(SystemClock.elapsedRealtime())
+        mutableState.update {
+            it.copy(
+                connectionState = TrikiConnectionState.WAITING_FOR_WAKE,
+                selectedDevice = device,
+                rssi = null,
+                measuredSampleRateHz = null,
+                lastFrameMillis = null,
+                decodedFrames = 0L,
+                discardedStartupFrames = 0L,
+                droppedProtocolBytes = 0L,
+                lastPacketId = null,
+                wakeWatcherArmed = false,
+                errorMessage = null,
+            )
+        }
+        startScanner(ScanSettings.SCAN_MODE_BALANCED)
+        startWakeArmMonitor()
+        logger.log(LogCategory.BLE, "Połączenie GATT uśpione; nasłuchuję nowego wybudzenia Triki.")
+    }.onFailure { error ->
+        fail(error.message ?: "Nie udało się uruchomić nasłuchu wybudzenia Triki.", error)
     }
 
     @SuppressLint("MissingPermission")
@@ -214,8 +309,13 @@ class TrikiBleManager(
         mutableRawPackets.value = emptyList()
     }
 
+    fun setRawCaptureEnabled(enabled: Boolean) {
+        rawCaptureEnabled = enabled
+        if (!enabled) clearRawPackets()
+    }
+
     @SuppressLint("MissingPermission")
-    private fun startScanner() {
+    private fun startScanner(scanMode: Int = ScanSettings.SCAN_MODE_LOW_LATENCY) {
         val scanner = requireNotNull(bluetoothManager?.adapter?.bluetoothLeScanner) { "Skaner BLE jest niedostępny." }
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) = handleScanResult(result)
@@ -226,14 +326,15 @@ class TrikiBleManager(
 
             override fun onScanFailed(errorCode: Int) {
                 fail("Skanowanie BLE zakończyło się błędem $errorCode.")
+                if (waitingForWake && !manualDisconnect) scheduleReconnect()
             }
         }
-        scanCallback = callback
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setScanMode(scanMode)
             .setReportDelay(0L)
             .build()
         scanner.startScan(null, settings, callback)
+        scanCallback = callback
     }
 
     @SuppressLint("MissingPermission")
@@ -243,6 +344,20 @@ class TrikiBleManager(
         val isAddressMatch = result.device.address.equals(autoConnectAddress, ignoreCase = true)
         if (!isNameMatch && !isAddressMatch) return
         val device = TrikiDevice(name, result.device.address, result.rssi, isKnown = isAddressMatch)
+        if (isAddressMatch && waitingForWake) {
+            if (!wakeAdvertisementGate.observeAdvertisement(SystemClock.elapsedRealtime())) return
+            waitingForWake = false
+            wakeWatcherArmed = false
+            wakeArmJob?.cancel()
+            wakeArmJob = null
+            mutableState.update { it.copy(wakeWatcherArmed = false) }
+            runCatching { connect(result.device, device, useAutoConnect = false) }
+                .onFailure { error ->
+                    fail(error.message ?: "Połączenie po wybudzeniu nie powiodło się.", error)
+                    scheduleReconnect()
+                }
+            return
+        }
         mutableState.update { current ->
             val devices = (current.discoveredDevices.filterNot { it.address == device.address } + device)
                 .sortedWith(compareByDescending<TrikiDevice> { it.isKnown }.thenByDescending { it.rssi ?: Int.MIN_VALUE })
@@ -260,6 +375,7 @@ class TrikiBleManager(
     @SuppressLint("MissingPermission")
     private fun connect(device: BluetoothDevice, model: TrikiDevice, useAutoConnect: Boolean) {
         stopScanInternal()
+        cancelWakeWatcher()
         closeGatt()
         manualDisconnect = false
         mutableState.update {
@@ -305,6 +421,9 @@ class TrikiBleManager(
                 if (manualDisconnect || mutableState.value.selectedDevice == null) {
                     closeGatt(gatt)
                     mutableState.update { it.disconnectedTelemetry() }
+                } else if (connectOnlyWhenNeeded) {
+                    closeGatt(gatt)
+                    scheduleReconnect()
                 } else if (gattUsesAutoConnect && status == BluetoothGatt.GATT_SUCCESS) {
                     // A successful peripheral-side disconnect keeps an autoConnect GATT alive;
                     // Android will reconnect this same client after the button wakes Triki.
@@ -476,6 +595,7 @@ class TrikiBleManager(
                 discardedStartupFrames = 0L,
                 droppedProtocolBytes = 0L,
                 lastPacketId = null,
+                wakeWatcherArmed = false,
             )
         }
         logger.log(LogCategory.PROTOCOL, "Wysłano komendę stabilnego strumienia ~53 Hz: 20 10 00 D0 07 34 00 03.")
@@ -520,8 +640,10 @@ class TrikiBleManager(
 
     private fun handleNotification(uuid: UUID, value: ByteArray) {
         val nowMillis = System.currentTimeMillis()
-        val packet = RawBlePacket(nowMillis, uuid.toString(), value.copyOf())
-        mutableRawPackets.update { current -> (current + packet).takeLast(MAX_RAW_PACKETS) }
+        if (rawCaptureEnabled) {
+            val packet = RawBlePacket(nowMillis, uuid.toString(), value.copyOf())
+            mutableRawPackets.update { current -> (current + packet).takeLast(MAX_RAW_PACKETS) }
+        }
         if (uuid == TrikiProtocol.BATTERY_LEVEL_UUID) {
             value.firstOrNull()?.toInt()?.and(0xFF)?.takeIf { it in 0..100 }?.let { updateBattery(it) }
             return
@@ -612,12 +734,19 @@ class TrikiBleManager(
         reconnectJob = scope.launch {
             delay(delayMillis)
             reconnectJob = null
-            if (!manualDisconnect) autoConnectKnown(address, rememberedName)
+            if (!manualDisconnect) {
+                if (connectOnlyWhenNeeded) waitForWake(address, rememberedName)
+                else autoConnectKnown(address, rememberedName)
+            }
         }
     }
 
     private fun TrikiBleState.waitingForWakeTelemetry(): TrikiBleState = copy(
-        connectionState = TrikiConnectionState.RECONNECTING,
+        connectionState = if (connectOnlyWhenNeeded) {
+            TrikiConnectionState.WAITING_FOR_WAKE
+        } else {
+            TrikiConnectionState.RECONNECTING
+        },
         rssi = null,
         measuredSampleRateHz = null,
         lastFrameMillis = null,
@@ -625,6 +754,7 @@ class TrikiBleManager(
         discardedStartupFrames = 0L,
         droppedProtocolBytes = 0L,
         lastPacketId = null,
+        wakeWatcherArmed = false,
         errorMessage = null,
     )
 
@@ -638,8 +768,36 @@ class TrikiBleManager(
         discardedStartupFrames = 0L,
         droppedProtocolBytes = 0L,
         lastPacketId = null,
+        wakeWatcherArmed = false,
         errorMessage = null,
     )
+
+    private fun startWakeArmMonitor() {
+        wakeArmJob?.cancel()
+        wakeArmJob = scope.launch {
+            while (waitingForWake && !wakeWatcherArmed) {
+                delay(WAKE_ARM_POLL_MILLIS)
+                if (wakeAdvertisementGate.tryArm(SystemClock.elapsedRealtime())) {
+                    wakeWatcherArmed = true
+                    mutableState.update { state ->
+                        if (state.connectionState == TrikiConnectionState.WAITING_FOR_WAKE) {
+                            state.copy(wakeWatcherArmed = true)
+                        } else {
+                            state
+                        }
+                    }
+                    logger.log(LogCategory.BLE, "Nasłuch uzbrojony; następne wybudzenie przyciskiem wznowi połączenie.")
+                }
+            }
+        }
+    }
+
+    private fun cancelWakeWatcher() {
+        waitingForWake = false
+        wakeWatcherArmed = false
+        wakeArmJob?.cancel()
+        wakeArmJob = null
+    }
 
     @SuppressLint("MissingPermission")
     private fun stopScanInternal() {
@@ -738,6 +896,7 @@ class TrikiBleManager(
         const val BASE_RECONNECT_DELAY_MILLIS = 1_000L
         const val MAX_RECONNECT_DELAY_MILLIS = 15_000L
         const val MAX_RECONNECT_ATTEMPT_EXPONENT = 4
+        const val WAKE_ARM_POLL_MILLIS = 250L
         const val GATT_REQUEST_REJECTED = -1
 
         val METADATA_UUIDS = setOf(

@@ -5,21 +5,31 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
         <StackPanel MaxWidth="850" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
-            <TextBlock Text="Ustawienia" Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Spacing="4">
+                <TextBlock Text="Ustawienia" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Dostosuj zachowanie połączenia i wygląd aplikacji" Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="14">
                     <TextBlock Text="Połączenie" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="{Binding RememberedDevice}" TextWrapping="Wrap" />
-                    <ToggleSwitch Header="Automatycznie łącz po wybudzeniu Triki" IsOn="{Binding AutoReconnect, Mode=TwoWay}" />
-                    <ToggleSwitch Header="Uruchamiaj aplikację razem z Windows" IsOn="{Binding StartWithWindows, Mode=TwoWay}" />
+                    <ToggleSwitch Header="Automatycznie łącz po wybudzeniu Triki" OffContent="Wyłączone" OnContent="Włączone" IsOn="{Binding AutoReconnect, Mode=TwoWay}" AutomationProperties.HelpText="Łączy zapamiętany kapsel, gdy zacznie nadawać." />
+                    <ToggleSwitch Header="Łącz tylko podczas użycia" OffContent="Stała gotowość" OnContent="Na żądanie" IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}" AutomationProperties.HelpText="Po 12 sekundach bezczynności zamyka połączenie GATT." />
+                    <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Tryb połączenia" Message="{Binding ConnectionModeSummary}" />
+                    <ToggleSwitch Header="Uruchamiaj aplikację razem z Windows" OffContent="Wyłączone" OnContent="Włączone" IsOn="{Binding StartWithWindows, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Wygląd" Style="{StaticResource SectionTitleStyle}" />
                     <ComboBox Header="Motyw aplikacji"
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                               HorizontalAlignment="Left"
                               MinWidth="220" />
-                    <TextBlock Text="{Binding SettingsStatus}" TextWrapping="Wrap" Opacity="0.72" />
                 </StackPanel>
             </Border>
+            <TextBlock Text="{Binding SettingsStatus}" TextWrapping="Wrap" Style="{StaticResource PageSubtitleStyle}" />
         </StackPanel>
     </ScrollViewer>
 </Page>

@@ -85,6 +85,19 @@ class SensorFilterAndCalibrationTest {
     }
 
     @Test
+    fun `extreme calibration angles are normalized without iterative work`() {
+        val result = SensorFilter(filterAlpha = 1f).process(
+            sample(0L),
+            CalibrationProfile(neutralPitch = Float.MAX_VALUE, neutralRoll = -Float.MAX_VALUE),
+        )
+
+        assertTrue(result.orientation.pitch.isFinite())
+        assertTrue(result.orientation.roll.isFinite())
+        assertTrue(result.orientation.pitch in -180f..180f)
+        assertTrue(result.orientation.roll in -180f..180f)
+    }
+
+    @Test
     fun `calibration computes stable bias and valid profile`() {
         val samples = List(120) { index ->
             sample(

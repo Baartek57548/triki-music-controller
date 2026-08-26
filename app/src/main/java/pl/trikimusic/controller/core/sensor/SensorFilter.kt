@@ -125,10 +125,9 @@ class SensorFilter(
     }
 
     private fun normalizeDegrees(value: Float): Float {
-        var normalized = value
-        while (normalized > 180f) normalized -= 360f
-        while (normalized < -180f) normalized += 360f
-        return normalized
+        if (!value.isFinite()) return 0f
+        val normalized = Math.IEEEremainder(value.toDouble(), 360.0).toFloat()
+        return if (normalized == -180f) 180f else normalized
     }
 
     private fun complementaryAngle(gyroscopeAngle: Float, accelerometerAngle: Float): Float {

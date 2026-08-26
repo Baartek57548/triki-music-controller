@@ -5,15 +5,19 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
         <StackPanel MaxWidth="1180" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
-            <TextBlock Text="Triki Music Controller" Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Spacing="4">
+                <TextBlock Text="Triki Music Controller" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Połączenie, muzyka i gesty w jednym miejscu" Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
             <Grid x:Name="DashboardGrid" ColumnSpacing="16" RowSpacing="16">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition x:Name="DashboardSecondaryColumn" Width="*" /></Grid.ColumnDefinitions>
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <VisualStateManager.VisualStateGroups>
                     <VisualStateGroup>
                         <VisualState x:Name="Narrow">
                             <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0" /></VisualState.StateTriggers>
                             <VisualState.Setters>
+                                <Setter Target="DashboardSecondaryColumn.Width" Value="0" />
                                 <Setter Target="MediaCard.(Grid.Column)" Value="0" />
                                 <Setter Target="MediaCard.(Grid.Row)" Value="1" />
                             </VisualState.Setters>
@@ -21,6 +25,7 @@
                         <VisualState x:Name="Wide">
                             <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="900" /></VisualState.StateTriggers>
                             <VisualState.Setters>
+                                <Setter Target="DashboardSecondaryColumn.Width" Value="*" />
                                 <Setter Target="MediaCard.(Grid.Column)" Value="1" />
                                 <Setter Target="MediaCard.(Grid.Row)" Value="0" />
                             </VisualState.Setters>
@@ -31,7 +36,13 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="{Binding ConnectionTitle}" Style="{StaticResource SectionTitleStyle}" />
                         <TextBlock Text="{Binding ConnectionDetails}" TextWrapping="Wrap" Opacity="0.78" />
-                        <Button Content="Skanuj urządzenia" Click="Scan_Click" AutomationProperties.Name="Skanuj urządzenia Triki" />
+                        <TextBlock Text="{Binding ConnectionModeSummary}" Style="{StaticResource PageSubtitleStyle}" />
+                        <Button Click="Scan_Click" AutomationProperties.Name="Skanuj urządzenia Triki">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Find" />
+                                <TextBlock Text="Skanuj urządzenia" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
                 <Border x:Name="MediaCard" Grid.Column="1" Style="{StaticResource CardBorderStyle}">
@@ -48,21 +59,45 @@
                     </StackPanel>
                 </Border>
             </Grid>
-            <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="{Binding VolumeControlTitle}" Style="{StaticResource SectionTitleStyle}" />
-                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding VolumeProgress}" />
-                    <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding VolumeText}" Opacity="0.75" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Like / Dislike" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding LastActionStatus}" Opacity="0.75" TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
+            <Grid ColumnSpacing="16" RowSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition x:Name="ControlSecondaryColumn" Width="*" /></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup>
+                        <VisualState x:Name="ControlsNarrow">
+                            <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0" /></VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="ControlSecondaryColumn.Width" Value="0" />
+                                <Setter Target="GestureCard.(Grid.Column)" Value="0" />
+                                <Setter Target="GestureCard.(Grid.Row)" Value="1" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="ControlsWide">
+                            <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="900" /></VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="ControlSecondaryColumn.Width" Value="*" />
+                                <Setter Target="GestureCard.(Grid.Column)" Value="1" />
+                                <Setter Target="GestureCard.(Grid.Row)" Value="0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{Binding VolumeControlTitle}" Style="{StaticResource SectionTitleStyle}" />
+                        <ProgressBar Minimum="0" Maximum="1" Value="{Binding VolumeProgress}" />
+                        <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding VolumeText}" Opacity="0.75" />
+                    </StackPanel>
+                </Border>
+                <Border x:Name="GestureCard" Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Like / Dislike" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding LastActionStatus}" Opacity="0.75" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </StackPanel>
     </ScrollViewer>
 </Page>

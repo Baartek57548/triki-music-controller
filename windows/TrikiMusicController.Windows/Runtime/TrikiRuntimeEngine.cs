@@ -15,6 +15,8 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly GyroscopeVolumeController _volumeController = new();
     private readonly HoldVerticalGestureDetector _ratingGestureDetector = new();
     private readonly TrikiButtonInterpreter _buttonInterpreter = new();
+    private readonly ConnectionActivityLease _connectionActivityLease = new();
+    private bool _connectionWasReady;
     private bool _disposed;
 
     public TrikiRuntimeEngine(
@@ -32,6 +34,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
     }
 
     public RuntimeSnapshot State { get; private set; } = RuntimeSnapshot.Initial;
+    public event EventHandler<RuntimeSnapshot>? StateChanged;
 
     public void Reset()
     {
@@ -41,24 +44,42 @@ public sealed class TrikiRuntimeEngine : IDisposable
             _volumeController.Reset();
             _ratingGestureDetector.Reset();
             _buttonInterpreter.Reset();
+            _connectionActivityLease.Reset();
             State = RuntimeSnapshot.Initial;
         }
+        StateChanged?.Invoke(this, State);
     }
 
     private void BluetoothOnStateChanged(object? sender, BluetoothSnapshot state)
     {
-        if (state.ConnectionState != TrikiConnectionState.Ready && State.LatestSample is not null) Reset();
+        var isReady = state.ConnectionState == TrikiConnectionState.Ready;
+        if (isReady != _connectionWasReady)
+        {
+            lock (_sync) _connectionActivityLease.Reset();
+            _connectionWasReady = isReady;
+        }
+        if (!isReady && State.LatestSample is not null) Reset();
     }
 
     private void BluetoothOnSampleReceived(object? sender, TrikiSensorData sample)
     {
         MediaAction? actionToExecute = null;
         RatingGestureAction? ratingFeedback = null;
+        var shouldParkConnection = false;
         lock (_sync)
         {
             var filtered = _sensorFilter.Process(sample, _settings.Current.Calibration);
             var buttonEvent = _buttonInterpreter.Process(sample);
             var gesture = _ratingGestureDetector.Process(filtered, _buttonInterpreter.IsPressed);
+            var explicitConnectionActivity = buttonEvent is not null ||
+                _buttonInterpreter.IsPressed ||
+                gesture.Phase is HoldGesturePhase.Holding or
+                    HoldGesturePhase.Ready or
+                    HoldGesturePhase.Tracking or
+                    HoldGesturePhase.Completing or
+                    HoldGesturePhase.Triggered;
+            shouldParkConnection = _settings.Current.ConnectOnlyWhenNeeded &&
+                _connectionActivityLease.Observe(filtered, explicitConnectionActivity);
 
             if (gesture.Action is RatingGestureAction ratingAction)
             {
@@ -110,9 +131,24 @@ public sealed class TrikiRuntimeEngine : IDisposable
                 };
             }
         }
+        StateChanged?.Invoke(this, State);
 
         if (actionToExecute is MediaAction action && action != MediaAction.None)
             _ = ExecuteAsync(action, ratingFeedback);
+        if (shouldParkConnection) _ = ParkConnectionAfterIdleAsync();
+    }
+
+    private async Task ParkConnectionAfterIdleAsync()
+    {
+        try
+        {
+            await _bluetooth.ParkUntilWakeAsync().ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            lock (_sync) _connectionActivityLease.Reset();
+            System.Diagnostics.Debug.WriteLine($"Nie udało się uśpić połączenia GATT: {error}");
+        }
     }
 
     private async Task ExecuteAsync(MediaAction action, RatingGestureAction? ratingFeedback)
@@ -137,6 +173,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
                 LastActionStatus = result.Succeeded ? $"Wykonano: {action.DisplayName()}" : $"Nie wykonano: {result.Message}",
             };
         }
+        StateChanged?.Invoke(this, State);
     }
 
     public void Dispose()

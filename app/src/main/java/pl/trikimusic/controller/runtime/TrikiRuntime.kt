@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import pl.trikimusic.controller.core.bluetooth.TrikiBleManager
 import pl.trikimusic.controller.core.bluetooth.TrikiButtonInterpreter
 import pl.trikimusic.controller.core.bluetooth.TrikiButtonProtocolMode
+import pl.trikimusic.controller.core.bluetooth.ConnectionActivityLease
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.core.sensor.SensorFilter
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
@@ -64,6 +65,7 @@ class TrikiRuntime(
     private val volumeController = GyroscopeVolumeController()
     private val ratingGestureDetector = HoldVerticalGestureDetector()
     private val buttonInterpreter = TrikiButtonInterpreter()
+    private val connectionActivityLease = ConnectionActivityLease()
     private val mutableState = MutableStateFlow(RuntimeState())
     private val mutableButtonEvents = MutableSharedFlow<ButtonClickEvent>(
         extraBufferCapacity = 8,
@@ -75,6 +77,7 @@ class TrikiRuntime(
     )
     private var settings = AppSettings()
     private var reportedButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN
+    private var connectionWasReady = false
 
     val state: StateFlow<RuntimeState> = mutableState.asStateFlow()
     val buttonEvents = mutableButtonEvents.asSharedFlow()
@@ -84,8 +87,12 @@ class TrikiRuntime(
         scope.launch {
             settingsRepository.settings.collectLatest { value ->
                 val calibrationChanged = value.calibration != settings.calibration
+                val connectionModeChanged = value.connectOnlyWhenNeeded != settings.connectOnlyWhenNeeded
                 settings = value
+                bleManager.setConnectOnlyWhenNeeded(value.connectOnlyWhenNeeded)
+                bleManager.setRawCaptureEnabled(value.developerMode)
                 if (calibrationChanged) resetProcessing()
+                else if (connectionModeChanged) connectionActivityLease.reset()
             }
         }
         scope.launch {
@@ -93,8 +100,11 @@ class TrikiRuntime(
         }
         scope.launch {
             bleManager.state.collectLatest { bleState ->
+                val isReady = bleState.connectionState == TrikiConnectionState.READY
+                if (isReady != connectionWasReady) connectionActivityLease.reset()
+                connectionWasReady = isReady
                 if (
-                    bleState.connectionState != TrikiConnectionState.READY &&
+                    !isReady &&
                     mutableState.value.latestSample != null
                 ) {
                     resetProcessing()
@@ -112,6 +122,7 @@ class TrikiRuntime(
         volumeController.reset()
         ratingGestureDetector.reset()
         buttonInterpreter.reset()
+        connectionActivityLease.reset()
         reportedButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN
         mutableState.update {
             it.copy(
@@ -137,6 +148,28 @@ class TrikiRuntime(
         val filtered = sensorFilter.process(sample, settings.calibration)
         val buttonEvent = buttonInterpreter.process(sample)
         val ratingGestureResult = ratingGestureDetector.process(filtered, buttonInterpreter.isPressed)
+        val explicitConnectionActivity =
+            buttonEvent != null ||
+                buttonInterpreter.isPressed ||
+                ratingGestureResult.phase in setOf(
+                    HoldGesturePhase.HOLDING,
+                    HoldGesturePhase.READY,
+                    HoldGesturePhase.TRACKING,
+                    HoldGesturePhase.COMPLETING,
+                    HoldGesturePhase.TRIGGERED,
+                )
+        if (
+            settings.connectOnlyWhenNeeded &&
+            connectionActivityLease.observe(filtered, explicitConnectionActivity)
+        ) {
+            logger.log(LogCategory.BLE, "Brak aktywności przez 12 s; zamykam GATT i czekam na kolejne wybudzenie.")
+            scope.launch {
+                bleManager.parkUntilWake().onFailure { error ->
+                    connectionActivityLease.reset()
+                    logger.log(LogCategory.BLE, "Nie udało się przejść w tryb połączenia na żądanie.", error)
+                }
+            }
+        }
         val buttonMode = buttonInterpreter.protocolMode
         if (buttonMode != reportedButtonProtocolMode) {
             reportedButtonProtocolMode = buttonMode

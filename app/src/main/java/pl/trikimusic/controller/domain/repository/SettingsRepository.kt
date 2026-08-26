@@ -17,5 +17,6 @@ interface SettingsRepository {
     suspend fun saveCalibration(profile: CalibrationProfile)
     suspend fun setDeveloperMode(enabled: Boolean)
     suspend fun setBackgroundEnabled(enabled: Boolean)
+    suspend fun setConnectOnlyWhenNeeded(enabled: Boolean)
     suspend fun setTheme(theme: ThemePreference)
 }

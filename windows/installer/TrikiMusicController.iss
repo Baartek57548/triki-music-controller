@@ -1,9 +1,12 @@
 #define AppName "Triki Music Controller"
-#define AppVersion "2.3.4"
+#define AppVersion "2.4.0"
 #define AppPublisher "Bartek"
 #define AppExeName "TrikiMusicController.Windows.exe"
 #define AppMutex "Local\TrikiMusicController.BAEDA449-C844-43F1-8888-AE0EFE5FBB13"
 #define GitHubUrl "https://github.com/Baartek57548/triki-music-controller"
+#ifndef PublishDirectory
+#define PublishDirectory "..\artifacts\publish"
+#endif
 
 [Setup]
 AppId={{BAEDA449-C844-43F1-8888-AE0EFE5FBB13}
@@ -48,7 +51,7 @@ Name: "desktopicon"; Description: "Utwórz skrót na pulpicie"; GroupDescription
 Name: "startup"; Description: "Uruchamiaj aplikację razem z Windows"; GroupDescription: "Automatyczne łączenie:"; Flags: checkedonce
 
 [Files]
-Source: "..\artifacts\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs restartreplace
+Source: "{#PublishDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs restartreplace
 
 [Icons]
 Name: "{group}\Triki Music Controller"; Filename: "{app}\{#AppExeName}"

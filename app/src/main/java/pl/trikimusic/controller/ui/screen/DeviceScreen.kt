@@ -1,6 +1,7 @@
 package pl.trikimusic.controller.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -61,6 +62,7 @@ fun DeviceScreen(
         TrikiConnectionState.SCANNING,
         TrikiConnectionState.CONNECTING,
         TrikiConnectionState.RECONNECTING,
+        TrikiConnectionState.WAITING_FOR_WAKE,
         TrikiConnectionState.CONNECTED,
     )
 
@@ -80,24 +82,18 @@ fun DeviceScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             ) {
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Bluetooth, null, tint = MaterialTheme.colorScheme.primary)
-                        Column(Modifier.weight(1f).padding(horizontal = 13.dp)) {
-                            Text(state.ble.selectedDevice?.name ?: state.settings.knownDeviceName ?: "Triki", style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                state.ble.selectedDevice?.address ?: state.settings.knownDeviceAddress ?: "Brak zapamiętanego urządzenia",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        StatusPill(state.ble.connectionState)
-                    }
+                    DeviceHeader(state)
                     LoadingInline(
                         when (state.ble.connectionState) {
                             TrikiConnectionState.SCANNING -> "Szukam aktywnego Triki…"
                             TrikiConnectionState.CONNECTING -> "Nawiązuję połączenie GATT…"
                             TrikiConnectionState.CONNECTED -> "Odczytuję usługi i informacje…"
                             TrikiConnectionState.RECONNECTING -> "Naciśnij przycisk Triki — telefon czeka na jego wybudzenie…"
+                            TrikiConnectionState.WAITING_FOR_WAKE -> if (state.ble.wakeWatcherArmed) {
+                                "Tryb na żądanie jest gotowy — naciśnij przycisk Triki…"
+                            } else {
+                                "Czekam, aż poprzednia sesja Triki całkowicie zaśnie…"
+                            }
                             else -> ""
                         },
                         working,
@@ -117,17 +113,31 @@ fun DeviceScreen(
                             }
 
                             TrikiConnectionState.RECONNECTING,
+                            TrikiConnectionState.WAITING_FOR_WAKE,
                             TrikiConnectionState.CONNECTING,
                             TrikiConnectionState.CONNECTED,
                             -> Button(
-                                onClick = if (state.ble.connectionState == TrikiConnectionState.RECONNECTING) {
+                                onClick = if (state.ble.connectionState in setOf(
+                                    TrikiConnectionState.RECONNECTING,
+                                    TrikiConnectionState.WAITING_FOR_WAKE,
+                                )) {
                                     viewModel::disableAutoConnect
                                 } else {
                                     viewModel::disconnect
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Text(if (state.ble.connectionState == TrikiConnectionState.RECONNECTING) "Wyłącz autołączenie" else "Anuluj")
+                                Text(
+                                    if (state.ble.connectionState in setOf(
+                                            TrikiConnectionState.RECONNECTING,
+                                            TrikiConnectionState.WAITING_FOR_WAKE,
+                                        )
+                                    ) {
+                                        "Wyłącz autołączenie"
+                                    } else {
+                                        "Anuluj"
+                                    },
+                                )
                             }
 
                             else -> {
@@ -201,13 +211,68 @@ fun DeviceScreen(
 @Composable
 private fun DeviceResult(device: TrikiDevice, onConnect: () -> Unit) {
     Card(shape = RoundedCornerShape(22.dp)) {
-        Row(Modifier.fillMaxWidth().padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.SignalCellularAlt, null, tint = MaterialTheme.colorScheme.primary)
-            Column(Modifier.weight(1f).padding(horizontal = 13.dp)) {
-                Text(device.name, style = MaterialTheme.typography.titleMedium)
-                Text("${device.address} · ${device.rssi ?: "—"} dBm", style = MaterialTheme.typography.bodyMedium)
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(17.dp)) {
+            if (maxWidth < 440.dp) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    DeviceIdentity(device)
+                    Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (device.isKnown) "Połącz ponownie" else "Połącz i zapamiętaj")
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DeviceIdentity(device, Modifier.weight(1f))
+                    Button(onClick = onConnect) {
+                        Text(if (device.isKnown) "Połącz ponownie" else "Połącz i zapamiętaj")
+                    }
+                }
             }
-            Button(onClick = onConnect) { Text(if (device.isKnown) "Połącz ponownie" else "Połącz i zapamiętaj") }
+        }
+    }
+}
+
+@Composable
+private fun DeviceHeader(state: MainUiState) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val identity: @Composable (Modifier) -> Unit = { modifier ->
+            Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Bluetooth, null, tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                    Text(
+                        state.ble.selectedDevice?.name ?: state.settings.knownDeviceName ?: "Triki",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        state.ble.selectedDevice?.address
+                            ?: state.settings.knownDeviceAddress
+                            ?: "Brak zapamiętanego urządzenia",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (maxWidth < 420.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                identity(Modifier.fillMaxWidth())
+                StatusPill(state.ble.connectionState)
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                identity(Modifier.weight(1f))
+                StatusPill(state.ble.connectionState)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceIdentity(device: TrikiDevice, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.SignalCellularAlt, null, tint = MaterialTheme.colorScheme.primary)
+        Column(Modifier.weight(1f).padding(horizontal = 13.dp)) {
+            Text(device.name, style = MaterialTheme.typography.titleMedium)
+            Text("${device.address} · ${device.rssi ?: "—"} dBm", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

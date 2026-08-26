@@ -10,6 +10,7 @@
                 <StackPanel Spacing="10">
                     <TextBlock Text="Połączenie" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="Przy pierwszym użyciu wybudź Triki przyciskiem, wyszukaj je i połącz. Komputer zapamięta kapsel; kolejne naciśnięcie przycisku wybudzi urządzenie i uruchomi automatyczne łączenie." TextWrapping="Wrap" />
+                    <TextBlock Text="Opcja „Łącz tylko podczas użycia” zamyka aktywne GATT po 12 sekundach bez ruchu lub przycisku. Lekki nasłuch reklam BLE uzbraja się po zaśnięciu kapsla i wznawia połączenie przy kolejnym wybudzeniu." TextWrapping="Wrap" Opacity="0.78" />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
@@ -34,7 +35,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Wersja 2.3.4 • Windows x64" />
+                    <TextBlock Text="Wersja 2.4.0 • Windows x64" />
                     <TextBlock Text="Natywna aplikacja WinUI 3 sterująca globalną sesją multimedialną i głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="Sprawdź aktualizacje" Click="CheckUpdates_Click" />

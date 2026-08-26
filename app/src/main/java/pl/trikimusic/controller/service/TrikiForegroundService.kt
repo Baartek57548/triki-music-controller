@@ -101,6 +101,7 @@ class TrikiForegroundService : Service() {
                 container.settingsRepository.settings.first()
             } ?: container.settings.value
             val knownAddress = persisted.knownDeviceAddress
+            container.bleManager.setConnectOnlyWhenNeeded(persisted.connectOnlyWhenNeeded)
             if (!persisted.backgroundEnabled) {
                 if (startId != null) stopSelf(startId) else stopSelf()
             } else if (
@@ -108,7 +109,11 @@ class TrikiForegroundService : Service() {
                 container.bleManager.state.value.connectionState in
                 setOf(TrikiConnectionState.DISCONNECTED, TrikiConnectionState.ERROR)
             ) {
-                container.bleManager.autoConnectKnown(knownAddress, persisted.knownDeviceName)
+                if (persisted.connectOnlyWhenNeeded) {
+                    container.bleManager.waitForWake(knownAddress, persisted.knownDeviceName)
+                } else {
+                    container.bleManager.autoConnectKnown(knownAddress, persisted.knownDeviceName)
+                }
             } else if (knownAddress == null && container.bleManager.state.value.connectionState == TrikiConnectionState.DISCONNECTED) {
                 if (startId != null) stopSelf(startId) else stopSelf()
             }
@@ -155,6 +160,7 @@ class TrikiForegroundService : Service() {
         )
         val text = when (state) {
             TrikiConnectionState.READY -> getString(R.string.notification_connected)
+            TrikiConnectionState.WAITING_FOR_WAKE -> getString(R.string.notification_waiting_for_wake)
             TrikiConnectionState.RECONNECTING -> getString(R.string.notification_waiting_for_wake)
             TrikiConnectionState.SCANNING,
             TrikiConnectionState.CONNECTING,

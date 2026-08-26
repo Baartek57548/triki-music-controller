@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.io.IOException
+import kotlin.math.abs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -82,6 +83,10 @@ class DataStoreSettingsRepository(
 
     override suspend fun setBackgroundEnabled(enabled: Boolean) = update { copy(backgroundEnabled = enabled) }
 
+    override suspend fun setConnectOnlyWhenNeeded(enabled: Boolean) = update {
+        copy(connectOnlyWhenNeeded = enabled)
+    }
+
     override suspend fun setTheme(theme: ThemePreference) = update { copy(theme = theme) }
 
     private suspend fun update(transform: AppSettings.() -> AppSettings) {
@@ -110,8 +115,30 @@ class DataStoreSettingsRepository(
         return copy(
             profiles = safeProfiles,
             activeProfileId = safeActive,
-            calibration = calibration.withCurrentOrientationConvention(),
+            calibration = calibration.sanitized(),
         )
+    }
+
+    private fun CalibrationProfile.sanitized(): CalibrationProfile {
+        val safe = isValid &&
+            calibratedAtMillis?.let { it >= 0L } == true &&
+            listOf(accelerometerBiasX, accelerometerBiasY, accelerometerBiasZ).all { it.isFinite() && abs(it) <= 4f } &&
+            listOf(gyroscopeBiasX, gyroscopeBiasY, gyroscopeBiasZ).all { it.isFinite() && abs(it) <= 2_000f } &&
+            accelerometerNoise.isFinite() && accelerometerNoise in 0f..4f &&
+            gyroscopeNoise.isFinite() && gyroscopeNoise in 0f..2_000f &&
+            neutralPitch.isFinite() && neutralRoll.isFinite()
+        if (!safe) return CalibrationProfile()
+
+        val migrated = withCurrentOrientationConvention()
+        return migrated.copy(
+            neutralPitch = normalizeDegrees(migrated.neutralPitch),
+            neutralRoll = normalizeDegrees(migrated.neutralRoll),
+        )
+    }
+
+    private fun normalizeDegrees(value: Float): Float {
+        val normalized = Math.IEEEremainder(value.toDouble(), 360.0).toFloat()
+        return if (normalized == -180f) 180f else normalized
     }
 
     private companion object {

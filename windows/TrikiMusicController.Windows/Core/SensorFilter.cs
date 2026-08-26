@@ -98,9 +98,9 @@ public sealed class SensorFilter
 
     private static float NormalizeDegrees(float value)
     {
-        while (value > 180f) value -= 360f;
-        while (value < -180f) value += 360f;
-        return value;
+        if (!float.IsFinite(value)) return 0f;
+        var normalized = MathF.IEEERemainder(value, 360f);
+        return normalized == -180f ? 180f : normalized;
     }
 
     private static float ComplementaryAngle(float gyroscopeAngle, float accelerometerAngle) =>

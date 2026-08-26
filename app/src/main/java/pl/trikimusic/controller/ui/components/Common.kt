@@ -66,7 +66,7 @@ fun StatusPill(state: TrikiConnectionState, modifier: Modifier = Modifier) {
         TrikiConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
         else -> MaterialTheme.colorScheme.tertiary
     }
-    Surface(modifier = modifier, color = color.copy(alpha = 0.14f), shape = CircleShape) {
+    Surface(modifier = modifier, color = color.copy(alpha = 0.14f), shape = RoundedCornerShape(12.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -251,6 +251,7 @@ fun TrikiConnectionState.displayName(): String = when (this) {
     TrikiConnectionState.CONNECTING -> "Łączenie"
     TrikiConnectionState.CONNECTED -> "Połączone"
     TrikiConnectionState.READY -> "Gotowe"
+    TrikiConnectionState.WAITING_FOR_WAKE -> "Czeka na przycisk"
     TrikiConnectionState.RECONNECTING -> "Czekam na Triki"
     TrikiConnectionState.ERROR -> "Błąd"
 }

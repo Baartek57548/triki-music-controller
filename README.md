@@ -15,7 +15,8 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 
 ## Funkcje
 
-- pełny cykl BLE: skan pierwszego urządzenia na żądanie, zapamiętanie po udanym połączeniu, pasywne GATT `autoConnect`, discovery, NUS notifications, timeout, RSSI i bateria;
+- pełny cykl BLE: skan pierwszego urządzenia na żądanie, zapamiętanie po udanym połączeniu, automatyczne wybudzanie, discovery, NUS notifications, timeout, RSSI i bateria;
+- dodatkowy tryb **Łącz tylko podczas użycia**: po 12 sekundach bez ruchu lub przycisku zamyka aktywne GATT, czeka na rzeczywiste zaśnięcie kapsla i łączy go ponownie przy kolejnym wybudzeniu;
 - potwierdzony dekoder ramek IMU z resynchronizacją po rozciętych i sklejonych notyfikacjach;
 - ciągły regulator głośności wykorzystujący dokładnie przefiltrowaną wartość żyroskopu Z: dodatnie Z podgłaśnia, ujemne Z ścisza;
 - 2-sekundowa stabilizacja kąta 0–25° bez wymogu odkładania kapsla; gwałtowne przyspieszenie poza 0,80–1,20 g natychmiast wstrzymuje regulację i rozpoczyna stabilizację od nowa;
@@ -34,7 +35,7 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - `FakeTrikiDataSource` dostępny wyłącznie w buildzie debug po włączeniu trybu deweloperskiego;
 - automatyczne sprawdzanie najnowszego wydania GitHub przy uruchomieniu wersji release, ręczne sprawdzanie na ekranie **Informacje** oraz weryfikowany instalator APK;
 - jasny, ciemny i systemowy motyw Material 3, edge-to-edge oraz responsywny dashboard.
-- natywna wersja Windows 11 w WinUI 3: ten sam dekoder, filtr, gesty i mapowania, globalna sesja multimedialna, głośność domyślnego urządzenia audio, zapamiętywanie adresu Triki oraz automatyczne łączenie po naciśnięciu przycisku;
+- natywna wersja Windows 11 w WinUI 3: ten sam dekoder, filtr, gesty i mapowania, globalna sesja multimedialna, precyzyjna regulacja domyślnego urządzenia audio przez Core Audio, zapamiętywanie adresu Triki oraz automatyczne łączenie po naciśnięciu przycisku;
 - instalator Windows z opcjonalnym skrótem, autostartem w tle, deinstalatorem i wbudowanym mechanizmem aktualizacji.
 
 ## Wymagania
@@ -61,6 +62,7 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 9. Uruchom muzykę i utrzymuj kapsel górą do góry w przechyle 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć; gwałtowne przyspieszenie ponownie uruchamia 2-sekundową stabilizację. Gdy UI pokaże „Regulator gotowy”, obracaj go łagodnie: dodatnia wartość Z podgłaśnia, ujemna ścisza.
 10. Aby ocenić utwór, przytrzymaj przycisk około pół sekundy, następnie podnieś kapsel o 20–30 cm dla Like albo opuść go o 20–30 cm dla Dislike i łagodnie wyhamuj. Sygnał potwierdzi wysłanie akcji; sygnał błędu oznacza brak obsługi przez aktywny odtwarzacz.
 11. Gdy Triki uśnie i rozłączy BLE, naciśnij jego fizyczny przycisk. Przy włączonym **Sterowaniu w tle** Android automatycznie dokończy oczekujące połączenie z zapamiętanym kapslem — bez ponownego wybierania urządzenia.
+12. Opcjonalnie włącz **Ustawienia → Łącz tylko podczas użycia**. Aplikacja zamknie aktywne połączenie po 12 sekundach bezczynności; po komunikacie o uzbrojonym nasłuchu kolejne naciśnięcie przycisku ponownie połączy zapamiętany kapsel.
 
 Build z linii poleceń na Windows:
 
@@ -126,6 +128,7 @@ Wersja Windows zachowuje ten sam deterministyczny rdzeń i ma osobne adaptery pl
 BluetoothLEAdvertisementWatcher → BluetoothService → TrikiProtocolDecoder
     → SensorFilter → GyroscopeVolumeController / HoldVerticalGestureDetector
     → TrikiRuntimeEngine → GSMTC / Core Audio EndpointVolume
+                         ↘ ConnectionActivityLease → WakeAdvertisementGate
 ```
 
 - `core/bluetooth` — protokół, parser ramek i stanowa warstwa BLE;
@@ -181,7 +184,7 @@ Po włączeniu **Ustawienia → Tryb deweloperski** dostępne są:
 
 ## Testy
 
-Testy JVM obejmują:
+Testy automatyczne JVM i xUnit obejmują:
 
 - dekodowanie little-endian, skalowanie, startup discard i resynchronizację parsera;
 - autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
@@ -190,7 +193,9 @@ Testy JVM obejmują:
 - przytrzymanie konsumujące zwykły klik, symetryczną estymację ruchu góra/dół, korektę pojedynczego początkowego impulsu, potwierdzenie kierunku i hamowania, odrzucanie ruchu zbyt długiego lub naprzemiennego, pojedyncze Like/Dislike na jedno przytrzymanie oraz bezpieczne dopasowanie niestandardowych akcji ratingu;
 - mapowanie przycisk → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, mapowań przycisku i kalibracji, migrację starszej konwencji osi oraz bezpieczne ignorowanie pól poprzedniego systemu sterowania;
-- parsowanie i numeryczne porównywanie wersji semantycznych używanych przez aktualizator.
+- parsowanie i numeryczne porównywanie wersji semantycznych używanych przez aktualizator;
+- wygaszanie bezczynnego połączenia dokładnie raz, odporność na cofnięcie czasu oraz bramkę nowej reklamy BLE po pełnym zaśnięciu kapsla;
+- wersja Windows dodatkowo testuje cały łańcuch regulatora Z i rzeczywisty endpoint Core Audio z przywróceniem pierwotnej głośności po próbie sprzętowej.
 
 ## Znane ograniczenia
 

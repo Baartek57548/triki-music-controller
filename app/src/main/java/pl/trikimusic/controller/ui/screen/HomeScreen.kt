@@ -189,10 +189,17 @@ private fun ConnectionCard(state: MainUiState, onOpenDevice: () -> Unit) {
             )
             Text(
                 state.ble.errorMessage ?: if (
-                    state.ble.connectionState == TrikiConnectionState.RECONNECTING &&
+                    state.ble.connectionState in setOf(
+                        TrikiConnectionState.RECONNECTING,
+                        TrikiConnectionState.WAITING_FOR_WAKE,
+                    ) &&
                     state.settings.knownDeviceAddress != null
                 ) {
-                    "Naciśnij przycisk zapamiętanego Triki. Telefon połączy się automatycznie, gdy kapsel się wybudzi."
+                    if (state.ble.connectionState == TrikiConnectionState.WAITING_FOR_WAKE && !state.ble.wakeWatcherArmed) {
+                        "Kończę poprzednią sesję. Gdy kapsel zaśnie, nasłuch uzbroi się automatycznie."
+                    } else {
+                        "Naciśnij przycisk zapamiętanego Triki. Telefon połączy się automatycznie, gdy kapsel się wybudzi."
+                    }
                 } else {
                     "Obudź kapsel przyciskiem, wyszukaj go i połącz pierwszy raz."
                 },

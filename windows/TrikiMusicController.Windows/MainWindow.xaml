@@ -34,6 +34,10 @@
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="True"
             PaneDisplayMode="Auto"
+            CompactModeThresholdWidth="760"
+            ExpandedModeThresholdWidth="1080"
+            OpenPaneLength="224"
+            PaneTitle="Triki Music"
             SelectionChanged="Navigation_SelectionChanged">
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="HomeItem" Content="Start" Tag="home">

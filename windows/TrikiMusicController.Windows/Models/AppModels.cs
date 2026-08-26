@@ -7,6 +7,7 @@ public enum TrikiConnectionState
     Disconnected,
     Scanning,
     WaitingForDevice,
+    WaitingForWake,
     Connecting,
     Ready,
     Error,
@@ -30,10 +31,11 @@ public sealed record BluetoothSnapshot(
     long DecodedFrames,
     long DiscardedStartupFrames,
     long DroppedProtocolBytes,
+    bool WakeWatcherArmed,
     string? ErrorMessage)
 {
     public static BluetoothSnapshot Initial { get; } = new(
-        TrikiConnectionState.Disconnected, null, [], null, null, 0, 0, 0, null);
+        TrikiConnectionState.Disconnected, null, [], null, null, 0, 0, 0, false, null);
 }
 
 public sealed record MediaSnapshot(
@@ -78,6 +80,7 @@ public sealed class AppSettings
     public string? KnownDeviceAddressHex { get; set; }
     public string? KnownDeviceName { get; set; }
     public bool AutoReconnect { get; set; } = true;
+    public bool ConnectOnlyWhenNeeded { get; set; }
     public bool StartWithWindows { get; set; }
     public string Theme { get; set; } = "System";
     public MediaAction SingleClickAction { get; set; } = MediaAction.PlayPause;
@@ -104,7 +107,7 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "2.3.4";
+    public const string Version = "2.4.0";
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }

@@ -59,6 +59,7 @@ data class AppSettings(
     val calibration: CalibrationProfile = CalibrationProfile(),
     val developerMode: Boolean = false,
     val backgroundEnabled: Boolean = true,
+    val connectOnlyWhenNeeded: Boolean = false,
     val theme: ThemePreference = ThemePreference.SYSTEM,
 ) {
     val activeProfile: ControlProfile

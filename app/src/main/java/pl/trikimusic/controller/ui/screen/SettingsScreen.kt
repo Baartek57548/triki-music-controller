@@ -52,6 +52,7 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
+        item { SectionTitle("Personalizacja") }
         item {
             Card(shape = RoundedCornerShape(24.dp)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -70,11 +71,29 @@ fun SettingsScreen(
             }
         }
         item {
+            SectionTitle(
+                title = "Połączenie",
+                subtitle = "Wybierz, czy Triki ma pozostawać gotowe, czy oszczędzać aktywne połączenie GATT.",
+            )
+        }
+        item {
             SettingSwitchRow(
                 title = "Sterowanie w tle",
                 description = "Czekaj na wybudzenie zapamiętanego Triki i łącz je automatycznie po naciśnięciu przycisku.",
                 checked = state.settings.backgroundEnabled,
                 onCheckedChange = viewModel::setBackgroundEnabled,
+            )
+        }
+        item {
+            SettingSwitchRow(
+                title = "Łącz tylko podczas użycia",
+                description = if (state.settings.connectOnlyWhenNeeded) {
+                    "Po 12 sekundach bez ruchu lub przycisku połączenie jest zamykane. Następne naciśnięcie budzi kapsel i przywraca sterowanie."
+                } else {
+                    "Opcjonalny tryb: po bezczynności zamyka GATT i czeka na kolejne wybudzenie przyciskiem."
+                },
+                checked = state.settings.connectOnlyWhenNeeded,
+                onCheckedChange = viewModel::setConnectOnlyWhenNeeded,
             )
         }
         item {
@@ -87,7 +106,7 @@ fun SettingsScreen(
         }
         item { SectionTitle("System") }
         item { NavigationRow(Icons.Default.Security, "Uprawnienia", "Sprawdź dostęp do Bluetooth i informacji o odtwarzaniu.", onPermissions) }
-        item { NavigationRow(Icons.Default.NotificationsActive, "Autołączenie w tle", if (state.settings.backgroundEnabled) "Telefon oczekuje na zapamiętane Triki także po jego uśpieniu." else "Wyłączone.", onPermissions) }
+        item { NavigationRow(Icons.Default.NotificationsActive, "Dostęp w tle", if (state.settings.backgroundEnabled) "Telefon może oczekiwać na zapamiętane Triki także przy zamkniętym ekranie." else "Wyłączony — automatyczne wybudzenie działa tylko przy otwartej aplikacji.", onPermissions) }
         if (state.settings.developerMode) {
             item { SectionTitle("Narzędzia deweloperskie") }
             item { NavigationRow(Icons.Default.Sensors, "Monitor czujników", "Dane IMU i generator testowych kliknięć.", onSensor) }
@@ -103,7 +122,10 @@ private fun SettingSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Card(shape = RoundedCornerShape(22.dp)) {
+    Card(
+        onClick = { onCheckedChange(!checked) },
+        shape = RoundedCornerShape(22.dp),
+    ) {
         Row(
             Modifier.fillMaxWidth().padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -113,7 +135,7 @@ private fun SettingSwitchRow(
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(checked = checked, onCheckedChange = null)
         }
     }
 }

@@ -22,6 +22,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private MediaSnapshot _lastMedia = MediaSnapshot.Initial;
     private RuntimeSnapshot _lastRuntime = RuntimeSnapshot.Initial;
     private string _settingsStatus = string.Empty;
+    private int _uiRefreshPending = 1;
 
     public MainViewModel(
         DispatcherQueue dispatcherQueue,
@@ -38,6 +39,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _uiTimer.Interval = TimeSpan.FromMilliseconds(100);
         _uiTimer.IsRepeating = true;
         _uiTimer.Tick += UiTimerOnTick;
+        _bluetooth.StateChanged += BluetoothOnStateChanged;
+        _media.StateChanged += MediaOnStateChanged;
+        _runtime.StateChanged += RuntimeOnStateChanged;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -63,6 +67,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         TrikiConnectionState.Ready => "Triki połączone",
         TrikiConnectionState.Connecting => "Łączenie z Triki…",
         TrikiConnectionState.WaitingForDevice => "Oczekiwanie na wybudzenie",
+        TrikiConnectionState.WaitingForWake => "Połączenie na żądanie",
         TrikiConnectionState.Scanning => "Skanowanie Bluetooth LE",
         TrikiConnectionState.Error => "Błąd Bluetooth",
         _ => "Triki rozłączone",
@@ -71,7 +76,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string ConnectionDetails => _lastBluetooth.ConnectionState == TrikiConnectionState.Ready
         ? $"{_lastBluetooth.ConnectedDevice?.Name} • {_lastBluetooth.SampleRateHz?.ToString("0.0") ?? "—"} Hz • bateria {_lastBluetooth.BatteryPercent?.ToString() ?? "—"}%"
         : _lastBluetooth.ErrorMessage ?? (_settings.Current.KnownDeviceAddress is not null
-            ? "Naciśnij przycisk kapsla. Aplikacja połączy się, gdy urządzenie zacznie nadawać."
+            ? (_lastBluetooth.ConnectionState == TrikiConnectionState.WaitingForWake && !_lastBluetooth.WakeWatcherArmed
+                ? "Kończę poprzednią sesję. Nasłuch uzbroi się, gdy kapsel całkowicie zaśnie."
+                : "Naciśnij przycisk kapsla. Aplikacja połączy się, gdy urządzenie zacznie nadawać.")
             : "Wybierz urządzenie z listy i połącz je po raz pierwszy.");
 
     public string MediaTitle => _lastMedia.Title;
@@ -123,6 +130,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string RememberedDevice => _settings.Current.KnownDeviceAddress is ulong address
         ? $"{_settings.Current.KnownDeviceName ?? "Triki"} • {address:X12}"
         : "Brak zapamiętanego urządzenia";
+    public string ConnectionModeSummary => _settings.Current.ConnectOnlyWhenNeeded
+        ? "Po 12 sekundach bez ruchu lub przycisku aplikacja zamyka GATT. Następne wybudzenie automatycznie przywraca sterowanie."
+        : "Połączenie pozostaje aktywne do czasu uśpienia kapsla lub ręcznego rozłączenia.";
     public string SettingsStatus
     {
         get => _settingsStatus;
@@ -136,8 +146,35 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (_settings.Current.AutoReconnect == value) return;
             _settings.Current.AutoReconnect = value;
-            _bluetooth.ConfigureRememberedDevice(_settings.Current.KnownDeviceAddress, _settings.Current.KnownDeviceName, value);
+            _bluetooth.ConfigureRememberedDevice(
+                _settings.Current.KnownDeviceAddress,
+                _settings.Current.KnownDeviceName,
+                value,
+                _settings.Current.ConnectOnlyWhenNeeded);
             OnPropertyChanged();
+            _ = SaveSettingsAsync();
+        }
+    }
+
+    public bool ConnectOnlyWhenNeeded
+    {
+        get => _settings.Current.ConnectOnlyWhenNeeded;
+        set
+        {
+            if (_settings.Current.ConnectOnlyWhenNeeded == value) return;
+            _settings.Current.ConnectOnlyWhenNeeded = value;
+            if (value && !_settings.Current.AutoReconnect)
+            {
+                _settings.Current.AutoReconnect = true;
+                OnPropertyChanged(nameof(AutoReconnect));
+            }
+            _bluetooth.ConfigureRememberedDevice(
+                _settings.Current.KnownDeviceAddress,
+                _settings.Current.KnownDeviceName,
+                _settings.Current.AutoReconnect,
+                value);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ConnectionModeSummary));
             _ = SaveSettingsAsync();
         }
     }
@@ -190,7 +227,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _bluetooth.ConfigureRememberedDevice(
             _settings.Current.KnownDeviceAddress,
             _settings.Current.KnownDeviceName,
-            _settings.Current.AutoReconnect);
+            _settings.Current.AutoReconnect,
+            _settings.Current.ConnectOnlyWhenNeeded);
         await _media.InitializeAsync();
         await _bluetooth.StartAsync();
         _uiTimer.Start();
@@ -204,7 +242,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         var selected = SelectedDevice ?? throw new InvalidOperationException("Najpierw wybierz Triki z listy.");
         await _bluetooth.ConnectAsync(selected);
         await _settings.RememberDeviceAsync(selected);
-        _bluetooth.ConfigureRememberedDevice(selected.BluetoothAddress, selected.Name, _settings.Current.AutoReconnect);
+        _bluetooth.ConfigureRememberedDevice(
+            selected.BluetoothAddress,
+            selected.Name,
+            _settings.Current.AutoReconnect,
+            _settings.Current.ConnectOnlyWhenNeeded);
         OnPropertyChanged(nameof(RememberedDevice));
     }
 
@@ -214,7 +256,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         await _bluetooth.DisconnectAsync(forgetDevice: true);
         await _settings.ForgetDeviceAsync();
-        _bluetooth.ConfigureRememberedDevice(null, null, _settings.Current.AutoReconnect);
+        _bluetooth.ConfigureRememberedDevice(
+            null,
+            null,
+            _settings.Current.AutoReconnect,
+            _settings.Current.ConnectOnlyWhenNeeded);
         OnPropertyChanged(nameof(RememberedDevice));
     }
 
@@ -238,7 +284,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private MediaActionOption OptionFor(MediaAction action) =>
         AvailableActions.First(option => option.Action == action);
 
-    private void UiTimerOnTick(DispatcherQueueTimer sender, object args) => RefreshUi();
+    private void BluetoothOnStateChanged(object? sender, BluetoothSnapshot state) => MarkUiDirty();
+    private void MediaOnStateChanged(object? sender, MediaSnapshot state) => MarkUiDirty();
+    private void RuntimeOnStateChanged(object? sender, RuntimeSnapshot state) => MarkUiDirty();
+    private void MarkUiDirty() => Interlocked.Exchange(ref _uiRefreshPending, 1);
+
+    private void UiTimerOnTick(DispatcherQueueTimer sender, object args)
+    {
+        if (Interlocked.Exchange(ref _uiRefreshPending, 0) == 0) return;
+        RefreshUi();
+    }
 
     private void RefreshUi()
     {
@@ -274,5 +329,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _disposed = true;
         _uiTimer.Stop();
         _uiTimer.Tick -= UiTimerOnTick;
+        _bluetooth.StateChanged -= BluetoothOnStateChanged;
+        _media.StateChanged -= MediaOnStateChanged;
+        _runtime.StateChanged -= RuntimeOnStateChanged;
     }
 }

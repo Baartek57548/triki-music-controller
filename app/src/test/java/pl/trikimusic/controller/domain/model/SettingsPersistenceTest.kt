@@ -32,6 +32,7 @@ class SettingsPersistenceTest {
             ),
             developerMode = true,
             backgroundEnabled = false,
+            connectOnlyWhenNeeded = true,
             theme = ThemePreference.DARK,
         )
 
