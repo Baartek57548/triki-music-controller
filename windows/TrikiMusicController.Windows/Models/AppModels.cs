@@ -59,7 +59,7 @@ public sealed record MediaSnapshot(
 public sealed record RuntimeSnapshot(
     FilteredSensorData? LatestSample,
     VolumeControlResult? Volume,
-    HoldArcGestureResult Gesture,
+    FullRotationGestureResult Gesture,
     TrikiButtonProtocolMode ButtonProtocol,
     MediaAction? LastAction,
     string LastActionStatus,
@@ -68,7 +68,7 @@ public sealed record RuntimeSnapshot(
     public static RuntimeSnapshot Initial { get; } = new(
         null,
         null,
-        new HoldArcGestureResult(null, null, HoldGesturePhase.Idle, 0, false, 0, 0),
+        new FullRotationGestureResult(false, null, HoldGesturePhase.Idle, 0, false, 0, 0),
         TrikiButtonProtocolMode.Unknown,
         null,
         "Oczekiwanie na dane Triki",
@@ -84,8 +84,8 @@ public sealed class AppSettings
     public bool StartWithWindows { get; set; }
     public string Theme { get; set; } = "System";
     public MediaAction SingleClickAction { get; set; } = MediaAction.PlayPause;
-    public MediaAction DoubleClickAction { get; set; } = MediaAction.Next;
-    public MediaAction TripleClickAction { get; set; } = MediaAction.Previous;
+    public MediaAction DoubleClickAction { get; set; } = MediaAction.Like;
+    public MediaAction TripleClickAction { get; set; } = MediaAction.Dislike;
     public CalibrationProfile Calibration { get; set; } = new();
 
     public ulong? KnownDeviceAddress => ulong.TryParse(
@@ -107,7 +107,7 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "2.5.4";
+    public const string Version = "2.6.0";
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }

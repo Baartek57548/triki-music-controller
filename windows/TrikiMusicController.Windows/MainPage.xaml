@@ -92,7 +92,7 @@
                 </Border>
                 <Border x:Name="GestureCard" Grid.Column="1" Style="{StaticResource CardBorderStyle}">
                     <StackPanel Spacing="8">
-                        <TextBlock Text="Like / Dislike" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Nawigacja pełnym obrotem" Style="{StaticResource SectionTitleStyle}" />
                         <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding LastActionStatus}" Opacity="0.75" TextWrapping="Wrap" />
                     </StackPanel>

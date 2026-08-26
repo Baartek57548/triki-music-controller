@@ -23,9 +23,9 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - wielostopniowa filtracja IMU: mediana odrzucająca pojedyncze skoki, adaptacyjna martwa strefa gyro, low-pass i filtr komplementarny;
 - łagodne wygładzenie żyroskopu Z, histereza, ograniczenie zaległych kroków, limit częstotliwości i całkowanie prędkości kątowej ograniczające gwałtowne skoki głośności;
 - opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
-- bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa przechodzą do następnego utworu, trzy do poprzedniego; każde mapowanie można zmienić w profilu;
+- bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa wysyłają Like, trzy Dislike; każde mapowanie można zmienić w profilu;
 - konfigurowalne mapowania przycisku zapisywane w Preferences DataStore;
-- paraboliczny łuk odwróconym kapslem około 10 cm od pozycji początkowej do końcowej, bez wciskania przycisku: ruch w prawo wysyła Like, ruch w lewo Dislike; detektor wymaga odwrócenia (Z dodatnie), 0,5 s stabilizacji, pionowej fazy łuku, trwałego impulsu i potwierdzonego wyhamowania;
+- pełny obrót odwróconym kapslem bez wciskania przycisku: po 0,5 s stabilizacji obrót w prawo przechodzi do następnego utworu, a w lewo do poprzedniego;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Like, Dislike, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i informacją o odtwarzanym utworze;
 - uproszczone ekrany robocze i wspólny ekran **Informacje**, otwierany ikoną w prawym górnym rogu aplikacji Android i Windows;
@@ -60,7 +60,7 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 7. Naciśnij przycisk Triki, wybierz **Urządzenie → Skanuj urządzenia**, a następnie **Połącz i zapamiętaj**. Adres jest zapisywany dopiero po pełnym uruchomieniu strumienia IMU.
 8. Po stanie **Gotowe** otwórz **Sterowanie**, sprawdź status regulatora Z i ustaw akcje dla jednego, dwóch oraz trzech kliknięć.
 9. Uruchom muzykę i utrzymuj kapsel górą do góry w przechyle 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć; gwałtowne przyspieszenie ponownie uruchamia 2-sekundową stabilizację. Gdy UI pokaże „Regulator gotowy”, obracaj go łagodnie: dodatnia wartość Z podgłaśnia, ujemna ścisza.
-10. Aby ocenić utwór, odwróć kapsel górą w dół i ustaw znacznik od siebie. Odczekaj około pół sekundy stabilizacji, następnie bez wciskania przycisku poprowadź płytki łuk około 10 cm od pozycji początkowej do końcowej — w prawo dla Like albo w lewo dla Dislike — i łagodnie wyhamuj. Sygnał potwierdzi wysłanie akcji; sygnał błędu oznacza brak obsługi przez aktywny odtwarzacz.
+10. Aby ocenić utwór, użyj przycisku: dwa kliknięcia oznaczają Like, a trzy kliknięcia Dislike (mapowania można zmienić w profilu). Aby zmienić utwór bez przycisku, odwróć kapsel, odczekaj około pół sekundy stabilizacji i wykonaj jeden pełny obrót wokół osi Z — prawo przechodzi do następnego, lewo do poprzedniego.
 11. Gdy Triki uśnie i rozłączy BLE, naciśnij jego fizyczny przycisk. Przy włączonym **Sterowaniu w tle** Android automatycznie dokończy oczekujące połączenie z zapamiętanym kapslem — bez ponownego wybierania urządzenia.
 12. Opcjonalnie włącz **Ustawienia → Łącz tylko podczas użycia**. Aplikacja zamknie aktywne połączenie po 12 sekundach bezczynności; po komunikacie o uzbrojonym nasłuchu kolejne naciśnięcie przycisku ponownie połączy zapamiętany kapsel.
 
@@ -115,7 +115,7 @@ SensorFilter + calibration + complementary orientation
     ↓
 GyroscopeVolumeController + bramka 0,80–1,20 g + 2 s stabilizacji przechyłu 0–25°
     ↓
-HoldArcGestureDetector + łuk lewo–prawo na odwróconym kapslu
+FullRotationGestureDetector + pełny obrót lewo–prawo na odwróconym kapslu
     ↓
 ActionMapper + mapowanie przycisku i rating MediaSession
     ↓
@@ -126,7 +126,7 @@ Wersja Windows zachowuje ten sam deterministyczny rdzeń i ma osobne adaptery pl
 
 ```text
 BluetoothLEAdvertisementWatcher → BluetoothService → TrikiProtocolDecoder
-    → SensorFilter → GyroscopeVolumeController / HoldArcGestureDetector
+    → SensorFilter → GyroscopeVolumeController / FullRotationGestureDetector
     → TrikiRuntimeEngine → GSMTC / Core Audio EndpointVolume
                          ↘ ConnectionActivityLease → WakeAdvertisementGate
 ```
@@ -167,9 +167,9 @@ Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [
 
 Martwa strefa osi Z 22°/s, próg zwolnienia 12°/s, zerowanie po zmianie kierunku, gwałtownym przyspieszeniu, wyjściu poza 25° i przerwie strumienia ograniczają niezamierzone skoki. Interfejs pokazuje bieżący przechył, długość wektora akcelerometru i wartość żyroskopu Z, dzięki czemu użytkownik wie, co blokuje sterowanie.
 
-Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
+Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Like`, `×3 → Dislike`.
 
-`HoldArcGestureDetector` uruchamia się po około 500 ms stabilizacji odwróconego kapsla — przycisk nie jest wymagany. Zapamiętuje lokalny wektor grawitacji, wyznacza z niego płaszczyznę ruchu oraz odejmuje grawitację od kolejnych próbek. Ruch w osi X w prawo daje Like, a w lewo Dislike; kierunek zostaje zablokowany dopiero po co najmniej 120 ms spójnego impulsu. Akcja wymaga około 10 cm przemieszczenia poziomego od startu do końca, wyraźnej pionowej fazy parabolicznej (oba kierunki przyspieszenia), rozpoczętego po 4 cm hamowania i obniżenia prędkości. Ruch prosty, zbyt głęboki, dłuższy niż około 16 cm, silnie obrotowy albo poza osią jest odrzucany; po akcji detektor czeka na krótkie uspokojenie ruchu i samoczynnie uzbraja się ponownie. `AndroidMediaControllerGateway` korzysta ze standardowego `ACTION_SET_RATING` lub akcji niestandardowej jawnie wystawionej przez aktywną MediaSession.
+`FullRotationGestureDetector` uruchamia się po około 500 ms stabilizacji odwróconego kapsla — przycisk nie jest wymagany. Korzysta z tej samej filtrowanej i całkowanej osi Z co regulator głośności: dodatni obrót w prawo oznacza następny utwór, a ujemny w lewo poprzedni. Kierunek zaczyna być liczony po przekroczeniu 22°/s, a akcja jest wyzwalana po estymacji co najmniej 330° (co odpowiada pełnemu obrotowi ręką mimo strat filtra); zatrzymanie, zmiana kierunku, wyjście poza 0,80–1,20 g lub zbyt długi obrót zerują próbę. Dwa i trzy kliknięcia przycisku są domyślnie mapowane odpowiednio na Like i Dislike.
 
 ## Diagnostyka
 
@@ -190,7 +190,7 @@ Testy automatyczne JVM i xUnit obejmują:
 - autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
 - dodatni i ujemny kierunek regulatora Z, pełne 2 sekundy w przechyle 0–25°, tolerancję ruchu 0,80–1,20 g, reset po gwałtownym przyspieszeniu, łagodniejsze wygładzenie Z, limit kroków, blokadę powyżej 25°, położenie 90°/180° oraz reset po przerwie strumienia;
-- stabilizację bez przycisku, symetryczną estymację łuku lewo/prawo, wymóg odwróconego kapsla i pionowej fazy, korektę pojedynczego początkowego impulsu, potwierdzenie kierunku i hamowania, odrzucanie ruchu prostego, zbyt głębokiego, zbyt długiego lub naprzemiennego, pojedyncze Like/Dislike na jeden łuk oraz automatyczne ponowne uzbrajanie po uspokojeniu ruchu;
+- stabilizację bez przycisku, pełny obrót osi Z lewo/prawo na odwróconym kapslu, odrzucanie zmiany kierunku, zbyt długiego obrotu i niestabilnego przyspieszenia oraz automatyczne ponowne uzbrajanie po uspokojeniu ruchu;
 - mapowanie przycisk → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, mapowań przycisku i kalibracji, migrację starszej konwencji osi oraz bezpieczne ignorowanie pól poprzedniego systemu sterowania;
 - parsowanie i numeryczne porównywanie wersji semantycznych używanych przez aktualizator;
@@ -206,8 +206,8 @@ Testy automatyczne JVM i xUnit obejmują:
 - Autołączenie wymaga włączonego Bluetooth, przyznanego dostępu do urządzeń w pobliżu i aktywnego ustawienia **Sterowanie w tle**. Wymuszone zatrzymanie aplikacji w ustawieniach Androida blokuje jej usługi i odbiorniki do następnego ręcznego uruchomienia; część nakładek producentów może również wymagać zezwolenia na autostart.
 - Metadane i okładka wymagają dostępu do aktywnej MediaSession. Play/Pause, Next, Previous i Stop mają fallback przez standardowe klawisze multimedialne, ale ostateczna obsługa komendy zależy od aktywnego odtwarzacza.
 - Aktualizator obsługuje publiczne, stabilne wydania GitHub zawierające jednoznaczny APK release. Android wymaga zgody na instalowanie z tego źródła oraz osobnego potwierdzenia każdej instalacji.
-- Like/Dislike działa tylko wtedy, gdy aktywna aplikacja udostępnia standardowe `ACTION_SET_RATING` albo jednoznaczną akcję niestandardową MediaSession. Brak takiej możliwości zwraca błąd i osobny sygnał dźwiękowy; aplikacja nie deklaruje wtedy zmiany oceny.
-- Windows Global System Media Transport Controls nie definiuje standardowej komendy Like/Dislike. Wersja Windows rozpoznaje poprawny kierunek gestu i sygnalizuje brak wykonania, ale bez osobnej integracji konkretnego odtwarzacza nie deklaruje zmiany oceny; Play/Pause, Next, Previous, Stop i głośność działają systemowo.
+- Like/Dislike z dwóch lub trzech kliknięć działa tylko wtedy, gdy aktywna aplikacja udostępnia standardowe `ACTION_SET_RATING` albo jednoznaczną akcję niestandardową MediaSession. Brak takiej możliwości zwraca błąd; aplikacja nie deklaruje wtedy zmiany oceny.
+- Pełny obrót odwróconego kapsla korzysta z Next/Previous, więc działa wszędzie tam, gdzie odtwarzacz obsługuje standardowe przechodzenie między utworami. Windows Global System Media Transport Controls nie definiuje systemowej komendy Like/Dislike, dlatego oceny są dostępne przez kliknięcia tylko w aplikacji z obsługą MediaSession.
 - Publiczny instalator Windows nie jest podpisany komercyjnym certyfikatem Authenticode, dlatego SmartScreen może pokazać ostrzeżenie nieznanego wydawcy. Integralność pliku można porównać z digestem SHA-256 publikowanym przez GitHub.
 
 ## Licencja i znaki towarowe

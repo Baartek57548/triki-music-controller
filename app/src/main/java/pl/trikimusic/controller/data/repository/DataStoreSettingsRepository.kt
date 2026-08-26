@@ -18,9 +18,11 @@ import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.ButtonMapping
 import pl.trikimusic.controller.domain.model.CalibrationProfile
+import pl.trikimusic.controller.domain.model.ControlProfile
 import pl.trikimusic.controller.domain.model.LogCategory
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.ThemePreference
+import pl.trikimusic.controller.domain.model.defaultButtonMappings
 import pl.trikimusic.controller.domain.model.defaultProfiles
 import pl.trikimusic.controller.domain.model.withCurrentOrientationConvention
 import pl.trikimusic.controller.domain.repository.SettingsRepository
@@ -111,12 +113,22 @@ class DataStoreSettingsRepository(
 
     private fun AppSettings.normalized(): AppSettings {
         val safeProfiles = profiles.ifEmpty { defaultProfiles() }
+            .map { profile -> profile.migrateLegacyButtonDefaults() }
         val safeActive = activeProfileId.takeIf { id -> safeProfiles.any { it.id == id } } ?: safeProfiles.first().id
         return copy(
             profiles = safeProfiles,
             activeProfileId = safeActive,
             calibration = calibration.sanitized(),
         )
+    }
+
+    private fun ControlProfile.migrateLegacyButtonDefaults(): ControlProfile {
+        if (!builtIn) return this
+        val actionByClick = buttonMappings.associate { mapping -> mapping.click to mapping.action }
+        val usesLegacyDefaults = actionByClick[ButtonClickType.SINGLE] == MediaAction.PLAY_PAUSE &&
+            actionByClick[ButtonClickType.DOUBLE] == MediaAction.NEXT &&
+            actionByClick[ButtonClickType.TRIPLE] == MediaAction.PREVIOUS
+        return if (usesLegacyDefaults) copy(buttonMappings = defaultButtonMappings()) else this
     }
 
     private fun CalibrationProfile.sanitized(): CalibrationProfile {

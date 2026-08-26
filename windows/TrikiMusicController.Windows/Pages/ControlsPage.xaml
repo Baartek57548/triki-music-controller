@@ -19,8 +19,9 @@
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="Like i Dislike łukiem" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Ustaw odwrócony kapsel znacznikiem od siebie i ustabilizuj go przez 0,5 s. Bez wciskania przycisku wykonaj płytki łuk około 10 cm od pozycji początkowej do końcowej: w lewo odrzuca utwór, a w prawo go lubi." TextWrapping="Wrap" Opacity="0.75" />
+                    <TextBlock Text="Nawigacja pełnym obrotem" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="Odwróć kapsel, ustabilizuj go przez 0,5 s i wykonaj jeden pełny obrót wokół osi Z. Obrót w prawo przechodzi do następnego utworu, a w lewo wraca do poprzedniego — bez wciskania przycisku." TextWrapping="Wrap" Opacity="0.75" />
+                    <TextBlock Text="Dwa kliknięcia przycisku → Like • trzy kliknięcia → Dislike" TextWrapping="Wrap" Opacity="0.75" />
                     <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>

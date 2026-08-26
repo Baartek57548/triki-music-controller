@@ -42,8 +42,8 @@ data class ButtonMapping(
 
 fun defaultButtonMappings(): List<ButtonMapping> = listOf(
     ButtonMapping(ButtonClickType.SINGLE, MediaAction.PLAY_PAUSE),
-    ButtonMapping(ButtonClickType.DOUBLE, MediaAction.NEXT),
-    ButtonMapping(ButtonClickType.TRIPLE, MediaAction.PREVIOUS),
+    ButtonMapping(ButtonClickType.DOUBLE, MediaAction.LIKE),
+    ButtonMapping(ButtonClickType.TRIPLE, MediaAction.DISLIKE),
 )
 
 @Serializable

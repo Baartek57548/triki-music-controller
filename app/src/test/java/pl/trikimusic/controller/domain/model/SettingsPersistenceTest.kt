@@ -9,6 +9,15 @@ class SettingsPersistenceTest {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
     @Test
+    fun `default button mappings rate the current song`() {
+        val profile = defaultProfiles().single()
+
+        assertEquals(MediaAction.PLAY_PAUSE, profile.actionFor(ButtonClickType.SINGLE))
+        assertEquals(MediaAction.LIKE, profile.actionFor(ButtonClickType.DOUBLE))
+        assertEquals(MediaAction.DISLIKE, profile.actionFor(ButtonClickType.TRIPLE))
+    }
+
+    @Test
     fun `settings round trip preserves button mappings calibration and preferences`() {
         val custom = ControlProfile(
             id = "custom-id",
@@ -121,7 +130,7 @@ class SettingsPersistenceTest {
         val restored = json.decodeFromString(AppSettings.serializer(), legacy)
 
         assertEquals(MediaAction.PLAY_PAUSE, restored.activeProfile.actionFor(ButtonClickType.SINGLE))
-        assertEquals(MediaAction.NEXT, restored.activeProfile.actionFor(ButtonClickType.DOUBLE))
-        assertEquals(MediaAction.PREVIOUS, restored.activeProfile.actionFor(ButtonClickType.TRIPLE))
+        assertEquals(MediaAction.LIKE, restored.activeProfile.actionFor(ButtonClickType.DOUBLE))
+        assertEquals(MediaAction.DISLIKE, restored.activeProfile.actionFor(ButtonClickType.TRIPLE))
     }
 }

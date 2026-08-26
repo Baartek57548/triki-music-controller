@@ -11,10 +11,9 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly MediaControlService _media;
     private readonly SystemVolumeService _systemVolume;
     private readonly SettingsService _settings;
-    private readonly FeedbackToneService _feedback;
     private readonly SensorFilter _sensorFilter = new();
     private readonly GyroscopeVolumeController _volumeController = new();
-    private readonly HoldArcGestureDetector _ratingGestureDetector = new();
+    private readonly FullRotationGestureDetector _rotationGestureDetector = new();
     private readonly TrikiButtonInterpreter _buttonInterpreter = new();
     private readonly ConnectionActivityLease _connectionActivityLease = new();
     private bool _connectionWasReady;
@@ -24,14 +23,12 @@ public sealed class TrikiRuntimeEngine : IDisposable
         BluetoothService bluetooth,
         MediaControlService media,
         SystemVolumeService systemVolume,
-        SettingsService settings,
-        FeedbackToneService feedback)
+        SettingsService settings)
     {
         _bluetooth = bluetooth;
         _media = media;
         _systemVolume = systemVolume;
         _settings = settings;
-        _feedback = feedback;
         _bluetooth.SampleReceived += BluetoothOnSampleReceived;
         _bluetooth.StateChanged += BluetoothOnStateChanged;
     }
@@ -45,7 +42,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
         {
             _sensorFilter.Reset();
             _volumeController.Reset();
-            _ratingGestureDetector.Reset();
+            _rotationGestureDetector.Reset();
             _buttonInterpreter.Reset();
             _connectionActivityLease.Reset();
             State = RuntimeSnapshot.Initial;
@@ -67,13 +64,12 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private void BluetoothOnSampleReceived(object? sender, TrikiSensorData sample)
     {
         MediaAction? actionToExecute = null;
-        RatingGestureAction? ratingFeedback = null;
         var shouldParkConnection = false;
         lock (_sync)
         {
             var filtered = _sensorFilter.Process(sample, _settings.Current.Calibration);
             var buttonEvent = _buttonInterpreter.Process(sample);
-            var gesture = _ratingGestureDetector.Process(filtered);
+            var gesture = _rotationGestureDetector.Process(filtered);
             var explicitConnectionActivity = buttonEvent is not null ||
                 _buttonInterpreter.IsPressed ||
                 gesture.Phase is HoldGesturePhase.Holding or
@@ -84,17 +80,21 @@ public sealed class TrikiRuntimeEngine : IDisposable
             shouldParkConnection = _settings.Current.ConnectOnlyWhenNeeded &&
                 _connectionActivityLease.Observe(filtered, explicitConnectionActivity);
 
-            if (gesture.Action is RatingGestureAction ratingAction)
+            if (buttonEvent is null && gesture.Triggered)
             {
                 _volumeController.Reset();
-                ratingFeedback = ratingAction;
-                actionToExecute = ratingAction == RatingGestureAction.Like ? MediaAction.Like : MediaAction.Dislike;
+                actionToExecute = gesture.Direction switch
+                {
+                    RotationGestureDirection.Right => MediaAction.Next,
+                    RotationGestureDirection.Left => MediaAction.Previous,
+                    _ => MediaAction.None,
+                };
                 State = State with
                 {
                     LatestSample = filtered,
                     Gesture = gesture,
                     ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                    LastActionStatus = $"Rozpoznano gest: {actionToExecute.Value.DisplayName()}",
+                    LastActionStatus = $"Rozpoznano obrót: {actionToExecute.Value.DisplayName()}",
                 };
             }
             else if (buttonEvent is not null)
@@ -136,7 +136,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
         StateChanged?.Invoke(this, State);
 
         if (actionToExecute is MediaAction action && action != MediaAction.None)
-            _ = ExecuteAsync(action, ratingFeedback);
+            _ = ExecuteAsync(action);
         if (shouldParkConnection) _ = ParkConnectionAfterIdleAsync();
     }
 
@@ -153,7 +153,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
         }
     }
 
-    private async Task ExecuteAsync(MediaAction action, RatingGestureAction? ratingFeedback)
+    private async Task ExecuteAsync(MediaAction action)
     {
         (bool Succeeded, string Message) result;
         try
@@ -182,7 +182,6 @@ public sealed class TrikiRuntimeEngine : IDisposable
             result = (false, error.Message);
             System.Diagnostics.Debug.WriteLine($"Wykonanie akcji {action} nie powiodło się: {error}");
         }
-        if (ratingFeedback is RatingGestureAction rating) _feedback.PlayRatingResult(rating, result.Succeeded);
         lock (_sync)
         {
             State = State with

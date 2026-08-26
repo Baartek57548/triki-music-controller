@@ -96,8 +96,15 @@ public sealed class SettingsService
     {
         settings.Theme = settings.Theme is "System" or "Light" or "Dark" ? settings.Theme : "System";
         settings.SingleClickAction = NormalizeAction(settings.SingleClickAction, MediaAction.PlayPause);
-        settings.DoubleClickAction = NormalizeAction(settings.DoubleClickAction, MediaAction.Next);
-        settings.TripleClickAction = NormalizeAction(settings.TripleClickAction, MediaAction.Previous);
+        settings.DoubleClickAction = NormalizeAction(settings.DoubleClickAction, MediaAction.Like);
+        settings.TripleClickAction = NormalizeAction(settings.TripleClickAction, MediaAction.Dislike);
+        if (settings.SingleClickAction == MediaAction.PlayPause &&
+            settings.DoubleClickAction == MediaAction.Next &&
+            settings.TripleClickAction == MediaAction.Previous)
+        {
+            settings.DoubleClickAction = MediaAction.Like;
+            settings.TripleClickAction = MediaAction.Dislike;
+        }
         if (settings.ConnectOnlyWhenNeeded) settings.AutoReconnect = true;
 
         if (!ulong.TryParse(settings.KnownDeviceAddressHex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var address) ||

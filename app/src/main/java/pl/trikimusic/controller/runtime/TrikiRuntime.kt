@@ -16,11 +16,10 @@ import pl.trikimusic.controller.core.bluetooth.TrikiButtonProtocolMode
 import pl.trikimusic.controller.core.bluetooth.ConnectionActivityLease
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.core.sensor.SensorFilter
+import pl.trikimusic.controller.core.gesture.FullRotationGestureDetector
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
-import pl.trikimusic.controller.core.gesture.HoldArcGestureDetector
-import pl.trikimusic.controller.core.gesture.RatingGestureAction
+import pl.trikimusic.controller.core.gesture.RotationGestureDirection
 import pl.trikimusic.controller.core.volume.GyroscopeVolumeController
-import pl.trikimusic.controller.data.media.RatingFeedbackPlayer
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.ButtonClickEvent
 import pl.trikimusic.controller.domain.model.FilteredSensorData
@@ -36,7 +35,7 @@ data class RuntimeState(
     val history: List<FilteredSensorData> = emptyList(),
     val lastButtonClick: ButtonClickEvent? = null,
     val lastVolumeChangeTimestampNanos: Long? = null,
-    val lastRatingGestureTimestampNanos: Long? = null,
+    val lastRotationGestureTimestampNanos: Long? = null,
     val lastAction: MediaAction? = null,
     val lastActionError: String? = null,
     val volumeSensorValid: Boolean = false,
@@ -46,12 +45,11 @@ data class RuntimeState(
     val volumeStabilizationProgress: Float = 0f,
     val volumeTiltDegrees: Float = 180f,
     val volumeGyroscopeZDps: Float = 0f,
-    val ratingGesturePhase: HoldGesturePhase = HoldGesturePhase.IDLE,
-    val ratingGestureDirection: RatingGestureAction? = null,
-    val ratingGestureHoldProgress: Float = 0f,
-    val ratingGestureFaceDown: Boolean = false,
-    val ratingGestureHorizontalCentimeters: Float = 0f,
-    val ratingGestureArcDepthCentimeters: Float = 0f,
+    val rotationGesturePhase: HoldGesturePhase = HoldGesturePhase.IDLE,
+    val rotationGestureDirection: RotationGestureDirection? = null,
+    val rotationGestureStabilizationProgress: Float = 0f,
+    val rotationGestureFaceDown: Boolean = false,
+    val rotationGestureDegrees: Float = 0f,
     val buttonProtocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
 )
 
@@ -60,12 +58,11 @@ class TrikiRuntime(
     private val bleManager: TrikiBleManager,
     settingsRepository: SettingsRepository,
     private val actionMapper: ActionMapper,
-    private val ratingFeedbackPlayer: RatingFeedbackPlayer,
     private val logger: AppLogger,
 ) {
     private val sensorFilter = SensorFilter()
     private val volumeController = GyroscopeVolumeController()
-    private val ratingGestureDetector = HoldArcGestureDetector()
+    private val rotationGestureDetector = FullRotationGestureDetector()
     private val buttonInterpreter = TrikiButtonInterpreter()
     private val connectionActivityLease = ConnectionActivityLease()
     private val mutableState = MutableStateFlow(RuntimeState())
@@ -122,7 +119,7 @@ class TrikiRuntime(
     fun resetProcessing() {
         sensorFilter.reset()
         volumeController.reset()
-        ratingGestureDetector.reset()
+        rotationGestureDetector.reset()
         buttonInterpreter.reset()
         connectionActivityLease.reset()
         reportedButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN
@@ -137,12 +134,11 @@ class TrikiRuntime(
                 volumeStabilizationProgress = 0f,
                 volumeTiltDegrees = 180f,
                 volumeGyroscopeZDps = 0f,
-                ratingGesturePhase = HoldGesturePhase.IDLE,
-                ratingGestureDirection = null,
-                ratingGestureHoldProgress = 0f,
-                ratingGestureFaceDown = false,
-                ratingGestureHorizontalCentimeters = 0f,
-                ratingGestureArcDepthCentimeters = 0f,
+                rotationGesturePhase = HoldGesturePhase.IDLE,
+                rotationGestureDirection = null,
+                rotationGestureStabilizationProgress = 0f,
+                rotationGestureFaceDown = false,
+                rotationGestureDegrees = 0f,
                 buttonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
             )
         }
@@ -151,11 +147,11 @@ class TrikiRuntime(
     private fun consume(sample: TrikiSensorData) {
         val filtered = sensorFilter.process(sample, settings.calibration)
         val buttonEvent = buttonInterpreter.process(sample)
-        val ratingGestureResult = ratingGestureDetector.process(filtered)
+        val rotationGestureResult = rotationGestureDetector.process(filtered)
         val explicitConnectionActivity =
             buttonEvent != null ||
                 buttonInterpreter.isPressed ||
-                ratingGestureResult.phase in setOf(
+                rotationGestureResult.phase in setOf(
                     HoldGesturePhase.HOLDING,
                     HoldGesturePhase.READY,
                     HoldGesturePhase.TRACKING,
@@ -187,32 +183,29 @@ class TrikiRuntime(
                 latestSample = filtered,
                 history = (current.history + filtered).takeLast(MAX_HISTORY_SAMPLES),
                 buttonProtocolMode = buttonMode,
-                ratingGesturePhase = ratingGestureResult.phase,
-                ratingGestureDirection = ratingGestureResult.direction,
-                ratingGestureHoldProgress = ratingGestureResult.holdProgress,
-                ratingGestureFaceDown = ratingGestureResult.faceDown,
-                ratingGestureHorizontalCentimeters =
-                    ratingGestureResult.estimatedHorizontalDisplacementMeters * 100f,
-                ratingGestureArcDepthCentimeters = ratingGestureResult.estimatedArcDepthMeters * 100f,
+                rotationGesturePhase = rotationGestureResult.phase,
+                rotationGestureDirection = rotationGestureResult.direction,
+                rotationGestureStabilizationProgress = rotationGestureResult.stabilizationProgress,
+                rotationGestureFaceDown = rotationGestureResult.faceDown,
+                rotationGestureDegrees = rotationGestureResult.estimatedRotationDegrees,
             )
         }
-        ratingGestureResult.action?.let { gestureAction ->
+        if (buttonEvent == null && rotationGestureResult.triggered) {
             volumeController.reset()
-            val mediaAction = when (gestureAction) {
-                RatingGestureAction.LIKE -> MediaAction.LIKE
-                RatingGestureAction.DISLIKE -> MediaAction.DISLIKE
+            val mediaAction = when (rotationGestureResult.direction) {
+                RotationGestureDirection.RIGHT -> MediaAction.NEXT
+                RotationGestureDirection.LEFT -> MediaAction.PREVIOUS
+                null -> MediaAction.NONE
             }
             val execution = actionMapper.execute(mediaAction)
-            val succeeded = execution.result.isSuccess
-            ratingFeedbackPlayer.play(gestureAction, succeeded)
             logger.log(
                 LogCategory.CONTROL,
-                "HOLD_${gestureAction.name}: ${execution.action.name}",
+                "ROTATE_${rotationGestureResult.direction?.name ?: "UNKNOWN"}: ${execution.action.name}",
                 execution.result.exceptionOrNull(),
             )
             mutableState.update {
                 it.copy(
-                    lastRatingGestureTimestampNanos = filtered.source.timestampNanos,
+                    lastRotationGestureTimestampNanos = filtered.source.timestampNanos,
                     lastAction = execution.action,
                     lastActionError = execution.result.exceptionOrNull()?.message,
                 )

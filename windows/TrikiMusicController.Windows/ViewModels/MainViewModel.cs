@@ -104,24 +104,24 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string GestureStatus => _lastRuntime.Gesture.Phase switch
     {
         HoldGesturePhase.Holding => _lastRuntime.Gesture.FaceDown
-            ? $"Odwrócenie potwierdzone • stabilizacja {_lastRuntime.Gesture.HoldProgress * 100:0}%"
+            ? $"Odwrócenie potwierdzone • stabilizacja {_lastRuntime.Gesture.StabilizationProgress * 100:0}%"
             : "Odwróć kapsel górą w dół i uspokój go przed ruchem",
-        HoldGesturePhase.Ready => "Stabilizacja gotowa — wykonaj płytki łuk w lewo lub w prawo",
+        HoldGesturePhase.Ready => "Stabilizacja gotowa — wykonaj pełny obrót w lewo lub w prawo",
         HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction switch
         {
-            RatingGestureAction.Like => $"Łuk w prawo: {Math.Abs(_lastRuntime.Gesture.EstimatedHorizontalDisplacementMeters * 100):0.0} cm • głębokość {_lastRuntime.Gesture.EstimatedArcDepthMeters * 100:0.0} cm",
-            RatingGestureAction.Dislike => $"Łuk w lewo: {Math.Abs(_lastRuntime.Gesture.EstimatedHorizontalDisplacementMeters * 100):0.0} cm • głębokość {_lastRuntime.Gesture.EstimatedArcDepthMeters * 100:0.0} cm",
-            _ => "Potwierdzam kierunek ruchu…",
+            RotationGestureDirection.Right => $"Obrót w prawo: {Math.Abs(_lastRuntime.Gesture.EstimatedRotationDegrees):0}° / 330°",
+            RotationGestureDirection.Left => $"Obrót w lewo: {Math.Abs(_lastRuntime.Gesture.EstimatedRotationDegrees):0}° / 330°",
+            _ => "Potwierdzam kierunek obrotu…",
         },
         HoldGesturePhase.Completing => _lastRuntime.Gesture.Direction switch
         {
-            RatingGestureAction.Like => "Prawo potwierdzone — dokończ łuk i łagodnie wyhamuj",
-            RatingGestureAction.Dislike => "Lewo potwierdzone — dokończ łuk i łagodnie wyhamuj",
-            _ => "Dokończ łuk i łagodnie wyhamuj",
+            RotationGestureDirection.Right => "Prawo potwierdzone — dokończ pełny obrót",
+            RotationGestureDirection.Left => "Lewo potwierdzone — dokończ pełny obrót",
+            _ => "Dokończ pełny obrót",
         },
         HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
         HoldGesturePhase.Triggered => "Gest oceny rozpoznany",
-        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i wykonaj łuk około 10 cm: lewo Dislike, prawo Like",
+        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i wykonaj pełny obrót: prawo = następny, lewo = poprzedni",
     };
     public string LastActionStatus => _lastRuntime.LastActionStatus;
     public string SensorDetails => _lastRuntime.LatestSample is { } sample

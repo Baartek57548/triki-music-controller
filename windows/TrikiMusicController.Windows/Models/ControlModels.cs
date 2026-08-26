@@ -80,6 +80,12 @@ public enum RatingGestureAction
     Dislike,
 }
 
+public enum RotationGestureDirection
+{
+    Right,
+    Left,
+}
+
 public enum HoldGesturePhase
 {
     Idle,
@@ -99,3 +105,12 @@ public sealed record HoldArcGestureResult(
     bool FaceDown,
     float EstimatedHorizontalDisplacementMeters,
     float EstimatedArcDepthMeters);
+
+public sealed record FullRotationGestureResult(
+    bool Triggered,
+    RotationGestureDirection? Direction,
+    HoldGesturePhase Phase,
+    float StabilizationProgress,
+    bool FaceDown,
+    float EstimatedRotationDegrees,
+    float GyroscopeZDps);

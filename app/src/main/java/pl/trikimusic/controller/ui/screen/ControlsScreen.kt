@@ -14,9 +14,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -36,11 +36,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlin.math.abs
-import pl.trikimusic.controller.core.gesture.RatingGestureAction
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
+import pl.trikimusic.controller.core.gesture.RotationGestureDirection
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
 import pl.trikimusic.controller.ui.components.SectionTitle
@@ -129,50 +128,53 @@ fun ControlsScreen(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("Łuk odwróconym kapslem", style = MaterialTheme.typography.titleLarge)
+                    Text("Obrót odwróconym kapslem", style = MaterialTheme.typography.titleLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Łuk w prawo → polub utwór", Modifier.weight(1f))
+                        Icon(Icons.Default.SkipNext, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("Pełny obrót w prawo → następny utwór", Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Default.ThumbDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Łuk w lewo → odrzuć utwór", Modifier.weight(1f))
+                        Icon(Icons.Default.SkipPrevious, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("Pełny obrót w lewo → poprzedni utwór", Modifier.weight(1f))
                     }
                     Text(
-                        "Ustaw odwrócony kapsel znacznikiem od siebie, ustabilizuj go przez 0,5 s i poprowadź płytki łuk około 10 cm od pozycji początkowej do końcowej.",
+                        "Odwróć kapsel górą w dół, ustabilizuj go przez 0,5 s i wykonaj jeden pełny obrót wokół osi Z. Nie wciskaj przycisku.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "Dwa kliknięcia przycisku → Like · trzy kliknięcia → Dislike",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     HorizontalDivider()
                     Text(
-                        when (state.runtime.ratingGesturePhase) {
+                        when (state.runtime.rotationGesturePhase) {
                             HoldGesturePhase.IDLE -> "Gotowe — odwróć kapsel i odczekaj 0,5 s."
-                            HoldGesturePhase.HOLDING -> if (state.runtime.ratingGestureFaceDown) {
+                            HoldGesturePhase.HOLDING -> if (state.runtime.rotationGestureFaceDown) {
                                 "Odwrócenie potwierdzone · stabilizacja %.0f%%".format(
-                                    state.runtime.ratingGestureHoldProgress * 100f,
+                                    state.runtime.rotationGestureStabilizationProgress * 100f,
                                 )
                             } else {
                                 "Odwróć kapsel górą w dół i uspokój go przed ruchem."
                             }
-                            HoldGesturePhase.READY -> "Stabilizacja gotowa — wykonaj płytki łuk w lewo lub w prawo."
-                            HoldGesturePhase.TRACKING -> when (state.runtime.ratingGestureDirection) {
-                                RatingGestureAction.LIKE -> "Łuk w prawo: %.0f cm · głębokość %.0f cm".format(
-                                    abs(state.runtime.ratingGestureHorizontalCentimeters),
-                                    state.runtime.ratingGestureArcDepthCentimeters,
+                            HoldGesturePhase.READY -> "Stabilizacja gotowa — wykonaj pełny obrót w lewo lub w prawo."
+                            HoldGesturePhase.TRACKING -> when (state.runtime.rotationGestureDirection) {
+                                RotationGestureDirection.RIGHT -> "Obrót w prawo: %.0f° / 330°".format(
+                                    kotlin.math.abs(state.runtime.rotationGestureDegrees),
                                 )
-                                RatingGestureAction.DISLIKE -> "Łuk w lewo: %.0f cm · głębokość %.0f cm".format(
-                                    abs(state.runtime.ratingGestureHorizontalCentimeters),
-                                    state.runtime.ratingGestureArcDepthCentimeters,
+                                RotationGestureDirection.LEFT -> "Obrót w lewo: %.0f° / 330°".format(
+                                    kotlin.math.abs(state.runtime.rotationGestureDegrees),
                                 )
-                                null -> "Potwierdzam kierunek ruchu…"
+                                null -> "Potwierdzam kierunek obrotu…"
                             }
-                            HoldGesturePhase.COMPLETING -> when (state.runtime.ratingGestureDirection) {
-                                RatingGestureAction.LIKE -> "Prawo potwierdzone — dokończ łuk i łagodnie wyhamuj."
-                                RatingGestureAction.DISLIKE -> "Lewo potwierdzone — dokończ łuk i łagodnie wyhamuj."
-                                null -> "Dokończ łuk i łagodnie wyhamuj."
+                            HoldGesturePhase.COMPLETING -> when (state.runtime.rotationGestureDirection) {
+                                RotationGestureDirection.RIGHT -> "Prawo potwierdzone — dokończ pełny obrót."
+                                RotationGestureDirection.LEFT -> "Lewo potwierdzone — dokończ pełny obrót."
+                                null -> "Dokończ pełny obrót."
                             }
                             HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
-                            HoldGesturePhase.TRIGGERED -> "Ocena wysłana — uspokój kapsel przed następną akcją."
+                            HoldGesturePhase.TRIGGERED -> "Zmiana utworu wysłana — uspokój kapsel przed następną akcją."
                         },
                         style = MaterialTheme.typography.labelLarge,
                     )

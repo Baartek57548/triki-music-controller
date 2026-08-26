@@ -57,7 +57,7 @@ fun InfoScreen(
                     )
                     InfoSection(
                         "Like i Dislike",
-                        "Odwróć kapsel górą w dół i ustaw jego znacznik od siebie. Ustabilizuj go przez około pół sekundy, a następnie bez wciskania przycisku poprowadź płytki łuk około 10 cm od pozycji początkowej do końcowej: w prawo dla Like albo w lewo dla Dislike. Akcja wymaga pionowego przebiegu łuku i łagodnego wyhamowania; prosty ruch, szarpnięcie, silny obrót i zejście z osi są odrzucane.",
+                        "Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają. Niezależnie od przycisku możesz odwrócić kapsel, odczekać pół sekundy i wykonać jeden pełny obrót wokół osi Z: w prawo przechodzi do następnego utworu, w lewo wraca do poprzedniego.",
                     )
                     InfoSection(
                         "Prywatność i zgodność",

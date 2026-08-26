@@ -138,12 +138,12 @@ fun HomeScreen(
         item {
             val buttonClick = state.runtime.lastButtonClick
             val volumeTimestamp = state.runtime.lastVolumeChangeTimestampNanos
-            val ratingTimestamp = state.runtime.lastRatingGestureTimestampNanos
+            val rotationTimestamp = state.runtime.lastRotationGestureTimestampNanos
             val buttonIsLatest = buttonClick != null &&
-                buttonClick.timestampNanos >= maxOf(volumeTimestamp ?: Long.MIN_VALUE, ratingTimestamp ?: Long.MIN_VALUE)
-            val ratingIsLatest = ratingTimestamp != null &&
-                ratingTimestamp >= maxOf(volumeTimestamp ?: Long.MIN_VALUE, buttonClick?.timestampNanos ?: Long.MIN_VALUE)
-            if (volumeTimestamp != null || ratingTimestamp != null || buttonClick != null) {
+                buttonClick.timestampNanos >= maxOf(volumeTimestamp ?: Long.MIN_VALUE, rotationTimestamp ?: Long.MIN_VALUE)
+            val rotationIsLatest = rotationTimestamp != null &&
+                rotationTimestamp >= maxOf(volumeTimestamp ?: Long.MIN_VALUE, buttonClick?.timestampNanos ?: Long.MIN_VALUE)
+            if (volumeTimestamp != null || rotationTimestamp != null || buttonClick != null) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)),
                     shape = RoundedCornerShape(24.dp),
@@ -157,7 +157,7 @@ fun HomeScreen(
                             Text(
                                 when {
                                     buttonIsLatest -> buttonClick!!.type.displayName
-                                    ratingIsLatest -> "Łuk Like/Dislike lewo/prawo"
+                                    rotationIsLatest -> "Pełny obrót kapsla lewo/prawo"
                                     else -> "Obrót kapsla · oś Z"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
@@ -295,14 +295,14 @@ private fun DeviceMetrics(state: MainUiState, modifier: Modifier = Modifier) {
 private fun latestControlName(state: MainUiState): String {
     val click = state.runtime.lastButtonClick
     val volumeTimestamp = state.runtime.lastVolumeChangeTimestampNanos
-    val ratingTimestamp = state.runtime.lastRatingGestureTimestampNanos
+    val rotationTimestamp = state.runtime.lastRotationGestureTimestampNanos
     return when {
         click != null && click.timestampNanos >= maxOf(
             volumeTimestamp ?: Long.MIN_VALUE,
-            ratingTimestamp ?: Long.MIN_VALUE,
+            rotationTimestamp ?: Long.MIN_VALUE,
         ) -> click.type.displayName
-        ratingTimestamp != null && ratingTimestamp >= (volumeTimestamp ?: Long.MIN_VALUE) ->
-            state.runtime.lastAction?.displayName ?: "Ocena utworu"
+        rotationTimestamp != null && rotationTimestamp >= (volumeTimestamp ?: Long.MIN_VALUE) ->
+            state.runtime.lastAction?.displayName ?: "Nawigacja obrotem"
         volumeTimestamp != null -> state.runtime.lastAction?.displayName ?: "Głośność"
         else -> "—"
     }
