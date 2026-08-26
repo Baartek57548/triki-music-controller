@@ -53,14 +53,79 @@ public sealed class GyroscopeVolumeControllerTests
         Assert.Equal(expectedAction, emitted);
     }
 
+    [Theory]
+    [InlineData(-0.8f)]
+    [InlineData(-1.2f)]
+    public void AccelerationWithinTwentyPercent_AllowsInAirControl(float accelerometerZ)
+    {
+        var controller = CreateController();
+        for (var milliseconds = 0; milliseconds <= 2_020; milliseconds += 20)
+            controller.Process(Sample(milliseconds, accelerometerZ, 0));
+
+        var result = controller.Process(Sample(2_040, accelerometerZ, 60));
+
+        Assert.True(result.AccelerationStable);
+        Assert.True(result.Active);
+    }
+
+    [Fact]
+    public void SuddenAcceleration_BlocksVolumeAndRestartsFullStabilization()
+    {
+        var controller = CreateController();
+        for (var milliseconds = 0; milliseconds <= 2_020; milliseconds += 20)
+            controller.Process(Sample(milliseconds, -1, 0));
+
+        controller.Process(Sample(2_040, -1, 600));
+        var suddenMovement = controller.Process(Sample(2_060, -1.21f, 600));
+        var recoveryStart = controller.Process(Sample(2_080, -1, 600));
+        VolumeControlResult? beforeStable = null;
+        for (var milliseconds = 2_100; milliseconds < 4_080; milliseconds += 20)
+            beforeStable = controller.Process(Sample(milliseconds, -1, 600));
+        var stableAgain = controller.Process(Sample(4_080, -1, 600));
+
+        Assert.False(suddenMovement.AccelerationStable);
+        Assert.False(suddenMovement.Active);
+        Assert.Null(suddenMovement.Action);
+        Assert.Equal(0, suddenMovement.StabilizationProgress);
+        Assert.False(recoveryStart.Active);
+        Assert.Equal(0, recoveryStart.StabilizationProgress);
+        Assert.NotNull(beforeStable);
+        Assert.False(beforeStable.Active);
+        Assert.True(stableAgain.Active);
+        Assert.Null(stableAgain.Action);
+    }
+
+    [Fact]
+    public void DefaultVolumeResponse_IsGentleForModerateRotation()
+    {
+        var controller = CreateController();
+        for (var milliseconds = 0; milliseconds <= 2_020; milliseconds += 20)
+            controller.Process(Sample(milliseconds, -1, 0));
+
+        var earlyActions = new List<MediaAction>();
+        for (var milliseconds = 2_040; milliseconds <= 2_340; milliseconds += 20)
+        {
+            if (controller.Process(Sample(milliseconds, -1, 60)).Action is MediaAction action)
+                earlyActions.Add(action);
+        }
+
+        MediaAction? laterAction = null;
+        for (var milliseconds = 2_360; milliseconds <= 3_200 && laterAction is null; milliseconds += 20)
+            laterAction = controller.Process(Sample(milliseconds, -1, 60)).Action;
+
+        Assert.Empty(earlyActions);
+        Assert.Equal(MediaAction.VolumeUp, laterAction);
+    }
+
     private static GyroscopeVolumeController CreateController() => new(new VolumeControllerConfiguration(
         MaximumTiltDegrees: 25,
         TiltStabilizationMillis: 2_000,
-        ActivationGyroscopeDps: 18,
-        ReleaseGyroscopeDps: 10,
-        DegreesPerVolumeStep: 15,
-        GyroscopeSmoothingAlpha: 0.22f,
-        MinimumStepIntervalMillis: 100));
+        MaximumAccelerationDeviationG: 0.20f,
+        ActivationGyroscopeDps: 22,
+        ReleaseGyroscopeDps: 12,
+        DegreesPerVolumeStep: 22,
+        GyroscopeSmoothingAlpha: 0.16f,
+        MinimumStepIntervalMillis: 140));
 
     private static FilteredSensorData Sample(long milliseconds, float accelerometerZ, float gyroscopeZ) =>
         SensorTestData.Filtered(

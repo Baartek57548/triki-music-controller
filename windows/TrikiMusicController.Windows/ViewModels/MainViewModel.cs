@@ -87,12 +87,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         null => "Regulator oczekuje na dane",
         { SensorValid: false } => "Nieprawidłowe dane czujnika",
         { WithinTiltRange: false } volume => $"Poza zakresem: {volume.TiltDegrees:0.0}°",
+        { AccelerationStable: false } => "Gwałtowny ruch — stabilizacja od nowa",
         { TiltStable: false } volume => $"Stabilizacja kąta {volume.StabilizationProgress * 100:0}%",
         _ => "Regulator głośności gotowy",
     };
     public string VolumeControlDetails => _lastRuntime.Volume is { } volume
-        ? $"Przechył {volume.TiltDegrees:0.0}° • żyroskop Z {volume.GyroscopeZDps:+0.0;-0.0;0.0}°/s"
-        : "Utrzymuj kapsel w zakresie 0–25° przez 2 sekundy.";
+        ? $"Przechył {volume.TiltDegrees:0.0}° • |ACC| {_lastRuntime.LatestSample?.AccelerationMagnitude ?? 0:0.00} g • żyroskop Z {volume.GyroscopeZDps:+0.0;-0.0;0.0}°/s"
+        : "Utrzymuj kapsel w zakresie 0–25° przez 2 sekundy i unikaj gwałtownych ruchów.";
     public string GestureStatus => _lastRuntime.Gesture.Phase switch
     {
         HoldGesturePhase.Holding => $"Przytrzymanie: {_lastRuntime.Gesture.HoldProgress * 100:0}%",

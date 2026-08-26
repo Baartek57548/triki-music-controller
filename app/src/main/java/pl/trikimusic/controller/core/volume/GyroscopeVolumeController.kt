@@ -9,6 +9,7 @@ data class VolumeControlResult(
     val action: MediaAction? = null,
     val sensorValid: Boolean,
     val withinTiltRange: Boolean,
+    val accelerationStable: Boolean,
     val tiltStable: Boolean,
     val stabilizationProgress: Float,
     val active: Boolean,
@@ -20,8 +21,8 @@ data class VolumeControlResult(
  * Turns rotation around the local Z axis into discrete Android volume steps.
  *
  * The controller becomes active after the cap remains top-side up within 0–25 degrees for two
- * continuous seconds. This stabilization concerns only tilt: there is deliberately no stationary,
- * acceleration-magnitude or off-axis gate, so the user can hold and move the cap in the air.
+ * continuous seconds. Normal movement in the air is allowed, but acceleration outside the 0.8–1.2 g
+ * safety band cancels stabilization so a sudden movement cannot change the volume.
  */
 class GyroscopeVolumeController(
     private val configuration: Configuration = Configuration(),
@@ -29,15 +30,17 @@ class GyroscopeVolumeController(
     data class Configuration(
         val maximumTiltDegrees: Float = 25f,
         val tiltStabilizationMillis: Long = 2_000L,
-        val activationGyroscopeDps: Float = 18f,
-        val releaseGyroscopeDps: Float = 10f,
-        val degreesPerVolumeStep: Float = 15f,
-        val gyroscopeSmoothingAlpha: Float = 0.22f,
-        val minimumStepIntervalMillis: Long = 100L,
+        val maximumAccelerationDeviationG: Float = 0.20f,
+        val activationGyroscopeDps: Float = 22f,
+        val releaseGyroscopeDps: Float = 12f,
+        val degreesPerVolumeStep: Float = 22f,
+        val gyroscopeSmoothingAlpha: Float = 0.16f,
+        val minimumStepIntervalMillis: Long = 140L,
     ) {
         init {
             require(maximumTiltDegrees.isFinite() && maximumTiltDegrees in 0f..90f)
             require(tiltStabilizationMillis in 0L..10_000L)
+            require(maximumAccelerationDeviationG.isFinite() && maximumAccelerationDeviationG in 0.05f..0.50f)
             require(activationGyroscopeDps.isFinite() && activationGyroscopeDps > 0f)
             require(releaseGyroscopeDps.isFinite() && releaseGyroscopeDps in 0f..activationGyroscopeDps)
             require(degreesPerVolumeStep.isFinite() && degreesPerVolumeStep > 0f)
@@ -82,6 +85,9 @@ class GyroscopeVolumeController(
         val tiltDegrees = calculateTiltDegrees(sample.accelerometerG.z, accelerationMagnitude)
         val withinTiltRange = sensorValid &&
             tiltDegrees <= configuration.maximumTiltDegrees + TILT_COMPARISON_EPSILON_DEGREES
+        val accelerationStable = sensorValid &&
+            abs(accelerationMagnitude - STANDARD_GRAVITY_G) <=
+            configuration.maximumAccelerationDeviationG + ACCELERATION_COMPARISON_EPSILON_G
         val deltaSeconds = calculateDeltaSeconds(timestampNanos)
 
         if (!withinTiltRange) {
@@ -89,6 +95,19 @@ class GyroscopeVolumeController(
             return result(
                 sensorValid = sensorValid,
                 withinTiltRange = false,
+                accelerationStable = accelerationStable,
+                stabilizationProgress = 0f,
+                tiltDegrees = tiltDegrees,
+                gyroscopeZ = gyroscopeZ,
+            )
+        }
+
+        if (!accelerationStable) {
+            resetStabilization()
+            return result(
+                sensorValid = true,
+                withinTiltRange = true,
+                accelerationStable = false,
                 stabilizationProgress = 0f,
                 tiltDegrees = tiltDegrees,
                 gyroscopeZ = gyroscopeZ,
@@ -111,6 +130,7 @@ class GyroscopeVolumeController(
             return result(
                 sensorValid = true,
                 withinTiltRange = true,
+                accelerationStable = true,
                 stabilizationProgress = stabilizationProgress,
                 tiltDegrees = tiltDegrees,
                 gyroscopeZ = filteredGyroscopeZ,
@@ -123,6 +143,7 @@ class GyroscopeVolumeController(
             return result(
                 sensorValid = true,
                 withinTiltRange = true,
+                accelerationStable = true,
                 stabilizationProgress = 1f,
                 tiltDegrees = tiltDegrees,
                 gyroscopeZ = filteredGyroscopeZ,
@@ -137,6 +158,7 @@ class GyroscopeVolumeController(
             return result(
                 sensorValid = true,
                 withinTiltRange = true,
+                accelerationStable = true,
                 stabilizationProgress = 1f,
                 tiltDegrees = tiltDegrees,
                 gyroscopeZ = filteredGyroscopeZ,
@@ -167,6 +189,7 @@ class GyroscopeVolumeController(
             action = action,
             sensorValid = true,
             withinTiltRange = true,
+            accelerationStable = true,
             stabilizationProgress = 1f,
             tiltDegrees = tiltDegrees,
             gyroscopeZ = filteredGyroscopeZ,
@@ -177,6 +200,7 @@ class GyroscopeVolumeController(
         action: MediaAction? = null,
         sensorValid: Boolean,
         withinTiltRange: Boolean,
+        accelerationStable: Boolean,
         stabilizationProgress: Float,
         tiltDegrees: Float,
         gyroscopeZ: Float,
@@ -184,9 +208,10 @@ class GyroscopeVolumeController(
         action = action,
         sensorValid = sensorValid,
         withinTiltRange = withinTiltRange,
+        accelerationStable = accelerationStable,
         tiltStable = tiltStable,
         stabilizationProgress = stabilizationProgress,
-        active = sensorValid && withinTiltRange && tiltStable,
+        active = sensorValid && withinTiltRange && accelerationStable && tiltStable,
         tiltDegrees = tiltDegrees.takeIf(Float::isFinite) ?: 180f,
         gyroscopeZDps = gyroscopeZ.takeIf(Float::isFinite) ?: 0f,
     )
@@ -235,7 +260,9 @@ class GyroscopeVolumeController(
         const val MAX_SAMPLE_INTERVAL_NANOS = 100_000_000L
         const val MAX_STREAM_GAP_NANOS = 250_000_000L
         const val MIN_VECTOR_MAGNITUDE = 0.001f
+        const val STANDARD_GRAVITY_G = 1f
+        const val ACCELERATION_COMPARISON_EPSILON_G = 0.0001f
         const val TILT_COMPARISON_EPSILON_DEGREES = 0.001f
-        const val MAX_PENDING_VOLUME_STEPS = 2f
+        const val MAX_PENDING_VOLUME_STEPS = 1f
     }
 }

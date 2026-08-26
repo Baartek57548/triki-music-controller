@@ -5,11 +5,12 @@ namespace TrikiMusicController_Windows.Core;
 public sealed record VolumeControllerConfiguration(
     float MaximumTiltDegrees = 25f,
     long TiltStabilizationMillis = 2_000,
-    float ActivationGyroscopeDps = 18f,
-    float ReleaseGyroscopeDps = 10f,
-    float DegreesPerVolumeStep = 15f,
-    float GyroscopeSmoothingAlpha = 0.22f,
-    long MinimumStepIntervalMillis = 100);
+    float MaximumAccelerationDeviationG = 0.20f,
+    float ActivationGyroscopeDps = 22f,
+    float ReleaseGyroscopeDps = 12f,
+    float DegreesPerVolumeStep = 22f,
+    float GyroscopeSmoothingAlpha = 0.16f,
+    long MinimumStepIntervalMillis = 140);
 
 public sealed class GyroscopeVolumeController
 {
@@ -30,6 +31,8 @@ public sealed class GyroscopeVolumeController
         if (!float.IsFinite(_configuration.MaximumTiltDegrees) || _configuration.MaximumTiltDegrees is < 0 or > 90)
             throw new ArgumentOutOfRangeException(nameof(configuration));
         if (_configuration.TiltStabilizationMillis is < 0 or > 10_000 ||
+            !float.IsFinite(_configuration.MaximumAccelerationDeviationG) ||
+            _configuration.MaximumAccelerationDeviationG is < 0.05f or > 0.50f ||
             !float.IsFinite(_configuration.ActivationGyroscopeDps) || _configuration.ActivationGyroscopeDps <= 0 ||
             !float.IsFinite(_configuration.ReleaseGyroscopeDps) || _configuration.ReleaseGyroscopeDps < 0 ||
             _configuration.ReleaseGyroscopeDps > _configuration.ActivationGyroscopeDps ||
@@ -61,12 +64,20 @@ public sealed class GyroscopeVolumeController
         var sensorValid = accelerometerValid && float.IsFinite(gyroscopeZ);
         var tiltDegrees = CalculateTiltDegrees(sample.AccelerometerG.Z, accelerationMagnitude);
         var withinTiltRange = sensorValid && tiltDegrees <= _configuration.MaximumTiltDegrees + 0.001f;
+        var accelerationStable = sensorValid &&
+            Math.Abs(accelerationMagnitude - 1f) <= _configuration.MaximumAccelerationDeviationG + 0.0001f;
         var deltaSeconds = CalculateDeltaSeconds(timestamp);
 
         if (!withinTiltRange)
         {
             ResetStabilization();
-            return Result(null, sensorValid, false, 0, tiltDegrees, gyroscopeZ);
+            return Result(null, sensorValid, false, accelerationStable, 0, tiltDegrees, gyroscopeZ);
+        }
+
+        if (!accelerationStable)
+        {
+            ResetStabilization();
+            return Result(null, true, true, false, 0, tiltDegrees, gyroscopeZ);
         }
 
         _tiltRangeSinceNanos ??= timestamp;
@@ -79,26 +90,26 @@ public sealed class GyroscopeVolumeController
         if (!_tiltStable || !wasStable)
         {
             ResetRotation(true);
-            return Result(null, true, true, progress, tiltDegrees, filteredZ);
+            return Result(null, true, true, true, progress, tiltDegrees, filteredZ);
         }
 
         var absoluteZ = Math.Abs(filteredZ);
         if (absoluteZ <= _configuration.ReleaseGyroscopeDps)
         {
             ResetRotation(true);
-            return Result(null, true, true, 1, tiltDegrees, filteredZ);
+            return Result(null, true, true, true, 1, tiltDegrees, filteredZ);
         }
 
         var direction = filteredZ > 0 ? 1 : -1;
         if (_activeDirection != 0 && _activeDirection != direction) _accumulatedRotationDegrees = 0;
         if (_activeDirection == 0 && absoluteZ < _configuration.ActivationGyroscopeDps)
-            return Result(null, true, true, 1, tiltDegrees, filteredZ);
+            return Result(null, true, true, true, 1, tiltDegrees, filteredZ);
 
         _activeDirection = direction;
         _accumulatedRotationDegrees = Math.Clamp(
             _accumulatedRotationDegrees + filteredZ * deltaSeconds,
-            -_configuration.DegreesPerVolumeStep * 2,
-            _configuration.DegreesPerVolumeStep * 2);
+            -_configuration.DegreesPerVolumeStep,
+            _configuration.DegreesPerVolumeStep);
         var minimumIntervalNanos = _configuration.MinimumStepIntervalMillis * 1_000_000;
         var mayEmit = _lastVolumeStepNanos is not long last || timestamp - last >= minimumIntervalNanos;
         MediaAction? action = null;
@@ -114,11 +125,19 @@ public sealed class GyroscopeVolumeController
             _lastVolumeStepNanos = timestamp;
             action = MediaAction.VolumeDown;
         }
-        return Result(action, true, true, 1, tiltDegrees, filteredZ);
+        return Result(action, true, true, true, 1, tiltDegrees, filteredZ);
     }
 
-    private VolumeControlResult Result(MediaAction? action, bool sensorValid, bool withinRange, float progress, float tilt, float gyroZ) =>
-        new(action, sensorValid, withinRange, _tiltStable, progress, sensorValid && withinRange && _tiltStable,
+    private VolumeControlResult Result(
+        MediaAction? action,
+        bool sensorValid,
+        bool withinRange,
+        bool accelerationStable,
+        float progress,
+        float tilt,
+        float gyroZ) =>
+        new(action, sensorValid, withinRange, accelerationStable, _tiltStable, progress,
+            sensorValid && withinRange && accelerationStable && _tiltStable,
             float.IsFinite(tilt) ? tilt : 180f, float.IsFinite(gyroZ) ? gyroZ : 0);
 
     private static float CalculateTiltDegrees(float accelerometerZ, float magnitude)

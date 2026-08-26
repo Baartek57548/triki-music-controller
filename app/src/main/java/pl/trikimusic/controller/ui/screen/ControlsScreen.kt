@@ -110,6 +110,12 @@ fun ControlsScreen(
                         sample?.let { "przechył %.1f° · dozwolone 0–25°".format(state.runtime.volumeTiltDegrees) } ?: "brak danych",
                     )
                     HorizontalDivider()
+                    GateStatusRow(
+                        "Bez gwałtownego ruchu",
+                        state.runtime.volumeAccelerationStable,
+                        sample?.let { "|ACC| %.2f g · dozwolone 0,80–1,20 g".format(it.accelerationMagnitude) } ?: "brak danych",
+                    )
+                    HorizontalDivider()
                     SensorValueRow(
                         "Żyroskop Z",
                         sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",

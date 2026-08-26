@@ -40,6 +40,7 @@ data class RuntimeState(
     val lastActionError: String? = null,
     val volumeSensorValid: Boolean = false,
     val volumeWithinTiltRange: Boolean = false,
+    val volumeAccelerationStable: Boolean = false,
     val volumeTiltStable: Boolean = false,
     val volumeStabilizationProgress: Float = 0f,
     val volumeTiltDegrees: Float = 180f,
@@ -118,6 +119,7 @@ class TrikiRuntime(
                 latestSample = null,
                 volumeSensorValid = false,
                 volumeWithinTiltRange = false,
+                volumeAccelerationStable = false,
                 volumeTiltStable = false,
                 volumeStabilizationProgress = 0f,
                 volumeTiltDegrees = 180f,
@@ -205,6 +207,7 @@ class TrikiRuntime(
                 it.copy(
                     volumeSensorValid = false,
                     volumeWithinTiltRange = false,
+                    volumeAccelerationStable = false,
                     volumeTiltStable = false,
                     volumeStabilizationProgress = 0f,
                     volumeTiltDegrees = 180f,
@@ -219,6 +222,7 @@ class TrikiRuntime(
             it.copy(
                 volumeSensorValid = volumeResult.sensorValid,
                 volumeWithinTiltRange = volumeResult.withinTiltRange,
+                volumeAccelerationStable = volumeResult.accelerationStable,
                 volumeTiltStable = volumeResult.tiltStable,
                 volumeStabilizationProgress = volumeResult.stabilizationProgress,
                 volumeTiltDegrees = volumeResult.tiltDegrees,

@@ -67,6 +67,7 @@ public sealed record VolumeControlResult(
     MediaAction? Action,
     bool SensorValid,
     bool WithinTiltRange,
+    bool AccelerationStable,
     bool TiltStable,
     float StabilizationProgress,
     bool Active,

@@ -61,11 +61,11 @@ class GyroscopeVolumeControllerTest {
     }
 
     @Test
-    fun `acceleration magnitude does not gate control when tilt is in range`() {
+    fun `acceleration within twenty percent tolerance allows in-air control`() {
         val low = controller()
         val high = controller()
-        val lowGravity = Vector3(0f, 0f, -0.4f)
-        val highGravity = Vector3(0f, 0f, -1.8f)
+        val lowGravity = Vector3(0f, 0f, -0.8f)
+        val highGravity = Vector3(0f, 0f, -1.2f)
         val lowStart = stabilize(low, lowGravity)
         val highStart = stabilize(high, highGravity)
 
@@ -74,6 +74,59 @@ class GyroscopeVolumeControllerTest {
 
         assertTrue(lowActions.isNotEmpty())
         assertTrue(highActions.isNotEmpty())
+    }
+
+    @Test
+    fun `sudden acceleration blocks volume and restarts full stabilization`() {
+        val controller = controller()
+        val start = stabilize(controller, FACE_UP_GRAVITY)
+        val queuedRotation = controller.process(sample(start, Vector3(0f, 0f, 100f), FACE_UP_GRAVITY))
+        val suddenMovement = controller.process(
+            sample(start + SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 600f), Vector3(0f, 0f, -1.21f)),
+        )
+        val recoveryStart = controller.process(
+            sample(start + 2 * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 600f), FACE_UP_GRAVITY),
+        )
+        val recoveryHalfway = controller.process(
+            sample(start + 3 * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 600f), FACE_UP_GRAVITY),
+        )
+        val stableAgain = controller.process(
+            sample(start + 4 * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 600f), FACE_UP_GRAVITY),
+        )
+
+        assertNull(queuedRotation.action)
+        assertFalse(suddenMovement.accelerationStable)
+        assertFalse(suddenMovement.active)
+        assertNull(suddenMovement.action)
+        assertEquals(0f, suddenMovement.stabilizationProgress, 0f)
+        assertFalse(recoveryStart.active)
+        assertEquals(0f, recoveryStart.stabilizationProgress, 0f)
+        assertFalse(recoveryHalfway.active)
+        assertEquals(0.5f, recoveryHalfway.stabilizationProgress, 0.001f)
+        assertTrue(stableAgain.active)
+        assertNull(stableAgain.action)
+    }
+
+    @Test
+    fun `default volume response is gentle for moderate rotation`() {
+        val controller = GyroscopeVolumeController()
+        for (index in 0..40) {
+            controller.process(sample(index * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 0f), FACE_UP_GRAVITY))
+        }
+
+        val early = List(7) { index ->
+            controller.process(
+                sample((41L + index) * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 60f), FACE_UP_GRAVITY),
+            )
+        }
+        val later = List(14) { index ->
+            controller.process(
+                sample((48L + index) * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 60f), FACE_UP_GRAVITY),
+            )
+        }
+
+        assertTrue(early.none { it.action != null })
+        assertTrue(later.any { it.action == MediaAction.VOLUME_UP })
     }
 
     @Test

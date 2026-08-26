@@ -15,7 +15,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Głośność" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Stabilizacja dotyczy położenia w tym zakresie, nie bezruchu. Po aktywacji wygładzona wartość żyroskopu osi Z płynnie reguluje głośność systemową." TextWrapping="Wrap" />
+                    <TextBlock Text="Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Kapsel nie musi leżeć nieruchomo, ale gwałtowne przyspieszenie poza 0,80–1,20 g wstrzymuje regulację i rozpoczyna stabilizację od nowa. Po aktywacji wygładzona wartość żyroskopu osi Z łagodnie reguluje głośność systemową." TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
@@ -34,7 +34,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Wersja 2.3.2 • Windows x64" />
+                    <TextBlock Text="Wersja 2.3.3 • Windows x64" />
                     <TextBlock Text="Natywna aplikacja WinUI 3 sterująca globalną sesją multimedialną i głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="Sprawdź aktualizacje" Click="CheckUpdates_Click" />

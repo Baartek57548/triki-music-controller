@@ -38,14 +38,14 @@ class VolumeControlPresentationTest {
     }
 
     @Test
-    fun `valid sample in tilt range is ready without stationary state`() {
+    fun `valid sample in tilt range is ready without resting on a surface`() {
         val ready = uiState(runtime = runtime(withinRange = true, stable = true, tilt = 25f))
 
         val presentation = ready.volumeControlPresentation()
 
         assertEquals(VolumeGateState.READY, presentation.state)
         assertTrue(presentation.ready)
-        assertTrue(presentation.instruction.contains("Nie musisz zatrzymywać"))
+        assertTrue(presentation.instruction.contains("łagodnie"))
     }
 
     @Test
@@ -71,6 +71,19 @@ class VolumeControlPresentationTest {
         assertFalse(presentation.ready)
     }
 
+    @Test
+    fun `sudden movement has dedicated restart guidance`() {
+        val movement = uiState(
+            runtime = runtime(withinRange = true, accelerationStable = false, stable = false, tilt = 8f),
+        )
+
+        val presentation = movement.volumeControlPresentation()
+
+        assertEquals(VolumeGateState.SUDDEN_MOTION, presentation.state)
+        assertTrue(presentation.instruction.contains("kolejne 2 sekundy"))
+        assertFalse(presentation.ready)
+    }
+
     private fun uiState(
         connectionState: TrikiConnectionState = TrikiConnectionState.READY,
         runtime: RuntimeState,
@@ -82,6 +95,7 @@ class VolumeControlPresentationTest {
     private fun runtime(
         sensorValid: Boolean = true,
         withinRange: Boolean,
+        accelerationStable: Boolean = true,
         stable: Boolean = false,
         progress: Float = 0f,
         tilt: Float,
@@ -89,6 +103,7 @@ class VolumeControlPresentationTest {
         latestSample = sample(),
         volumeSensorValid = sensorValid,
         volumeWithinTiltRange = withinRange,
+        volumeAccelerationStable = accelerationStable,
         volumeTiltStable = stable,
         volumeStabilizationProgress = progress,
         volumeTiltDegrees = tilt,

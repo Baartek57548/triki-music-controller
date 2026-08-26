@@ -18,9 +18,9 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - pełny cykl BLE: skan pierwszego urządzenia na żądanie, zapamiętanie po udanym połączeniu, pasywne GATT `autoConnect`, discovery, NUS notifications, timeout, RSSI i bateria;
 - potwierdzony dekoder ramek IMU z resynchronizacją po rozciętych i sklejonych notyfikacjach;
 - ciągły regulator głośności wykorzystujący dokładnie przefiltrowaną wartość żyroskopu Z: dodatnie Z podgłaśnia, ujemne Z ścisza;
-- 2-sekundowa stabilizacja kąta 0–25° bez wymogu bezruchu, po której regulator działa także podczas trzymania i poruszania kapslem w powietrzu;
+- 2-sekundowa stabilizacja kąta 0–25° bez wymogu odkładania kapsla; gwałtowne przyspieszenie poza 0,80–1,20 g natychmiast wstrzymuje regulację i rozpoczyna stabilizację od nowa;
 - wielostopniowa filtracja IMU: mediana odrzucająca pojedyncze skoki, adaptacyjna martwa strefa gyro, low-pass i filtr komplementarny;
-- dodatkowe wygładzenie żyroskopu Z, histereza, limit częstotliwości kroków i całkowanie prędkości kątowej ograniczające gwałtowne skoki głośności;
+- łagodne wygładzenie żyroskopu Z, histereza, ograniczenie zaległych kroków, limit częstotliwości i całkowanie prędkości kątowej ograniczające gwałtowne skoki głośności;
 - opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
 - bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa przechodzą do następnego utworu, trzy do poprzedniego; każde mapowanie można zmienić w profilu;
 - konfigurowalne mapowania przycisku zapisywane w Preferences DataStore;
@@ -58,7 +58,7 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 6. Dostęp listenera powiadomień jest opcjonalny i służy do okładki, tytułu oraz dokładnego stanu sesji. Na Xiaomi podstawowe sterowanie działa również bez niego przez publiczne media keys.
 7. Naciśnij przycisk Triki, wybierz **Urządzenie → Skanuj urządzenia**, a następnie **Połącz i zapamiętaj**. Adres jest zapisywany dopiero po pełnym uruchomieniu strumienia IMU.
 8. Po stanie **Gotowe** otwórz **Sterowanie**, sprawdź status regulatora Z i ustaw akcje dla jednego, dwóch oraz trzech kliknięć.
-9. Uruchom muzykę i utrzymuj kapsel górą do góry w przechyle 0–25° przez 2 sekundy. Nie musi być nieruchomy. Gdy UI pokaże „Regulator gotowy”, obracaj go: dodatnia wartość Z podgłaśnia, ujemna ścisza.
+9. Uruchom muzykę i utrzymuj kapsel górą do góry w przechyle 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć; gwałtowne przyspieszenie ponownie uruchamia 2-sekundową stabilizację. Gdy UI pokaże „Regulator gotowy”, obracaj go łagodnie: dodatnia wartość Z podgłaśnia, ujemna ścisza.
 10. Aby ocenić utwór, przytrzymaj przycisk około pół sekundy, a następnie podnieś kapsel o 20–30 cm dla Like albo opuść go o 20–30 cm dla Dislike. Sygnał potwierdzi wysłanie akcji; sygnał błędu oznacza brak obsługi przez aktywny odtwarzacz.
 11. Gdy Triki uśnie i rozłączy BLE, naciśnij jego fizyczny przycisk. Przy włączonym **Sterowaniu w tle** Android automatycznie dokończy oczekujące połączenie z zapamiętanym kapslem — bez ponownego wybierania urządzenia.
 
@@ -111,7 +111,7 @@ TrikiProtocolDecoder
     ↓
 SensorFilter + calibration + complementary orientation
     ↓
-GyroscopeVolumeController + 2 s stabilizacji przechyłu 0–25°
+GyroscopeVolumeController + bramka 0,80–1,20 g + 2 s stabilizacji przechyłu 0–25°
     ↓
 HoldVerticalGestureDetector + przycisk/ruch góra–dół
     ↓
@@ -160,9 +160,9 @@ Pełna tabela offsetów, źródeł potwierdzenia i ograniczeń znajduje się w [
 
 ## Regulator głośności
 
-`GyroscopeVolumeController` przyjmuje przefiltrowaną wartość żyroskopu Z w °/s i całkuje ją do kąta obrotu. Zakres 0–25° musi być zachowany nieprzerwanie przez 2 sekundy, ale nie ma wymogu bezruchu, odkładania kapsla ani długości wektora 0,8–1,2 g. Dodatkowy filtr Z oraz limit jednego kroku na 100 ms wygładzają regulację. Każde 15° daje jeden krok głośności; znak Z określa kierunek. Przekroczenie 25° zeruje stabilizację i nagromadzony obrót. Położenie pionowe 90° i odwrócone 180° nie może zmienić głośności.
+`GyroscopeVolumeController` przyjmuje przefiltrowaną wartość żyroskopu Z w °/s i całkuje ją do kąta obrotu. Zakres 0–25° musi być zachowany nieprzerwanie przez 2 sekundy; kapsel może być trzymany w powietrzu, ale długość wektora akcelerometru musi pozostać w tolerancji 0,80–1,20 g. Wyjście poza tę tolerancję jest traktowane jako gwałtowny ruch: blokuje akcję, czyści nagromadzony obrót i wymusza pełną ponowną stabilizację. Łagodniejszy filtr Z, limit jednego kroku na 140 ms i brak kolejki zaległych kroków wygładzają regulację. Każde 22° obrotu daje jeden krok głośności; znak Z określa kierunek. Przekroczenie 25° również zeruje stabilizację. Położenie pionowe 90° i odwrócone 180° nie może zmienić głośności.
 
-Martwa strefa osi Z 18°/s, próg zwolnienia 10°/s, zerowanie po zmianie kierunku, wyjściu poza 25° i przerwie strumienia ograniczają niezamierzone skoki. Interfejs pokazuje bieżący przechył, dozwolony zakres i wartość żyroskopu Z, dzięki czemu użytkownik wie, co blokuje sterowanie.
+Martwa strefa osi Z 22°/s, próg zwolnienia 12°/s, zerowanie po zmianie kierunku, gwałtownym przyspieszeniu, wyjściu poza 25° i przerwie strumienia ograniczają niezamierzone skoki. Interfejs pokazuje bieżący przechył, długość wektora akcelerometru i wartość żyroskopu Z, dzięki czemu użytkownik wie, co blokuje sterowanie.
 
 Fizyczny przycisk nie korzysta z IMU ani kalibracji. Po potwierdzeniu wariantu `0/1` aplikacja stosuje debounce, liczy pełne cykle wciśnięcie–puszczenie i czeka 450 ms na następny klik. Firmware z licznikiem `0..15` oraz wariant naprzemienny `0/1` są ignorowane, aby identyfikatory ramek nie uruchamiały muzyki. Domyślnie: `×1 → Play/Pause`, `×2 → Next`, `×3 → Previous`.
 
@@ -186,7 +186,7 @@ Testy JVM obejmują:
 - dekodowanie little-endian, skalowanie, startup discard i resynchronizację parsera;
 - autodetekcję przycisku/licznika, debounce, wieloklik, odbicia styku, długie przytrzymanie i zerwanie strumienia;
 - medianowe odrzucanie skoków, smoothing, adaptacyjną martwą strefę gyro, korekcję biasu i walidację kalibracji;
-- dodatni i ujemny kierunek regulatora Z, pełne 2 sekundy w przechyle 0–25°, brak bramki bezruchu i wartości g, wygładzenie Z, limit kroków, blokadę powyżej 25°, położenie 90°/180° oraz reset po przerwie strumienia;
+- dodatni i ujemny kierunek regulatora Z, pełne 2 sekundy w przechyle 0–25°, tolerancję ruchu 0,80–1,20 g, reset po gwałtownym przyspieszeniu, łagodniejsze wygładzenie Z, limit kroków, blokadę powyżej 25°, położenie 90°/180° oraz reset po przerwie strumienia;
 - przytrzymanie konsumujące zwykły klik, estymację ruchu +/−20 cm, pojedyncze Like/Dislike na jedno przytrzymanie oraz bezpieczne dopasowanie niestandardowych akcji ratingu;
 - mapowanie przycisk → akcja i brak wywołania dla `NONE`;
 - round-trip serializacji ustawień, mapowań przycisku i kalibracji, migrację starszej konwencji osi oraz bezpieczne ignorowanie pól poprzedniego systemu sterowania;
@@ -197,7 +197,7 @@ Testy JVM obejmują:
 - Fizyczna walidacja wymaga konkretnego egzemplarza Triki. Projekt kompiluje się i ma testy dekodera na potwierdzonych ramkach, ale progi regulatora należy ostatecznie potwierdzić na rzeczywistym kapslu.
 - Częstotliwość IMU nie jest zakodowana jako gwarantowana stała protokołu. UI pokazuje wartość mierzoną na żywo; parser interpoluje znaczniki wewnątrz burstu wyłącznie na potrzeby stabilnego filtru.
 - Yaw bez magnetometru dryfuje. Pitch i roll są korygowane grawitacją, natomiast yaw opiera się na całkowaniu żyroskopu.
-- Kąt przechyłu jest wyznaczany z kierunku wektora akcelerometru. Silne przyspieszenie liniowe podczas trzymania kapsla w powietrzu może chwilowo zniekształcić ten kąt i zablokować sterowanie do powrotu w zakres 0–25°.
+- Kąt przechyłu jest wyznaczany z kierunku wektora akcelerometru. Silne przyspieszenie liniowe podczas trzymania kapsla w powietrzu celowo blokuje regulator i wymaga ponownych 2 sekund w zakresie 0–25° po powrocie do 0,80–1,20 g.
 - Autołączenie wymaga włączonego Bluetooth, przyznanego dostępu do urządzeń w pobliżu i aktywnego ustawienia **Sterowanie w tle**. Wymuszone zatrzymanie aplikacji w ustawieniach Androida blokuje jej usługi i odbiorniki do następnego ręcznego uruchomienia; część nakładek producentów może również wymagać zezwolenia na autostart.
 - Metadane i okładka wymagają dostępu do aktywnej MediaSession. Play/Pause, Next, Previous i Stop mają fallback przez standardowe klawisze multimedialne, ale ostateczna obsługa komendy zależy od aktywnego odtwarzacza.
 - Aktualizator obsługuje publiczne, stabilne wydania GitHub zawierające jednoznaczny APK release. Android wymaga zgody na instalowanie z tego źródła oraz osobnego potwierdzenia każdej instalacji.

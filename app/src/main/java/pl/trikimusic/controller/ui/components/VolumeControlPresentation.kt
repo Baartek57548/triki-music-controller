@@ -8,6 +8,7 @@ enum class VolumeGateState {
     SENSOR_INVALID,
     UPSIDE_DOWN,
     OUTSIDE_TILT_RANGE,
+    SUDDEN_MOTION,
     STABILIZING,
     READY,
 }
@@ -48,17 +49,24 @@ fun MainUiState.volumeControlPresentation(): VolumeControlPresentation = when {
         false,
     )
 
+    !runtime.volumeAccelerationStable -> VolumeControlPresentation(
+        VolumeGateState.SUDDEN_MOTION,
+        "Wykryto gwałtowny ruch",
+        "Regulacja jest wstrzymana. Utrzymuj przechył 0–25° przez kolejne 2 sekundy.",
+        false,
+    )
+
     !runtime.volumeTiltStable -> VolumeControlPresentation(
         VolumeGateState.STABILIZING,
         "Stabilizacja kąta ${runtime.volumeStabilizationProgress.percent()}%",
-        "Utrzymuj przechył 0–25° przez 2 sekundy. Kapsel może być w ruchu.",
+        "Utrzymuj przechył 0–25° przez 2 sekundy i unikaj gwałtownych ruchów.",
         false,
     )
 
     else -> VolumeControlPresentation(
         VolumeGateState.READY,
         "Regulator gotowy",
-        "Obracaj kapsel wokół osi Z. Nie musisz zatrzymywać go ani odkładać na powierzchnię.",
+        "Obracaj kapsel łagodnie wokół osi Z. Szarpnięcie wstrzyma regulację.",
         true,
     )
 }

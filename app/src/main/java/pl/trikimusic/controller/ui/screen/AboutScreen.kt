@@ -53,7 +53,7 @@ fun InfoScreen(
                     )
                     InfoSection(
                         "Głośność",
-                        "Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Stabilizacja dotyczy położenia w tym zakresie, nie bezruchu. Po aktywacji wygładzona wartość żyroskopu osi Z płynnie reguluje głośność.",
+                        "Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Kapsel nie musi leżeć nieruchomo, ale gwałtowne przyspieszenie poza 0,80–1,20 g wstrzymuje regulację i rozpoczyna stabilizację od nowa. Po aktywacji wygładzona wartość żyroskopu osi Z łagodnie reguluje głośność.",
                     )
                     InfoSection(
                         "Like i Dislike",
