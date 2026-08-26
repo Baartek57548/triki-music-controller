@@ -25,12 +25,12 @@ import pl.trikimusic.controller.ui.UpdateUiState
 import pl.trikimusic.controller.ui.components.DetailTopBar
 
 @Composable
-fun AboutScreen(
+fun InfoScreen(
     updateState: UpdateUiState,
     onCheckForUpdates: () -> Unit,
     onBack: () -> Unit,
 ) {
-    Scaffold(topBar = { DetailTopBar("O aplikacji", onBack) }) { padding ->
+    Scaffold(topBar = { DetailTopBar("Informacje", onBack) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -47,14 +47,40 @@ fun AboutScreen(
             }
             Card(shape = RoundedCornerShape(24.dp)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Interoperacyjność", style = MaterialTheme.typography.titleMedium)
-                    Text("Aplikacja korzysta wyłącznie z publicznych API Androida i standardowego Bluetooth LE. Nie omija zabezpieczeń Żappki ani usług muzycznych.")
-                    Text("Prywatność", style = MaterialTheme.typography.titleMedium)
-                    Text("Dane IMU, profile i kalibracja pozostają lokalnie na urządzeniu. Logi są ograniczone rotacją i eksportowane tylko na wyraźne żądanie użytkownika.")
-                    Text("Protokół", style = MaterialTheme.typography.titleMedium)
-                    Text("Implementacja NUS i dekodera opiera się na zweryfikowanej analizie projektu Maku-hub/TrikiScope. Inspector zachowuje RAW dla wariantów firmware, których format nie został jeszcze potwierdzony.")
+                    InfoSection(
+                        "Połączenie",
+                        "Przy pierwszym użyciu wybudź Triki przyciskiem, wyszukaj je i połącz. Telefon zapamięta kapsel; kolejne naciśnięcie przycisku wybudzi urządzenie i uruchomi automatyczne łączenie.",
+                    )
+                    InfoSection(
+                        "Głośność",
+                        "Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Stabilizacja dotyczy położenia w tym zakresie, nie bezruchu. Po aktywacji wygładzona wartość żyroskopu osi Z płynnie reguluje głośność.",
+                    )
+                    InfoSection(
+                        "Like i Dislike",
+                        "Przytrzymaj przycisk około pół sekundy. Podnieś kapsel o 20–30 cm, aby polubić utwór, albo opuść go o 20–30 cm, aby wysłać Dislike. Osobne krótkie sygnały dźwiękowe potwierdzają obie akcje.",
+                    )
+                    InfoSection(
+                        "Prywatność i zgodność",
+                        "Dane IMU, profile i kalibracja pozostają lokalnie w telefonie. Aplikacja korzysta ze standardowego Bluetooth LE i publicznych API Androida; sieć służy do sprawdzania wydań GitHub.",
+                    )
+                    InfoSection(
+                        "Protokół",
+                        "Komunikacja używa Nordic UART Service. Inspektor zachowuje pakiety RAW dla wariantów firmware, których format nie został jeszcze potwierdzony.",
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun InfoSection(title: String, description: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(
+            description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

@@ -11,8 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sensors
@@ -41,7 +39,6 @@ fun SettingsScreen(
     contentPadding: PaddingValues,
     viewModel: MainViewModel,
     onPermissions: () -> Unit,
-    onAbout: () -> Unit,
     onSensor: () -> Unit,
     onInspector: () -> Unit,
 ) {
@@ -55,7 +52,6 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        item { SectionTitle("Ustawienia", subtitle = "Zachowanie, wygląd i narzędzia deweloperskie") }
         item {
             Card(shape = RoundedCornerShape(24.dp)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -97,7 +93,6 @@ fun SettingsScreen(
             item { NavigationRow(Icons.Default.Sensors, "Monitor czujników", "Dane IMU i generator testowych kliknięć.", onSensor) }
             item { NavigationRow(Icons.Default.BugReport, "Inspektor BLE", "GATT, pakiety RAW i eksport sesji.", onInspector) }
         }
-        item { NavigationRow(Icons.Default.Info, "O aplikacji", "Protokół, prywatność, architektura i ograniczenia.", onAbout) }
     }
 }
 

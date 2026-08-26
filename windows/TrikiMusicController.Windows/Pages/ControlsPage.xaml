@@ -9,7 +9,6 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Płynna regulacja głośności" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Utrzymuj zakres przechyłu 0–25° przez 2 sekundy. Kapsel może być w ruchu. Potem obrót wokół osi Z zmienia głośność systemową." TextWrapping="Wrap" />
                     <ProgressBar Minimum="0" Maximum="1" Value="{Binding VolumeProgress}" />
                     <TextBlock Text="{Binding VolumeControlTitle}" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" Opacity="0.75" />
@@ -18,9 +17,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Polubienie i dislike ruchem" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Przytrzymaj przycisk przez 0,5 sekundy. Podniesienie kapsla o około 20–30 cm oznacza serduszko/Like; opuszczenie oznacza Dislike. Sygnał dźwiękowy potwierdza wynik." TextWrapping="Wrap" />
                     <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                    <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Ograniczenie Windows" Message="Systemowe Media Control obsługuje odtwarzanie, pauzę i zmianę utworu, ale nie udostępnia standardowej akcji Like/Dislike. Gest jest rozpoznawany i zgłasza błąd, jeśli odtwarzacz nie ma osobnej integracji." />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">

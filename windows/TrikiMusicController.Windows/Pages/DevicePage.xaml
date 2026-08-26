@@ -5,10 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Padding="28">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-        <StackPanel Spacing="6">
-            <TextBlock Text="Urządzenie Triki" Style="{StaticResource PageTitleStyle}" />
-            <TextBlock Text="Pierwsze połączenie wybiera urządzenie. Później naciśnięcie przycisku wybudza kapsel, a aplikacja rozpoznaje jego reklamę BLE i łączy się automatycznie." TextWrapping="Wrap" Opacity="0.75" />
-        </StackPanel>
+        <TextBlock Text="Urządzenie Triki" Style="{StaticResource PageTitleStyle}" />
         <InfoBar Grid.Row="1" Margin="0,18,0,12" IsOpen="True" IsClosable="False" Severity="Informational" Title="{Binding ConnectionTitle}" Message="{Binding ConnectionDetails}" />
         <ListView
             Grid.Row="2"

@@ -10,9 +10,24 @@
     <Window.SystemBackdrop><MicaBackdrop /></Window.SystemBackdrop>
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-        <TitleBar x:Name="AppTitleBar" Title="Triki Music Controller">
-            <TitleBar.IconSource><ImageIconSource ImageSource="Assets/AppIcon.ico" /></TitleBar.IconSource>
-        </TitleBar>
+        <Grid>
+            <TitleBar x:Name="AppTitleBar" Title="Triki Music Controller">
+                <TitleBar.IconSource><ImageIconSource ImageSource="Assets/AppIcon.ico" /></TitleBar.IconSource>
+            </TitleBar>
+            <Button
+                x:Name="InfoButton"
+                Width="40"
+                Height="40"
+                Margin="0,0,146,0"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Background="Transparent"
+                Click="Info_Click"
+                AutomationProperties.Name="Informacje"
+                ToolTipService.ToolTip="Informacje">
+                <FontIcon Glyph="&#xE946;" FontSize="16" />
+            </Button>
+        </Grid>
         <NavigationView
             x:Name="Navigation"
             Grid.Row="1"
@@ -32,9 +47,6 @@
                 </NavigationViewItem>
                 <NavigationViewItem Content="Diagnostyka" Tag="diagnostics">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="View" /></NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem Content="O aplikacji" Tag="about">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="Help" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
             <Frame x:Name="RootFrame" />

@@ -84,7 +84,6 @@ fun HomeScreen(
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Triki", style = MaterialTheme.typography.displaySmall)
                     Text("Sterowanie muzyką", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusPill(state.ble.connectionState)
@@ -111,7 +110,7 @@ fun HomeScreen(
             }
         }
 
-        item { SectionTitle("Teraz gra", subtitle = "Aktywna sesja multimedialna Androida") }
+        item { SectionTitle("Teraz gra") }
         item {
             when {
                 !state.media.hasPermission -> MediaKeyFallbackCard(onMediaAction, onOpenPermissions)

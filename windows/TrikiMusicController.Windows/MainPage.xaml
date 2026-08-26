@@ -6,7 +6,6 @@
     <ScrollViewer>
         <StackPanel MaxWidth="1180" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
             <TextBlock Text="Triki Music Controller" Style="{StaticResource PageTitleStyle}" />
-            <TextBlock Text="Steruj muzyką na laptopie z Windows 11 tym samym kapslem Triki." Opacity="0.75" FontSize="15" />
             <Grid x:Name="DashboardGrid" ColumnSpacing="16" RowSpacing="16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
@@ -59,8 +58,7 @@
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Przytrzymaj + ruch pionowy" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Podnieś kapsel, aby polubić utwór. Opuść go, aby wysłać dislike." TextWrapping="Wrap" />
+                    <TextBlock Text="Like / Dislike" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding LastActionStatus}" Opacity="0.75" TextWrapping="Wrap" />
                 </StackPanel>

@@ -74,7 +74,6 @@ fun DeviceScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        item { SectionTitle("Urządzenie", subtitle = "Połączenie, kalibracja i diagnostyka Triki") }
         item {
             Card(
                 shape = RoundedCornerShape(28.dp),
@@ -144,11 +143,6 @@ fun DeviceScreen(
                         }
                     }
                     if (state.settings.knownDeviceAddress != null) {
-                        Text(
-                            "Triki jest zapamiętane. Po uśpieniu naciśnij jego przycisk — telefon połączy się automatycznie.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                         OutlinedButton(onClick = viewModel::forgetDevice, modifier = Modifier.fillMaxWidth()) {
                             Text("Zapomnij urządzenie")
                         }
@@ -167,7 +161,7 @@ fun DeviceScreen(
         }
 
         if (state.ble.connectionState == TrikiConnectionState.READY) {
-            item { SectionTitle("Informacje") }
+            item { SectionTitle("Parametry urządzenia") }
             item {
                 Card(shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

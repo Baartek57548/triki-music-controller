@@ -66,12 +66,6 @@ fun ControlsScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            SectionTitle(
-                "Sterowanie",
-                subtitle = "Obrót kapsla reguluje głośność, a przycisk obsługuje pozostałe akcje",
-            )
-        }
-        item {
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
@@ -90,11 +84,6 @@ fun ControlsScreen(
                         Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Column(Modifier.weight(1f)) {
                             Text(volumePresentation.title, style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                volumePresentation.instruction,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
                         }
                         Icon(
                             if (volumePresentation.ready) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
@@ -123,11 +112,6 @@ fun ControlsScreen(
                         "Żyroskop Z",
                         sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",
                     )
-                    Text(
-                        "Utrzymuj zakres 0–25° przez 2 sekundy. Nie ma wymogu bezruchu ani odkładania kapsla; potem wygładzony ruch osi Z reguluje głośność.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
@@ -138,11 +122,6 @@ fun ControlsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text("Przytrzymaj + ruch pionowy", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Przytrzymaj przycisk około pół sekundy, a następnie przesuń kapsel pionowo o 20–30 cm.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text("W górę → polub utwór", Modifier.weight(1f))
@@ -180,7 +159,7 @@ fun ControlsScreen(
                 }
             }
         }
-        item { SectionTitle("Przycisk", subtitle = "Ustaw akcję dla liczby kliknięć") }
+        item { SectionTitle("Przycisk") }
         item {
             Card(shape = RoundedCornerShape(24.dp)) {
                 Column {

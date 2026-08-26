@@ -27,11 +27,12 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - przytrzymanie przycisku i pionowy ruch o około 20 cm: podniesienie wysyła Like, opuszczenie Dislike oraz odtwarza krótki sygnał powodzenia lub błędu;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Like, Dislike, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i informacją o odtwarzanym utworze;
+- uproszczone ekrany robocze i wspólny ekran **Informacje**, otwierany ikoną w prawym górnym rogu aplikacji Android i Windows;
 - onboarding, czytelna lista warunków bezpiecznej regulacji, monitor czujników i inspektor BLE;
 - rotujący bufor pakietów RAW z eksportem HEX/DEC oraz ograniczony bufor logów;
 - foreground service czekający na wybudzenie zapamiętanego Triki, akcja wyłączająca autołączenie oraz przywrócenie czuwania po restarcie telefonu;
 - `FakeTrikiDataSource` dostępny wyłącznie w buildzie debug po włączeniu trybu deweloperskiego;
-- automatyczne sprawdzanie najnowszego wydania GitHub przy uruchomieniu wersji release, ręczne sprawdzanie na ekranie **O aplikacji** oraz weryfikowany instalator APK;
+- automatyczne sprawdzanie najnowszego wydania GitHub przy uruchomieniu wersji release, ręczne sprawdzanie na ekranie **Informacje** oraz weryfikowany instalator APK;
 - jasny, ciemny i systemowy motyw Material 3, edge-to-edge oraz responsywny dashboard.
 - natywna wersja Windows 11 w WinUI 3: ten sam dekoder, filtr, gesty i mapowania, globalna sesja multimedialna, głośność domyślnego urządzenia audio, zapamiętywanie adresu Triki oraz automatyczne łączenie po naciśnięciu przycisku;
 - instalator Windows z opcjonalnym skrótem, autostartem w tle, deinstalatorem i wbudowanym mechanizmem aktualizacji.

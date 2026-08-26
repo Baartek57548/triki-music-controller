@@ -17,14 +17,7 @@
                               SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                               HorizontalAlignment="Left"
                               MinWidth="220" />
-                    <TextBlock Text="Autostart pozwala wykryć krótką reklamę BLE wysłaną po naciśnięciu przycisku, również gdy okno jest zminimalizowane." TextWrapping="Wrap" Opacity="0.72" />
                     <TextBlock Text="{Binding SettingsStatus}" TextWrapping="Wrap" Opacity="0.72" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Prywatność" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Aplikacja nie wysyła danych czujników do chmury. Sieć jest używana wyłącznie do sprawdzania publicznych wydań GitHub." TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
         </StackPanel>

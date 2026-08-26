@@ -35,6 +35,8 @@ public sealed partial class MainWindow : Window
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
+        if (!args.IsSettingsSelected && args.SelectedItemContainer is null) return;
+
         var pageType = args.IsSettingsSelected
             ? typeof(SettingsPage)
             : args.SelectedItemContainer?.Tag?.ToString() switch
@@ -42,10 +44,16 @@ public sealed partial class MainWindow : Window
                 "device" => typeof(DevicePage),
                 "controls" => typeof(ControlsPage),
                 "diagnostics" => typeof(DiagnosticsPage),
-                "about" => typeof(AboutPage),
                 _ => typeof(MainPage),
             };
         if (RootFrame.CurrentSourcePageType != pageType) RootFrame.Navigate(pageType);
+    }
+
+    private void Info_Click(object sender, RoutedEventArgs e)
+    {
+        Navigation.SelectedItem = null;
+        if (RootFrame.CurrentSourcePageType != typeof(AboutPage))
+            RootFrame.Navigate(typeof(AboutPage));
     }
 
     public async Task CheckForUpdatesAsync(bool showUpToDateMessage)
