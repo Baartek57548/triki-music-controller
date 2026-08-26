@@ -35,7 +35,7 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - `FakeTrikiDataSource` dostępny wyłącznie w buildzie debug po włączeniu trybu deweloperskiego;
 - automatyczne sprawdzanie najnowszego wydania GitHub przy uruchomieniu wersji release, ręczne sprawdzanie na ekranie **Informacje** oraz weryfikowany instalator APK;
 - jasny, ciemny i systemowy motyw Material 3, edge-to-edge oraz responsywny dashboard.
-- natywna wersja Windows 11 w WinUI 3: ten sam dekoder, filtr, gesty i mapowania, globalna sesja multimedialna, precyzyjna regulacja domyślnego urządzenia audio przez Core Audio, zapamiętywanie adresu Triki oraz automatyczne łączenie po naciśnięciu przycisku;
+- natywna wersja Windows 11 w WinUI 3: ten sam dekoder, filtr, gesty i mapowania, globalna sesja multimedialna, precyzyjna regulacja systemowego master volume domyślnego urządzenia przez Core Audio (bez zmiany głośności pojedynczej aplikacji), zapamiętywanie adresu Triki oraz automatyczne łączenie po naciśnięciu przycisku;
 - instalator Windows z opcjonalnym skrótem, autostartem w tle, deinstalatorem i wbudowanym mechanizmem aktualizacji.
 
 ## Wymagania

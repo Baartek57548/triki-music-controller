@@ -15,7 +15,7 @@ public sealed class AppServices : IDisposable
         Updates = new UpdateService();
         Bluetooth = new BluetoothService();
         Feedback = new FeedbackToneService();
-        Runtime = new TrikiRuntimeEngine(Bluetooth, Media, Settings, Feedback);
+        Runtime = new TrikiRuntimeEngine(Bluetooth, Media, Volume, Settings, Feedback);
         ViewModel = new MainViewModel(dispatcherQueue, Settings, Bluetooth, Media, Runtime);
     }
 

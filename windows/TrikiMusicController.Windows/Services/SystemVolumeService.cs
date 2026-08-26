@@ -4,6 +4,8 @@ namespace TrikiMusicController_Windows.Services;
 
 public sealed class SystemVolumeService
 {
+    // This service deliberately uses the endpoint master-volume interface. It never opens an
+    // audio-session volume, so every change is applied by Windows to the current system output.
     private const float VolumeStepScalar = 0.02f;
     private static readonly Guid EventContext = new("FBCA4A21-0933-47DD-A1EA-E8C8647348CC");
 

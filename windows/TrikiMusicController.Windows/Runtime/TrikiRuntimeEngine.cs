@@ -9,6 +9,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly object _sync = new();
     private readonly BluetoothService _bluetooth;
     private readonly MediaControlService _media;
+    private readonly SystemVolumeService _systemVolume;
     private readonly SettingsService _settings;
     private readonly FeedbackToneService _feedback;
     private readonly SensorFilter _sensorFilter = new();
@@ -22,11 +23,13 @@ public sealed class TrikiRuntimeEngine : IDisposable
     public TrikiRuntimeEngine(
         BluetoothService bluetooth,
         MediaControlService media,
+        SystemVolumeService systemVolume,
         SettingsService settings,
         FeedbackToneService feedback)
     {
         _bluetooth = bluetooth;
         _media = media;
+        _systemVolume = systemVolume;
         _settings = settings;
         _feedback = feedback;
         _bluetooth.SampleReceived += BluetoothOnSampleReceived;
@@ -155,7 +158,24 @@ public sealed class TrikiRuntimeEngine : IDisposable
         (bool Succeeded, string Message) result;
         try
         {
-            result = await _media.ExecuteAsync(action).ConfigureAwait(false);
+            if (action is MediaAction.VolumeUp or MediaAction.VolumeDown or MediaAction.Mute or MediaAction.Unmute)
+            {
+                // Keep the sensor path independent from MediaSession: IAudioEndpointVolume changes the
+                // Windows default render endpoint (the system master), never an individual app session.
+                switch (action)
+                {
+                    case MediaAction.VolumeUp: _systemVolume.StepUp(); break;
+                    case MediaAction.VolumeDown: _systemVolume.StepDown(); break;
+                    case MediaAction.Mute: _systemVolume.SetMute(true); break;
+                    case MediaAction.Unmute: _systemVolume.SetMute(false); break;
+                }
+                await _media.RefreshAsync().ConfigureAwait(false);
+                result = (true, action.DisplayName());
+            }
+            else
+            {
+                result = await _media.ExecuteAsync(action).ConfigureAwait(false);
+            }
         }
         catch (Exception error)
         {
