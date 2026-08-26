@@ -5,38 +5,37 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
         <StackPanel MaxWidth="850" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
-            <TextBlock Text="Informacje" Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Spacing="4">
+                <TextBlock Text="Informacje" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Najważniejsze zasady obsługi, prywatność i wersja aplikacji." Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Połączenie" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Przy pierwszym użyciu wybudź Triki przyciskiem, wyszukaj je i połącz. Komputer zapamięta kapsel; kolejne naciśnięcie przycisku wybudzi urządzenie i uruchomi automatyczne łączenie." TextWrapping="Wrap" />
-                    <TextBlock Text="Opcja „Łącz tylko podczas użycia” zamyka aktywne GATT po 12 sekundach bez ruchu lub przycisku. Lekki nasłuch reklam BLE uzbraja się po zaśnięciu kapsla i wznawia połączenie przy kolejnym wybudzeniu." TextWrapping="Wrap" Opacity="0.78" />
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Połączenie" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Przy pierwszym użyciu wybudź Triki przyciskiem, wyszukaj je i połącz. Komputer zapamięta kapsel; kolejne naciśnięcie przycisku wybudzi urządzenie i uruchomi automatyczne łączenie." TextWrapping="Wrap" />
+                        <TextBlock Text="Opcja „Łącz tylko podczas użycia” oszczędza baterię: po bezczynności zamyka aktywne połączenie, a lekki nasłuch BLE wznawia je po wybudzeniu kapsla." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Głośność" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Kapsel nie musi leżeć nieruchomo, ale gwałtowne przyspieszenie poza 0,80–1,20 g wstrzymuje regulację i rozpoczyna stabilizację od nowa. Po aktywacji wygładzona wartość żyroskopu osi Z łagodnie reguluje głośność systemową." TextWrapping="Wrap" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Głośność" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Kapsel nie musi leżeć nieruchomo, ale gwałtowne przyspieszenie poza 0,80–1,20 g wstrzymuje regulację i rozpoczyna stabilizację od nowa. Po aktywacji wygładzona wartość żyroskopu osi Z łagodnie reguluje głośność systemową." TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
+                <StackPanel Spacing="16">
                     <TextBlock Text="Sterowanie utworem" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają. Niezależnie od przycisku odwróć kapsel, odczekaj około pół sekundy i wykonaj jeden pełny obrót wokół osi Z: w prawo przechodzi do następnego utworu, a w lewo wraca do poprzedniego." TextWrapping="Wrap" />
+                    <TextBlock Text="Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają. Aby zmienić utwór bez przycisku, odwróć kapsel i odczekaj około pół sekundy. Następnie obróć go o 270° zgodnie z ruchem dłoni: w lewo przejdziesz do następnego utworu, a w prawo wrócisz do poprzedniego." TextWrapping="Wrap" />
                     <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Oceny utworów" Message="Windows nie udostępnia systemowej komendy Like/Dislike. Kliknięcia zostaną rozpoznane, ale zastosowanie oceny zależy od aktywnego odtwarzacza." />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Prywatność i aktualizacje" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Dane czujników pozostają lokalnie na komputerze. Sieć jest używana wyłącznie do sprawdzania publicznych wydań GitHub. Aplikacja sprawdza nową wersję po uruchomieniu." TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
+                <StackPanel Spacing="16">
                     <TextBlock Text="Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Wersja 2.6.0 • Windows x64" />
+                    <TextBlock Text="Wersja 2.6.1 • Windows x64" />
                     <TextBlock Text="Natywna aplikacja WinUI 3 sterująca globalną sesją multimedialną i głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
+                    <TextBlock Text="Dane czujników pozostają lokalnie na komputerze. Sieć jest używana wyłącznie do sprawdzania publicznych wydań GitHub; aplikacja sprawdza nową wersję po uruchomieniu." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="Sprawdź aktualizacje" Click="CheckUpdates_Click" />
                         <Button Content="Otwórz projekt na GitHub" Click="GitHub_Click" />

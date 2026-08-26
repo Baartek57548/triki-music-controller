@@ -7,27 +7,58 @@
         <StackPanel MaxWidth="900" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
             <StackPanel Spacing="4">
                 <TextBlock Text="Sterowanie" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Regulacja głośności i mapowanie fizycznego przycisku" Style="{StaticResource PageSubtitleStyle}" />
+                <TextBlock Text="Głośność, obrót 270° i mapowanie fizycznego przycisku" Style="{StaticResource PageSubtitleStyle}" />
             </StackPanel>
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Płynna regulacja głośności" Style="{StaticResource SectionTitleStyle}" />
-                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding VolumeProgress}" />
-                    <TextBlock Text="{Binding VolumeControlTitle}" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" Opacity="0.75" />
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="GŁOŚNOŚĆ SYSTEMOWA" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock Text="{Binding VolumeControlTitle}" Style="{StaticResource SectionTitleStyle}" />
+                    </StackPanel>
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding VolumeProgress}" AutomationProperties.Name="Postęp przygotowania regulacji głośności" />
+                    <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Expander Header="Szczegóły czujnika">
+                        <TextBlock Margin="0,8,0,2" Text="{Binding VolumeTechnicalDetails}" FontFamily="Consolas" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Expander>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="Nawigacja pełnym obrotem" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Odwróć kapsel, ustabilizuj go przez 0,5 s i wykonaj jeden pełny obrót wokół osi Z. Obrót w prawo przechodzi do następnego utworu, a w lewo wraca do poprzedniego — bez wciskania przycisku." TextWrapping="Wrap" Opacity="0.75" />
-                    <TextBlock Text="Dwa kliknięcia przycisku → Like • trzy kliknięcia → Dislike" TextWrapping="Wrap" Opacity="0.75" />
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="ODWRÓCONY KAPSEL" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock Text="Nawigacja obrotem 270°" Style="{StaticResource SectionTitleStyle}" />
+                    </StackPanel>
+                    <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Odwrócony kapsel" Message="Liczy się kierunek ruchu Twojej dłoni: lewo = następny utwór, prawo = poprzedni." />
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="14" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="←  Ruch dłoni w lewo" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="Następny utwór" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Padding="14" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Ruch dłoni w prawo  →" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="Poprzedni utwór" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock Text="Ustabilizuj odwrócony kapsel przez 0,5 s, a następnie obróć go o 270° wokół osi Z — bez wciskania przycisku." TextWrapping="Wrap" Opacity="0.75" />
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding GestureProgress}" AutomationProperties.Name="Postęp gestu obrotu 270 stopni" />
                     <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Akcje przycisku" Style="{StaticResource SectionTitleStyle}" />
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="PRZYCISK" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock Text="Akcje kliknięć" Style="{StaticResource SectionTitleStyle}" />
+                    </StackPanel>
+                    <TextBlock Text="Domyślnie dwa kliknięcia lubią utwór, a trzy oznaczają dislike. Każdą akcję możesz zmienić." Style="{StaticResource MetadataTextStyle}" />
                     <ComboBox Header="Jeden klik" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding SingleClickAction, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                     <ComboBox Header="Dwa kliknięcia" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding DoubleClickAction, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                     <ComboBox Header="Trzy kliknięcia" ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding TripleClickAction, Mode=TwoWay}" HorizontalAlignment="Stretch" />

@@ -86,6 +86,16 @@ public enum RotationGestureDirection
     Left,
 }
 
+public static class RotationGestureDirectionActions
+{
+    public static MediaAction ToInvertedCapsuleNavigationAction(this RotationGestureDirection direction) => direction switch
+    {
+        RotationGestureDirection.Left => MediaAction.Next,
+        RotationGestureDirection.Right => MediaAction.Previous,
+        _ => MediaAction.None,
+    };
+}
+
 public enum HoldGesturePhase
 {
     Idle,

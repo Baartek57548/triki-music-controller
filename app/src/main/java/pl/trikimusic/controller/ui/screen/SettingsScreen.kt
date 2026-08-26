@@ -1,5 +1,6 @@
 package pl.trikimusic.controller.ui.screen
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,11 +12,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
@@ -41,6 +43,7 @@ fun SettingsScreen(
     onPermissions: () -> Unit,
     onSensor: () -> Unit,
     onInspector: () -> Unit,
+    onInfo: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -52,11 +55,40 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        item { SectionTitle("Personalizacja") }
+        item {
+            SectionTitle(
+                title = "Triki",
+                subtitle = "Automatyczne łączenie i gotowość fizycznego kontrolera.",
+            )
+        }
         item {
             Card(shape = RoundedCornerShape(24.dp)) {
+                Column {
+                    SettingSwitchRow(
+                        title = "Sterowanie w tle",
+                        description = "Po naciśnięciu przycisku uśpione Triki połączy się automatycznie.",
+                        checked = state.settings.backgroundEnabled,
+                        onCheckedChange = viewModel::setBackgroundEnabled,
+                    )
+                    HorizontalDivider(Modifier.padding(horizontal = 18.dp))
+                    SettingSwitchRow(
+                        title = "Łącz tylko podczas użycia",
+                        description = if (state.settings.connectOnlyWhenNeeded) {
+                            "Po 12 sekundach bezczynności połączenie jest zamykane do kolejnego wybudzenia."
+                        } else {
+                            "Pozostaw wyłączone, jeśli Triki ma być stale gotowe podczas działania aplikacji."
+                        },
+                        checked = state.settings.connectOnlyWhenNeeded,
+                        onCheckedChange = viewModel::setConnectOnlyWhenNeeded,
+                    )
+                }
+            }
+        }
+        item { SectionTitle("Aplikacja") }
+        item {
+            Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("Wygląd", style = MaterialTheme.typography.titleMedium)
+                    Text("Motyw", style = MaterialTheme.typography.titleMedium)
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         ThemePreference.entries.forEachIndexed { index, theme ->
                             SegmentedButton(
@@ -70,48 +102,25 @@ fun SettingsScreen(
                 }
             }
         }
-        item {
-            SectionTitle(
-                title = "Połączenie",
-                subtitle = "Wybierz, czy Triki ma pozostawać gotowe, czy oszczędzać aktywne połączenie GATT.",
-            )
-        }
-        item {
-            SettingSwitchRow(
-                title = "Sterowanie w tle",
-                description = "Czekaj na wybudzenie zapamiętanego Triki i łącz je automatycznie po naciśnięciu przycisku.",
-                checked = state.settings.backgroundEnabled,
-                onCheckedChange = viewModel::setBackgroundEnabled,
-            )
-        }
-        item {
-            SettingSwitchRow(
-                title = "Łącz tylko podczas użycia",
-                description = if (state.settings.connectOnlyWhenNeeded) {
-                    "Po 12 sekundach bez ruchu lub przycisku połączenie jest zamykane. Następne naciśnięcie budzi kapsel i przywraca sterowanie."
-                } else {
-                    "Opcjonalny tryb: po bezczynności zamyka GATT i czeka na kolejne wybudzenie przyciskiem."
-                },
-                checked = state.settings.connectOnlyWhenNeeded,
-                onCheckedChange = viewModel::setConnectOnlyWhenNeeded,
-            )
-        }
-        item {
-            SettingSwitchRow(
-                title = "Tryb deweloperski",
-                description = "Pokazuje inspektor GATT, pakiety RAW, logi i generator testowych kliknięć.",
-                checked = state.settings.developerMode,
-                onCheckedChange = viewModel::setDeveloperMode,
-            )
-        }
-        item { SectionTitle("System") }
+        item { SectionTitle("Uprawnienia") }
         item { NavigationRow(Icons.Default.Security, "Uprawnienia", "Sprawdź dostęp do Bluetooth i informacji o odtwarzaniu.", onPermissions) }
-        item { NavigationRow(Icons.Default.NotificationsActive, "Dostęp w tle", if (state.settings.backgroundEnabled) "Telefon może oczekiwać na zapamiętane Triki także przy zamkniętym ekranie." else "Wyłączony — automatyczne wybudzenie działa tylko przy otwartej aplikacji.", onPermissions) }
+        item { SectionTitle("Zaawansowane", subtitle = "Narzędzia diagnostyczne są ukryte podczas codziennego użycia.") }
+        item {
+            Card(shape = RoundedCornerShape(20.dp)) {
+                SettingSwitchRow(
+                    title = "Tryb deweloperski",
+                    description = "Pokazuje monitor IMU, inspektor BLE, pakiety RAW i narzędzia testowe.",
+                    checked = state.settings.developerMode,
+                    onCheckedChange = viewModel::setDeveloperMode,
+                )
+            }
+        }
         if (state.settings.developerMode) {
-            item { SectionTitle("Narzędzia deweloperskie") }
             item { NavigationRow(Icons.Default.Sensors, "Monitor czujników", "Dane IMU i generator testowych kliknięć.", onSensor) }
             item { NavigationRow(Icons.Default.BugReport, "Inspektor BLE", "GATT, pakiety RAW i eksport sesji.", onInspector) }
         }
+        item { SectionTitle("Informacje") }
+        item { NavigationRow(Icons.Default.Info, "O aplikacji i aktualizacje", "Wersja, aktualizacje, prywatność i projekt GitHub.", onInfo) }
     }
 }
 
@@ -122,20 +131,18 @@ private fun SettingSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Card(
-        onClick = { onCheckedChange(!checked) },
-        shape = RoundedCornerShape(22.dp),
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(checked = checked, onCheckedChange = null)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

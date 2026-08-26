@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +21,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -50,7 +52,7 @@ import pl.trikimusic.controller.domain.model.TrikiConnectionState
 @Composable
 fun SectionTitle(title: String, modifier: Modifier = Modifier, subtitle: String? = null) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
+        Text(title, style = MaterialTheme.typography.titleMedium)
         if (subtitle != null) {
             Spacer(Modifier.height(3.dp))
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -61,7 +63,7 @@ fun SectionTitle(title: String, modifier: Modifier = Modifier, subtitle: String?
 @Composable
 fun StatusPill(state: TrikiConnectionState, modifier: Modifier = Modifier) {
     val color = when (state) {
-        TrikiConnectionState.READY -> Color(0xFF2CCB83)
+        TrikiConnectionState.READY -> MaterialTheme.colorScheme.primary
         TrikiConnectionState.ERROR -> MaterialTheme.colorScheme.error
         TrikiConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
         else -> MaterialTheme.colorScheme.tertiary
@@ -83,26 +85,6 @@ fun StatusPill(state: TrikiConnectionState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun MetricCard(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1)
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 fun NavigationRow(
     icon: ImageVector,
     title: String,
@@ -119,41 +101,31 @@ fun NavigationRow(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
     }
-    Card(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(15.dp),
-        ) {
-            Surface(shape = RoundedCornerShape(14.dp), color = iconColor.copy(alpha = 0.13f)) {
-                Icon(icon, contentDescription = null, modifier = Modifier.padding(10.dp), tint = iconColor)
+    ListItem(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)),
+        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor) },
+        supportingContent = {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = subtitleColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        leadingContent = {
+            Surface(shape = RoundedCornerShape(12.dp), color = iconColor.copy(alpha = 0.12f)) {
+                Icon(icon, contentDescription = null, modifier = Modifier.padding(9.dp), tint = iconColor)
             }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor)
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = subtitleColor,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (trailing != null) {
-                trailing()
-            } else {
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = subtitleColor)
-            }
-        }
-    }
+        },
+        trailingContent = trailing ?: {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = subtitleColor)
+        },
+    )
 }
 
 @Composable
@@ -249,8 +221,8 @@ fun TrikiConnectionState.displayName(): String = when (this) {
     TrikiConnectionState.SCANNING -> "Skanowanie"
     TrikiConnectionState.FOUND -> "Znaleziono"
     TrikiConnectionState.CONNECTING -> "Łączenie"
-    TrikiConnectionState.CONNECTED -> "Połączone"
-    TrikiConnectionState.READY -> "Gotowe"
+    TrikiConnectionState.CONNECTED -> "Konfiguracja"
+    TrikiConnectionState.READY -> "Połączono"
     TrikiConnectionState.WAITING_FOR_WAKE -> "Czeka na przycisk"
     TrikiConnectionState.RECONNECTING -> "Czekam na Triki"
     TrikiConnectionState.ERROR -> "Błąd"

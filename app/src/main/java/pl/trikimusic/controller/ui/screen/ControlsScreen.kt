@@ -1,5 +1,6 @@
 package pl.trikimusic.controller.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -34,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pl.trikimusic.controller.domain.model.ButtonClickType
@@ -53,8 +57,10 @@ fun ControlsScreen(
     viewModel: MainViewModel,
 ) {
     var selectedClick by remember { mutableStateOf<ButtonClickType?>(null) }
+    var showVolumeDetails by remember { mutableStateOf(false) }
     val sample = state.runtime.latestSample
     val volumePresentation = state.volumeControlPresentation()
+    val rotationProgress = state.runtime.rotationGestureProgress.coerceIn(0f, 1f)
 
     androidx.compose.foundation.lazy.LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -84,6 +90,7 @@ fun ControlsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Column(Modifier.weight(1f)) {
+                            Text("Głośność", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(volumePresentation.title, style = MaterialTheme.typography.titleLarge)
                         }
                         Icon(
@@ -102,23 +109,39 @@ fun ControlsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    HorizontalDivider()
-                    GateStatusRow(
-                        "Zakres stabilizacji",
-                        state.runtime.volumeWithinTiltRange,
-                        sample?.let { "przechył %.1f° · dozwolone 0–25°".format(state.runtime.volumeTiltDegrees) } ?: "brak danych",
+                    Text(
+                        volumePresentation.instruction,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    HorizontalDivider()
-                    GateStatusRow(
-                        "Bez gwałtownego ruchu",
-                        state.runtime.volumeAccelerationStable,
-                        sample?.let { "|ACC| %.2f g · dozwolone 0,80–1,20 g".format(it.accelerationMagnitude) } ?: "brak danych",
-                    )
-                    HorizontalDivider()
-                    SensorValueRow(
-                        "Żyroskop Z",
-                        sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",
-                    )
+                    TextButton(onClick = { showVolumeDetails = !showVolumeDetails }) {
+                        Icon(
+                            if (showVolumeDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                        )
+                        Text(if (showVolumeDetails) "Ukryj szczegóły" else "Pokaż szczegóły")
+                    }
+                    AnimatedVisibility(showVolumeDetails) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            HorizontalDivider()
+                            GateStatusRow(
+                                "Zakres 0–25°",
+                                state.runtime.volumeWithinTiltRange,
+                                sample?.let { "Aktualny przechył %.1f°".format(state.runtime.volumeTiltDegrees) } ?: "Brak danych",
+                            )
+                            HorizontalDivider()
+                            GateStatusRow(
+                                "Spokojny ruch",
+                                state.runtime.volumeAccelerationStable,
+                                sample?.let { "Przyspieszenie %.2f g · zakres 0,80–1,20 g".format(it.accelerationMagnitude) } ?: "Brak danych",
+                            )
+                            HorizontalDivider()
+                            SensorValueRow(
+                                "Żyroskop Z",
+                                sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -128,17 +151,11 @@ fun ControlsScreen(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("Obrót odwróconym kapslem", style = MaterialTheme.typography.titleLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Default.SkipNext, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Pełny obrót w prawo → następny utwór", Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Default.SkipPrevious, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Pełny obrót w lewo → poprzedni utwór", Modifier.weight(1f))
-                    }
+                    Text("Nawigacja obrotem 270°", style = MaterialTheme.typography.titleLarge)
+                    GestureActionRow(Icons.Default.SkipNext, "Ruch dłoni w lewo", "Następny utwór")
+                    GestureActionRow(Icons.Default.SkipPrevious, "Ruch dłoni w prawo", "Poprzedni utwór")
                     Text(
-                        "Odwróć kapsel górą w dół, ustabilizuj go przez 0,5 s i wykonaj jeden pełny obrót wokół osi Z. Nie wciskaj przycisku.",
+                        "Kapsel jest odwrócony, dlatego liczy się kierunek ruchu Twojej dłoni. Ustabilizuj go przez 0,5 s, a następnie obróć o 270° wokół osi Z — bez wciskania przycisku.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -148,40 +165,53 @@ fun ControlsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     HorizontalDivider()
+                    if (
+                        (state.runtime.rotationGesturePhase == HoldGesturePhase.HOLDING && state.runtime.rotationGestureFaceDown) ||
+                        state.runtime.rotationGesturePhase in setOf(HoldGesturePhase.TRACKING, HoldGesturePhase.COMPLETING)
+                    ) {
+                        LinearProgressIndicator(
+                            progress = { rotationProgress },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     Text(
                         when (state.runtime.rotationGesturePhase) {
                             HoldGesturePhase.IDLE -> "Gotowe — odwróć kapsel i odczekaj 0,5 s."
                             HoldGesturePhase.HOLDING -> if (state.runtime.rotationGestureFaceDown) {
                                 "Odwrócenie potwierdzone · stabilizacja %.0f%%".format(
-                                    state.runtime.rotationGestureStabilizationProgress * 100f,
+                                    rotationProgress * 100f,
                                 )
                             } else {
                                 "Odwróć kapsel górą w dół i uspokój go przed ruchem."
                             }
-                            HoldGesturePhase.READY -> "Stabilizacja gotowa — wykonaj pełny obrót w lewo lub w prawo."
+                            HoldGesturePhase.READY -> "Gotowe — obróć o 270°: lewo = następny, prawo = poprzedni."
                             HoldGesturePhase.TRACKING -> when (state.runtime.rotationGestureDirection) {
-                                RotationGestureDirection.RIGHT -> "Obrót w prawo: %.0f° / 330°".format(
-                                    kotlin.math.abs(state.runtime.rotationGestureDegrees),
+                                RotationGestureDirection.LEFT -> "Następny utwór · ruch w lewo: %.0f° / 270°".format(
+                                    rotationProgress * ROTATION_TARGET_DEGREES,
                                 )
-                                RotationGestureDirection.LEFT -> "Obrót w lewo: %.0f° / 330°".format(
-                                    kotlin.math.abs(state.runtime.rotationGestureDegrees),
+                                RotationGestureDirection.RIGHT -> "Poprzedni utwór · ruch w prawo: %.0f° / 270°".format(
+                                    rotationProgress * ROTATION_TARGET_DEGREES,
                                 )
                                 null -> "Potwierdzam kierunek obrotu…"
                             }
                             HoldGesturePhase.COMPLETING -> when (state.runtime.rotationGestureDirection) {
-                                RotationGestureDirection.RIGHT -> "Prawo potwierdzone — dokończ pełny obrót."
-                                RotationGestureDirection.LEFT -> "Lewo potwierdzone — dokończ pełny obrót."
-                                null -> "Dokończ pełny obrót."
+                                RotationGestureDirection.LEFT -> "Następny utwór — dokończ ruch w lewo do 270°."
+                                RotationGestureDirection.RIGHT -> "Poprzedni utwór — dokończ ruch w prawo do 270°."
+                                null -> "Dokończ obrót do 270°."
                             }
                             HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
-                            HoldGesturePhase.TRIGGERED -> "Zmiana utworu wysłana — uspokój kapsel przed następną akcją."
+                            HoldGesturePhase.TRIGGERED -> when (state.runtime.rotationGestureDirection) {
+                                RotationGestureDirection.LEFT -> "Następny utwór — rozpoznano ruch w lewo."
+                                RotationGestureDirection.RIGHT -> "Poprzedni utwór — rozpoznano ruch w prawo."
+                                null -> "Zmiana utworu wysłana."
+                            }
                         },
                         style = MaterialTheme.typography.labelLarge,
                     )
                     Text(
                         when {
                             !state.media.hasActiveSession -> "Uruchom odtwarzanie w aplikacji obsługującej Android MediaSession."
-                            state.media.canLike && state.media.canDislike -> "Odtwarzacz obsługuje polubienie i odrzucenie. Usłyszysz osobny krótki sygnał dla każdej akcji."
+                            state.media.canLike && state.media.canDislike -> "Odtwarzacz obsługuje Like i Dislike wysyłane przez dwa lub trzy kliknięcia."
                             state.media.canLike -> "Odtwarzacz obsługuje polubienie, ale nie udostępnia odrzucenia."
                             state.media.canDislike -> "Odtwarzacz obsługuje odrzucenie, ale nie udostępnia polubienia."
                             else -> "Aktywna aplikacja nie udostępnia oceniania utworów przez MediaSession."
@@ -232,12 +262,29 @@ fun ControlsScreen(
 }
 
 @Composable
+private fun GestureActionRow(icon: ImageVector, movement: String, action: String) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(Modifier.weight(1f)) {
+            Text(movement, style = MaterialTheme.typography.labelLarge)
+            Text(action, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
 private fun SensorValueRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.labelLarge)
     }
 }
+
+private const val ROTATION_TARGET_DEGREES = 270f
 
 @Composable
 private fun GateStatusRow(label: String, passed: Boolean, detail: String) {

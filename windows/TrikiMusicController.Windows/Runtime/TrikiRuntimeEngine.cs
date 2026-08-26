@@ -83,12 +83,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
             if (buttonEvent is null && gesture.Triggered)
             {
                 _volumeController.Reset();
-                actionToExecute = gesture.Direction switch
-                {
-                    RotationGestureDirection.Right => MediaAction.Next,
-                    RotationGestureDirection.Left => MediaAction.Previous,
-                    _ => MediaAction.None,
-                };
+                actionToExecute = gesture.Direction?.ToInvertedCapsuleNavigationAction() ?? MediaAction.None;
                 State = State with
                 {
                     LatestSample = filtered,

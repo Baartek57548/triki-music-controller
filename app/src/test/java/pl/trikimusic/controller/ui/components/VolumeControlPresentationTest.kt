@@ -49,7 +49,7 @@ class VolumeControlPresentationTest {
     }
 
     @Test
-    fun `valid angle reports two second stabilization progress`() {
+    fun `valid angle reports stabilization guidance`() {
         val stabilizing = uiState(
             runtime = runtime(withinRange = true, stable = false, progress = 0.5f, tilt = 12f),
         )
@@ -57,7 +57,8 @@ class VolumeControlPresentationTest {
         val presentation = stabilizing.volumeControlPresentation()
 
         assertEquals(VolumeGateState.STABILIZING, presentation.state)
-        assertTrue(presentation.title.contains("50%"))
+        assertEquals("Przygotowywanie sterowania…", presentation.title)
+        assertTrue(presentation.instruction.contains("unikaj gwałtownych ruchów"))
         assertFalse(presentation.ready)
     }
 
@@ -80,7 +81,7 @@ class VolumeControlPresentationTest {
         val presentation = movement.volumeControlPresentation()
 
         assertEquals(VolumeGateState.SUDDEN_MOTION, presentation.state)
-        assertTrue(presentation.instruction.contains("kolejne 2 sekundy"))
+        assertTrue(presentation.instruction.contains("2 sekundy"))
         assertFalse(presentation.ready)
     }
 

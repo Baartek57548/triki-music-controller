@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TrikiMusicController_Windows.Models;
+using TrikiMusicController_Windows.Pages;
 using TrikiMusicController_Windows.ViewModels;
 
 namespace TrikiMusicController_Windows;
@@ -22,11 +23,7 @@ public sealed partial class MainPage : Page
         catch (Exception error) { await ShowErrorAsync(error.Message); }
     }
 
-    private async void Scan_Click(object sender, RoutedEventArgs e)
-    {
-        try { await ViewModel.ScanAsync(); }
-        catch (Exception error) { await ShowErrorAsync(error.Message); }
-    }
+    private void Device_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(DevicePage));
 
     private async void Previous_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(MediaAction.Previous);
     private async void PlayPause_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(MediaAction.PlayPause);

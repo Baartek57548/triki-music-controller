@@ -19,6 +19,7 @@ import pl.trikimusic.controller.core.sensor.SensorFilter
 import pl.trikimusic.controller.core.gesture.FullRotationGestureDetector
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
 import pl.trikimusic.controller.core.gesture.RotationGestureDirection
+import pl.trikimusic.controller.core.gesture.toInvertedCapsuleNavigationAction
 import pl.trikimusic.controller.core.volume.GyroscopeVolumeController
 import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.ButtonClickEvent
@@ -47,9 +48,8 @@ data class RuntimeState(
     val volumeGyroscopeZDps: Float = 0f,
     val rotationGesturePhase: HoldGesturePhase = HoldGesturePhase.IDLE,
     val rotationGestureDirection: RotationGestureDirection? = null,
-    val rotationGestureStabilizationProgress: Float = 0f,
+    val rotationGestureProgress: Float = 0f,
     val rotationGestureFaceDown: Boolean = false,
-    val rotationGestureDegrees: Float = 0f,
     val buttonProtocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
 )
 
@@ -136,9 +136,8 @@ class TrikiRuntime(
                 volumeGyroscopeZDps = 0f,
                 rotationGesturePhase = HoldGesturePhase.IDLE,
                 rotationGestureDirection = null,
-                rotationGestureStabilizationProgress = 0f,
+                rotationGestureProgress = 0f,
                 rotationGestureFaceDown = false,
-                rotationGestureDegrees = 0f,
                 buttonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
             )
         }
@@ -185,18 +184,15 @@ class TrikiRuntime(
                 buttonProtocolMode = buttonMode,
                 rotationGesturePhase = rotationGestureResult.phase,
                 rotationGestureDirection = rotationGestureResult.direction,
-                rotationGestureStabilizationProgress = rotationGestureResult.stabilizationProgress,
+                rotationGestureProgress = rotationGestureResult.stabilizationProgress,
                 rotationGestureFaceDown = rotationGestureResult.faceDown,
-                rotationGestureDegrees = rotationGestureResult.estimatedRotationDegrees,
             )
         }
         if (buttonEvent == null && rotationGestureResult.triggered) {
             volumeController.reset()
-            val mediaAction = when (rotationGestureResult.direction) {
-                RotationGestureDirection.RIGHT -> MediaAction.NEXT
-                RotationGestureDirection.LEFT -> MediaAction.PREVIOUS
-                null -> MediaAction.NONE
-            }
+            val mediaAction = rotationGestureResult.direction
+                ?.toInvertedCapsuleNavigationAction()
+                ?: MediaAction.NONE
             val execution = actionMapper.execute(mediaAction)
             logger.log(
                 LogCategory.CONTROL,

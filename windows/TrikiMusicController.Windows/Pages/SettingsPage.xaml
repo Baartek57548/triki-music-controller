@@ -4,31 +4,67 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
-        <StackPanel MaxWidth="850" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
+        <StackPanel MaxWidth="880" Padding="32,24,32,32" Spacing="20" HorizontalAlignment="Stretch">
             <StackPanel Spacing="4">
                 <TextBlock Text="Ustawienia" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Dostosuj zachowanie połączenia i wygląd aplikacji" Style="{StaticResource PageSubtitleStyle}" />
+                <TextBlock Text="Połączenie, zachowanie aplikacji i funkcje zaawansowane" Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="Triki" Style="{StaticResource SectionTitleStyle}" />
+                <TextBlock Text="{Binding RememberedDevice}" Style="{StaticResource MetadataTextStyle}" />
             </StackPanel>
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="Połączenie" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="{Binding RememberedDevice}" TextWrapping="Wrap" />
-                    <ToggleSwitch Header="Automatycznie łącz po wybudzeniu Triki" OffContent="Wyłączone" OnContent="Włączone" IsOn="{Binding AutoReconnect, Mode=TwoWay}" AutomationProperties.HelpText="Łączy zapamiętany kapsel, gdy zacznie nadawać." />
-                    <ToggleSwitch Header="Łącz tylko podczas użycia" OffContent="Stała gotowość" OnContent="Na żądanie" IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}" AutomationProperties.HelpText="Po 12 sekundach bezczynności zamyka połączenie GATT." />
+                <StackPanel Spacing="16">
+                    <ToggleSwitch Header="Automatycznie łącz po wybudzeniu"
+                                  OffContent="Wyłączone"
+                                  OnContent="Włączone"
+                                  IsOn="{Binding AutoReconnect, Mode=TwoWay}"
+                                  AutomationProperties.HelpText="Łączy zapamiętany kontroler po naciśnięciu jego przycisku." />
+                    <ToggleSwitch Header="Łącz tylko podczas użycia"
+                                  OffContent="Stała gotowość"
+                                  OnContent="Na żądanie"
+                                  IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}"
+                                  AutomationProperties.HelpText="Zamyka aktywne połączenie po 12 sekundach bezczynności." />
                     <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Tryb połączenia" Message="{Binding ConnectionModeSummary}" />
-                    <ToggleSwitch Header="Uruchamiaj aplikację razem z Windows" OffContent="Wyłączone" OnContent="Włączone" IsOn="{Binding StartWithWindows, Mode=TwoWay}" />
                 </StackPanel>
             </Border>
+
+            <TextBlock Text="Aplikacja" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="Wygląd" Style="{StaticResource SectionTitleStyle}" />
-                    <ComboBox Header="Motyw aplikacji"
+                <StackPanel Spacing="16">
+                    <ToggleSwitch Header="Uruchamiaj razem z Windows"
+                                  OffContent="Wyłączone"
+                                  OnContent="Włączone"
+                                  IsOn="{Binding StartWithWindows, Mode=TwoWay}" />
+                    <ComboBox Header="Motyw"
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                               HorizontalAlignment="Left"
-                              MinWidth="220" />
+                              MinWidth="240" />
                 </StackPanel>
             </Border>
+
+            <TextBlock Text="Zaawansowane" Style="{StaticResource SectionTitleStyle}" />
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Diagnostyka" FontWeight="SemiBold" />
+                    <TextBlock Text="Dane IMU, częstotliwość próbek i szczegóły protokołu są oddzielone od codziennego sterowania." Style="{StaticResource PageSubtitleStyle}" />
+                    <Button Content="Otwórz diagnostykę" Click="Diagnostics_Click" HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Informacje" Style="{StaticResource SectionTitleStyle}" />
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Wersja, aktualizacje i prywatność" FontWeight="SemiBold" />
+                    <CommandBar Background="Transparent" DefaultLabelPosition="Right">
+                        <AppBarButton Icon="Help" Label="O aplikacji" Click="About_Click" />
+                        <AppBarButton Icon="Sync" Label="Sprawdź aktualizacje" Click="CheckUpdates_Click" />
+                    </CommandBar>
+                </StackPanel>
+            </Border>
+
             <TextBlock Text="{Binding SettingsStatus}" TextWrapping="Wrap" Style="{StaticResource PageSubtitleStyle}" />
         </StackPanel>
     </ScrollViewer>

@@ -14,11 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -27,7 +24,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,8 +49,6 @@ fun DeviceScreen(
     contentPadding: PaddingValues,
     viewModel: MainViewModel,
     onCalibration: () -> Unit,
-    onSensor: () -> Unit,
-    onInspector: () -> Unit,
     onPermissions: () -> Unit,
 ) {
     var ledOn by remember { mutableStateOf(false) }
@@ -147,7 +141,7 @@ fun DeviceScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Icon(Icons.AutoMirrored.Filled.BluetoothSearching, null)
-                                    Text(" Skanuj urządzenia")
+                                    Text(" Znajdź Triki")
                                 }
                             }
                         }
@@ -171,13 +165,12 @@ fun DeviceScreen(
         }
 
         if (state.ble.connectionState == TrikiConnectionState.READY) {
-            item { SectionTitle("Parametry urządzenia") }
+            item { SectionTitle("Informacje o urządzeniu") }
             item {
                 Card(shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         InfoRow("Bateria", state.ble.battery.percent?.let { "$it%" } ?: "Nieudostępniona")
-                        InfoRow("RSSI", state.ble.rssi?.let { "$it dBm" } ?: "Oczekiwanie")
-                        InfoRow("Próbkowanie", state.ble.measuredSampleRateHz?.let { "%.1f Hz (pomiar)".format(it) } ?: "Pomiar w toku")
+                        InfoRow("Jakość sygnału", signalQuality(state.ble.rssi))
                         InfoRow("Producent", state.ble.deviceInfo.manufacturer ?: "Nieudostępniony")
                         InfoRow("Model", state.ble.deviceInfo.model ?: "Nieudostępniony")
                         InfoRow("Firmware", state.ble.deviceInfo.firmwareRevision ?: "Nieudostępniony")
@@ -186,7 +179,7 @@ fun DeviceScreen(
             }
         }
 
-        item { SectionTitle("Narzędzia") }
+        item { SectionTitle("Konfiguracja") }
         item {
             NavigationRow(
                 Icons.Default.Tune,
@@ -199,10 +192,6 @@ fun DeviceScreen(
                 onCalibration,
                 enabled = state.ble.connectionState == TrikiConnectionState.READY,
             )
-        }
-        item { NavigationRow(Icons.Default.Sensors, "Monitor czujników", "Akcelerometr, żyroskop, orientacja i wykresy na żywo.", onSensor) }
-        if (state.settings.developerMode) {
-            item { NavigationRow(Icons.Default.BugReport, "Inspektor BLE", "Usługi GATT, właściwości oraz pakiety RAW w HEX i DEC.", onInspector) }
         }
         item { NavigationRow(Icons.Default.Security, "Uprawnienia", "Bluetooth, powiadomienie usługi i informacje o odtwarzaniu.", onPermissions) }
     }
@@ -272,7 +261,7 @@ private fun DeviceIdentity(device: TrikiDevice, modifier: Modifier = Modifier) {
         Icon(Icons.Default.SignalCellularAlt, null, tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f).padding(horizontal = 13.dp)) {
             Text(device.name, style = MaterialTheme.typography.titleMedium)
-            Text("${device.address} · ${device.rssi ?: "—"} dBm", style = MaterialTheme.typography.bodyMedium)
+            Text("${signalQuality(device.rssi)} · ${device.address}", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -283,4 +272,12 @@ private fun InfoRow(label: String, value: String) {
         Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.labelLarge)
     }
+}
+
+private fun signalQuality(rssi: Int?): String = when {
+    rssi == null -> "Brak danych"
+    rssi >= -60 -> "Bardzo dobry sygnał"
+    rssi >= -72 -> "Dobry sygnał"
+    rssi >= -84 -> "Słaby sygnał"
+    else -> "Bardzo słaby sygnał"
 }

@@ -43,7 +43,6 @@ public sealed partial class MainWindow : Window
             {
                 "device" => typeof(DevicePage),
                 "controls" => typeof(ControlsPage),
-                "diagnostics" => typeof(DiagnosticsPage),
                 _ => typeof(MainPage),
             };
         if (RootFrame.CurrentSourcePageType != pageType) RootFrame.Navigate(pageType);

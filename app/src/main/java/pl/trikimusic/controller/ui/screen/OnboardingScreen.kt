@@ -21,7 +21,6 @@ import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,11 +45,10 @@ private data class OnboardingPage(
 )
 
 private val pages = listOf(
-    OnboardingPage("Triki Music", "Bezpiecznie reguluj głośność obrotem kapsla i steruj odtwarzaniem jego fizycznym przyciskiem.", Icons.Default.MusicNote),
-    OnboardingPage("Połącz i zapamiętaj", "Pierwsze połączenie wybierzesz w aplikacji. Później wystarczy nacisnąć przycisk uśpionego Triki, a telefon połączy się z nim automatycznie.", Icons.AutoMirrored.Filled.BluetoothSearching),
-    OnboardingPage("Płynna głośność", "Utrzymuj kapsel górą do góry w zakresie 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć — gwałtowny ruch zeruje stabilizację. Po aktywacji łagodny obrót wokół osi Z płynnie zmieni głośność.", Icons.Default.GraphicEq),
-    OnboardingPage("Sterowanie utworem", "Dwa kliknięcia lubią utwór, trzy kliknięcia go odrzucają. Odwrócony kapsel po półsekundowej stabilizacji i pełnym obrocie w prawo przechodzi do następnego utworu, a w lewo wraca do poprzedniego.", Icons.Default.Favorite),
-    OnboardingPage("Kalibracja", "Kalibracja na równej powierzchni dopasuje czujniki do Twojego egzemplarza Triki i dodatkowo ograniczy przypadkowe zmiany głośności.", Icons.Default.Tune),
+    OnboardingPage("Triki Music", "Fizyczny kontroler do szybkiego sterowania muzyką bez sięgania do ekranu.", Icons.Default.MusicNote),
+    OnboardingPage("Obudź i połącz", "Naciśnij przycisk Triki i połącz je pierwszy raz. Telefon zapamięta kontroler i później połączy go automatycznie.", Icons.AutoMirrored.Filled.BluetoothSearching),
+    OnboardingPage("Obrót steruje głośnością", "Trzymaj Triki prawie poziomo przez 2 sekundy. Gdy sterowanie będzie gotowe, obracaj kapsel łagodnie, aby zmieniać głośność.", Icons.Default.GraphicEq),
+    OnboardingPage("Przycisk i utwory", "Jeden klik steruje Play/Pause, dwa oznaczają Like, a trzy Dislike. Odwrócony kapsel i obrót dłoni o 270° zmienia utwór: lewo to następny, prawo to poprzedni.", Icons.Default.Favorite),
 )
 
 @Composable

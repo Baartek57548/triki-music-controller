@@ -3,10 +3,11 @@ package pl.trikimusic.controller.core.gesture
 import kotlin.math.abs
 import kotlin.math.cos
 import pl.trikimusic.controller.domain.model.FilteredSensorData
+import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.Vector3
 
 /**
- * Recognizes one deliberate rotation around the capsule's local Z axis while it is inverted.
+ * Recognizes one deliberate 270° rotation around the capsule's local Z axis while it is inverted.
  *
  * The detector intentionally follows the same signed gyro integration model as the volume
  * controller. A positive Z rotation is a right turn, a negative Z rotation is a left turn. The
@@ -17,10 +18,10 @@ class FullRotationGestureDetector(
 ) {
     data class Configuration(
         val stabilizationMillis: Long = 500L,
-        // A filtered estimate loses a small amount at the beginning and end of a turn. Requiring
-        // 330° still represents a deliberate physical full turn while keeping it attainable.
-        val requiredRotationDegrees: Float = 330f,
-        val maximumRotationDegrees: Float = 500f,
+        // The two low-pass stages lose roughly 20–25° at the edges of a deliberate turn. A 245°
+        // integrated threshold therefore makes the physical gesture finish around the requested 270°.
+        val requiredRotationDegrees: Float = FILTERED_ROTATION_TRIGGER_DEGREES,
+        val maximumRotationDegrees: Float = 420f,
         val maximumRotationMillis: Long = 5_000L,
         val maximumFaceDownTiltDegrees: Float = 25f,
         val maximumAccelerationDeviationG: Float = 0.20f,
@@ -33,7 +34,7 @@ class FullRotationGestureDetector(
     ) {
         init {
             require(stabilizationMillis in 200L..3_000L)
-            require(requiredRotationDegrees.isFinite() && requiredRotationDegrees in 270f..360f)
+            require(requiredRotationDegrees.isFinite() && requiredRotationDegrees in 180f..360f)
             require(maximumRotationDegrees.isFinite() && maximumRotationDegrees > requiredRotationDegrees)
             require(maximumRotationMillis in 1_000L..10_000L)
             require(maximumFaceDownTiltDegrees.isFinite() && maximumFaceDownTiltDegrees in 5f..45f)
@@ -250,13 +251,16 @@ class FullRotationGestureDetector(
         value.x.isFinite() && value.y.isFinite() && value.z.isFinite() &&
             value.magnitude in MIN_USABLE_ACCELERATION_G..MAX_USABLE_ACCELERATION_G
 
-    private companion object {
-        const val NANOS_PER_MILLISECOND = 1_000_000L
-        const val NANOS_PER_SECOND = 1_000_000_000f
-        const val MAX_SAMPLE_INTERVAL_NANOS = 100_000_000L
-        const val STANDARD_GRAVITY_G = 1f
-        const val MIN_USABLE_ACCELERATION_G = 0.20f
-        const val MAX_USABLE_ACCELERATION_G = 2.50f
+    companion object {
+        const val PHYSICAL_ROTATION_TARGET_DEGREES = 270f
+        const val FILTERED_ROTATION_TRIGGER_DEGREES = 245f
+
+        private const val NANOS_PER_MILLISECOND = 1_000_000L
+        private const val NANOS_PER_SECOND = 1_000_000_000f
+        private const val MAX_SAMPLE_INTERVAL_NANOS = 100_000_000L
+        private const val STANDARD_GRAVITY_G = 1f
+        private const val MIN_USABLE_ACCELERATION_G = 0.20f
+        private const val MAX_USABLE_ACCELERATION_G = 2.50f
     }
 }
 
@@ -273,4 +277,9 @@ data class FullRotationGestureResult(
 enum class RotationGestureDirection {
     RIGHT,
     LEFT,
+}
+
+fun RotationGestureDirection.toInvertedCapsuleNavigationAction(): MediaAction = when (this) {
+    RotationGestureDirection.LEFT -> MediaAction.NEXT
+    RotationGestureDirection.RIGHT -> MediaAction.PREVIOUS
 }

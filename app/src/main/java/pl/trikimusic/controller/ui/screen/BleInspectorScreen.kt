@@ -79,7 +79,7 @@ fun BleInspectorScreen(state: MainUiState, viewModel: MainViewModel, onBack: () 
                         modifier = Modifier.weight(1f),
                     ) {
                         Icon(if (recording) Icons.Default.Stop else Icons.Default.FiberManualRecord, null)
-                        Text(if (recording) " Zatrzymaj" else " Start recording")
+                        Text(if (recording) " Zatrzymaj" else " Rozpocznij")
                     }
                     OutlinedButton(
                         onClick = {

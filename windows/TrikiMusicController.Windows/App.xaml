@@ -13,8 +13,8 @@
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Padding" Value="20" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="22" />
             </Style>
             <Style x:Key="PageTitleStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="28" />
@@ -29,6 +29,17 @@
             <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="18" />
                 <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style x:Key="EyebrowTextStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style x:Key="MetadataTextStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
         </ResourceDictionary>

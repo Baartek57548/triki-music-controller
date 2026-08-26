@@ -189,8 +189,6 @@ fun TrikiMusicApp(
                     contentPadding = padding,
                     viewModel = viewModel,
                     onCalibration = { navController.navigate(Routes.CALIBRATION) },
-                    onSensor = { navController.navigate(Routes.SENSOR) },
-                    onInspector = { navController.navigate(Routes.INSPECTOR) },
                     onPermissions = { navController.navigate(Routes.PERMISSIONS) },
                 )
             }
@@ -202,6 +200,7 @@ fun TrikiMusicApp(
                     onPermissions = { navController.navigate(Routes.PERMISSIONS) },
                     onSensor = { navController.navigate(Routes.SENSOR) },
                     onInspector = { navController.navigate(Routes.INSPECTOR) },
+                    onInfo = { navController.navigate(Routes.INFO) },
                 )
             }
             composable(Routes.CALIBRATION) {

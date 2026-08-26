@@ -5,11 +5,16 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
         <StackPanel MaxWidth="1000" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
-            <TextBlock Text="Diagnostyka" Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Spacing="4">
+                <TextBlock Text="Diagnostyka" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Zaawansowane dane do sprawdzania połączenia i czujników." Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
+            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Narzędzia zaawansowane" Message="Te wartości są przydatne podczas diagnozowania, ale nie są potrzebne do codziennej obsługi Triki." />
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Dane IMU" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="{Binding SensorDetails}" FontFamily="Consolas" FontSize="15" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding VolumeTechnicalDetails}" FontFamily="Consolas" FontSize="14" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">

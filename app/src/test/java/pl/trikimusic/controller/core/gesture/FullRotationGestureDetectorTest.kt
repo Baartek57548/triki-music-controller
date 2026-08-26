@@ -7,6 +7,7 @@ import org.junit.Test
 import pl.trikimusic.controller.core.sensor.SensorFilter
 import pl.trikimusic.controller.domain.model.CalibrationProfile
 import pl.trikimusic.controller.domain.model.FilteredSensorData
+import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.OrientationData
 import pl.trikimusic.controller.domain.model.RawVector3
 import pl.trikimusic.controller.domain.model.TrikiSensorData
@@ -14,18 +15,18 @@ import pl.trikimusic.controller.domain.model.Vector3
 
 class FullRotationGestureDetectorTest {
     @Test
-    fun rightFullRotationTriggersNextDirection() {
+    fun right270DegreeRotationReportsRightDirection() {
         val fixture = Fixture()
         fixture.stabilize()
         fixture.rotate(positive = true)
 
         assertEquals(listOf(RotationGestureDirection.RIGHT), fixture.triggers)
         assertTrue(fixture.latest.faceDown)
-        assertTrue(fixture.latest.estimatedRotationDegrees >= 330f)
+        assertTrue(fixture.latest.estimatedRotationDegrees >= 245f)
     }
 
     @Test
-    fun leftFullRotationTriggersPreviousDirection() {
+    fun left270DegreeRotationReportsLeftDirection() {
         val fixture = Fixture()
         fixture.stabilize()
         fixture.rotate(positive = false)
@@ -37,10 +38,10 @@ class FullRotationGestureDetectorTest {
     fun partialTurnIsNotEnough() {
         val fixture = Fixture()
         fixture.stabilize()
-        fixture.rotate(positive = true, frames = 100)
+        fixture.rotate(positive = true, frames = 90)
 
         assertTrue(fixture.triggers.isEmpty())
-        assertTrue(fixture.latest.estimatedRotationDegrees < 330f)
+        assertTrue(fixture.latest.estimatedRotationDegrees < 245f)
     }
 
     @Test
@@ -81,7 +82,7 @@ class FullRotationGestureDetectorTest {
     }
 
     @Test
-    fun sensorFilterPreservesFullRotation() {
+    fun filteredPhysicalTurnTriggersAt270DegreesButNotAt240Degrees() {
         val detector = FullRotationGestureDetector()
         val filter = SensorFilter()
         val directions = mutableListOf<RotationGestureDirection>()
@@ -91,14 +92,29 @@ class FullRotationGestureDetectorTest {
             val raw = sample(timestampNanos, Vector3(0f, 0f, 1f), 0f).source
             detector.process(filter.process(raw, CalibrationProfile()))
         }
-        repeat(170) {
+        repeat(100) {
             timestampNanos += SAMPLE_PERIOD_NANOS
-            val raw = sample(timestampNanos, Vector3(0f, 0f, 1f), 130f).source
+            val raw = sample(timestampNanos, Vector3(0f, 0f, 1f), 120f).source
+            detector.process(filter.process(raw, CalibrationProfile())).takeIf { it.triggered }
+                ?.direction?.let(directions::add)
+        }
+
+        assertTrue(directions.isEmpty())
+
+        repeat(13) {
+            timestampNanos += SAMPLE_PERIOD_NANOS
+            val raw = sample(timestampNanos, Vector3(0f, 0f, 1f), 120f).source
             detector.process(filter.process(raw, CalibrationProfile())).takeIf { it.triggered }
                 ?.direction?.let(directions::add)
         }
 
         assertEquals(listOf(RotationGestureDirection.RIGHT), directions)
+    }
+
+    @Test
+    fun invertedCapsuleDirectionMapsToUsersTrackDirection() {
+        assertEquals(MediaAction.NEXT, RotationGestureDirection.LEFT.toInvertedCapsuleNavigationAction())
+        assertEquals(MediaAction.PREVIOUS, RotationGestureDirection.RIGHT.toInvertedCapsuleNavigationAction())
     }
 
     private class Fixture(
@@ -107,8 +123,8 @@ class FullRotationGestureDetectorTest {
         private val detector = FullRotationGestureDetector(
             FullRotationGestureDetector.Configuration(
                 stabilizationMillis = 200L,
-                requiredRotationDegrees = 330f,
-                maximumRotationDegrees = 500f,
+                requiredRotationDegrees = 245f,
+                maximumRotationDegrees = 420f,
                 maximumRotationMillis = 4_000L,
                 activationGyroscopeDps = 18f,
                 releaseGyroscopeDps = 8f,
@@ -126,7 +142,7 @@ class FullRotationGestureDetectorTest {
 
         fun quiet(frames: Int) = feed(rest, frames)
 
-        fun rotate(positive: Boolean, frames: Int = 150) {
+        fun rotate(positive: Boolean, frames: Int = 110) {
             feed(rest, 1, if (positive) 130f else -130f)
             feed(rest, frames, if (positive) 130f else -130f)
         }

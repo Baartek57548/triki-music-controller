@@ -3,14 +3,14 @@ using TrikiMusicController_Windows.Models;
 namespace TrikiMusicController_Windows.Core;
 
 /// <summary>
-/// Recognizes one deliberate rotation around the inverted capsule's local Z axis.
+/// Recognizes one deliberate 270° rotation around the inverted capsule's local Z axis.
 /// </summary>
 public sealed record FullRotationGestureConfiguration(
     long StabilizationMillis = 500,
-    // A filtered estimate loses a small amount at the beginning and end of a turn. Requiring
-    // 330° still represents a deliberate physical full turn while keeping it attainable.
-    float RequiredRotationDegrees = 330,
-    float MaximumRotationDegrees = 500,
+    // The two low-pass stages lose roughly 20–25° at the edges of a deliberate turn. A 245°
+    // integrated threshold therefore makes the physical gesture finish around the requested 270°.
+    float RequiredRotationDegrees = FullRotationGestureDetector.FilteredRotationTriggerDegrees,
+    float MaximumRotationDegrees = 420,
     long MaximumRotationMillis = 5_000,
     float MaximumFaceDownTiltDegrees = 25,
     float MaximumAccelerationDeviationG = 0.20f,
@@ -23,6 +23,9 @@ public sealed record FullRotationGestureConfiguration(
 
 public sealed class FullRotationGestureDetector
 {
+    public const float PhysicalRotationTargetDegrees = 270;
+    public const float FilteredRotationTriggerDegrees = 245;
+
     private const long NanosPerMillisecond = 1_000_000;
     private const long MaxSampleIntervalNanos = 100_000_000;
     private const float NanosPerSecond = 1_000_000_000f;
@@ -243,7 +246,7 @@ public sealed class FullRotationGestureDetector
     private static void ValidateConfiguration(FullRotationGestureConfiguration value)
     {
         if (value.StabilizationMillis is < 200 or > 3_000 ||
-            !float.IsFinite(value.RequiredRotationDegrees) || value.RequiredRotationDegrees is < 270 or > 360 ||
+            !float.IsFinite(value.RequiredRotationDegrees) || value.RequiredRotationDegrees is < 180 or > 360 ||
             !float.IsFinite(value.MaximumRotationDegrees) || value.MaximumRotationDegrees <= value.RequiredRotationDegrees ||
             value.MaximumRotationMillis is < 1_000 or > 10_000 ||
             !float.IsFinite(value.MaximumFaceDownTiltDegrees) || value.MaximumFaceDownTiltDegrees is < 5 or > 45 ||

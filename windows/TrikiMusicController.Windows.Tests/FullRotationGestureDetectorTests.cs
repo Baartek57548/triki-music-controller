@@ -6,7 +6,7 @@ namespace TrikiMusicController.Windows.Tests;
 public sealed class FullRotationGestureDetectorTests
 {
     [Fact]
-    public void RightFullRotationTriggersNextDirection()
+    public void Right270DegreeRotationReportsRightDirection()
     {
         var fixture = new Fixture();
         fixture.Stabilize();
@@ -14,11 +14,11 @@ public sealed class FullRotationGestureDetectorTests
 
         Assert.Equal([RotationGestureDirection.Right], fixture.Triggers);
         Assert.True(fixture.Latest.FaceDown);
-        Assert.True(fixture.Latest.EstimatedRotationDegrees >= 330);
+        Assert.True(fixture.Latest.EstimatedRotationDegrees >= 245);
     }
 
     [Fact]
-    public void LeftFullRotationTriggersPreviousDirection()
+    public void Left270DegreeRotationReportsLeftDirection()
     {
         var fixture = new Fixture();
         fixture.Stabilize();
@@ -32,10 +32,10 @@ public sealed class FullRotationGestureDetectorTests
     {
         var fixture = new Fixture();
         fixture.Stabilize();
-        fixture.Rotate(positive: true, frames: 100);
+        fixture.Rotate(positive: true, frames: 90);
 
         Assert.Empty(fixture.Triggers);
-        Assert.InRange(fixture.Latest.EstimatedRotationDegrees, -329.99f, 329.99f);
+        Assert.InRange(fixture.Latest.EstimatedRotationDegrees, -244.99f, 244.99f);
     }
 
     [Fact]
@@ -75,13 +75,61 @@ public sealed class FullRotationGestureDetectorTests
         Assert.Equal([RotationGestureDirection.Right, RotationGestureDirection.Left], fixture.Triggers);
     }
 
+    [Fact]
+    public void InvertedCapsuleDirectionMapsToUsersTrackDirection()
+    {
+        Assert.Equal(MediaAction.Next, RotationGestureDirection.Left.ToInvertedCapsuleNavigationAction());
+        Assert.Equal(MediaAction.Previous, RotationGestureDirection.Right.ToInvertedCapsuleNavigationAction());
+    }
+
+    [Fact]
+    public void FilteredPhysicalTurnTriggersAt270DegreesButNotAt240Degrees()
+    {
+        var detector = new FullRotationGestureDetector();
+        var filter = new SensorFilter();
+        var directions = new List<RotationGestureDirection>();
+        var timestampNanos = 0L;
+
+        for (var index = 0; index < 40; index++)
+        {
+            timestampNanos += SensorTestData.SamplePeriodNanos;
+            var raw = SensorTestData.Filtered(timestampNanos, new Vector3f(0, 0, 1)).Source;
+            detector.Process(filter.Process(raw, new CalibrationProfile()));
+        }
+        for (var index = 0; index < 100; index++)
+        {
+            timestampNanos += SensorTestData.SamplePeriodNanos;
+            var raw = SensorTestData.Filtered(
+                timestampNanos,
+                new Vector3f(0, 0, 1),
+                new Vector3f(0, 0, 120)).Source;
+            var result = detector.Process(filter.Process(raw, new CalibrationProfile()));
+            if (result.Triggered && result.Direction is RotationGestureDirection direction) directions.Add(direction);
+        }
+
+        Assert.Empty(directions);
+
+        for (var index = 0; index < 13; index++)
+        {
+            timestampNanos += SensorTestData.SamplePeriodNanos;
+            var raw = SensorTestData.Filtered(
+                timestampNanos,
+                new Vector3f(0, 0, 1),
+                new Vector3f(0, 0, 120)).Source;
+            var result = detector.Process(filter.Process(raw, new CalibrationProfile()));
+            if (result.Triggered && result.Direction is RotationGestureDirection direction) directions.Add(direction);
+        }
+
+        Assert.Equal([RotationGestureDirection.Right], directions);
+    }
+
     private sealed class Fixture
     {
         private const long SamplePeriodNanos = 20_000_000;
         private readonly FullRotationGestureDetector _detector = new(new FullRotationGestureConfiguration(
             StabilizationMillis: 200,
-            RequiredRotationDegrees: 330,
-            MaximumRotationDegrees: 500,
+            RequiredRotationDegrees: 245,
+            MaximumRotationDegrees: 420,
             MaximumRotationMillis: 4_000,
             ActivationGyroscopeDps: 18,
             ReleaseGyroscopeDps: 8,
@@ -103,7 +151,7 @@ public sealed class FullRotationGestureDetectorTests
 
         public void Quiet(int frames) => Feed(_rest, frames);
 
-        public void Rotate(bool positive, int frames = 150)
+        public void Rotate(bool positive, int frames = 110)
         {
             var gyroscopeZ = positive ? 130f : -130f;
             Feed(_rest, 1, gyroscopeZ);

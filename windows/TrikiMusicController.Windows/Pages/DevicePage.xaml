@@ -3,24 +3,68 @@
     x:Class="TrikiMusicController_Windows.Pages.DevicePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Padding="28">
-        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-        <TextBlock Text="Urządzenie Triki" Style="{StaticResource PageTitleStyle}" />
-        <InfoBar Grid.Row="1" Margin="0,18,0,12" IsOpen="True" IsClosable="False" Severity="Informational" Title="{Binding ConnectionTitle}" Message="{Binding ConnectionDetails}" />
-        <ListView
-            Grid.Row="2"
-            ItemsSource="{Binding Devices}"
-            SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
-            DisplayMemberPath="DisplayName"
-            SelectionMode="Single"
-            AutomationProperties.Name="Wykryte urządzenia Bluetooth LE" />
-        <CommandBar Grid.Row="3" Margin="0,12,0,0" DefaultLabelPosition="Right">
-            <AppBarButton Icon="Find" Label="Skanuj" Click="Scan_Click" />
-            <AppBarButton Icon="Accept" Label="Połącz" Click="Connect_Click" />
-            <AppBarButton Icon="Cancel" Label="Rozłącz" Click="Disconnect_Click" />
-            <AppBarButton Icon="Delete" Label="Zapomnij" Click="Forget_Click" />
-            <AppBarSeparator />
-            <AppBarToggleButton Icon="Highlight" Label="Dioda LED" Click="Led_Click" />
-        </CommandBar>
+    <Grid>
+        <Grid MaxWidth="1000" Padding="28" HorizontalAlignment="Stretch">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="Urządzenie Triki" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock Text="Połącz kapsel raz, a Windows zapamięta go i wznowi połączenie po wybudzeniu przyciskiem." Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
+
+            <InfoBar
+                Grid.Row="1"
+                Margin="0,18,0,14"
+                IsOpen="True"
+                IsClosable="False"
+                Severity="Informational"
+                Title="{Binding ConnectionTitle}"
+                Message="{Binding ConnectionDetails}" />
+
+            <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
+                <Grid ColumnSpacing="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="BATERIA" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock Text="{Binding BatteryText}" FontSize="20" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="3">
+                        <TextBlock Text="SYGNAŁ" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock Text="{Binding SignalQuality}" FontSize="20" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <TextBlock Grid.Row="3" Margin="0,22,0,8" Text="Wykryte urządzenia" Style="{StaticResource SectionTitleStyle}" />
+
+            <ListView
+                Grid.Row="4"
+                MinHeight="180"
+                ItemsSource="{Binding Devices}"
+                SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
+                DisplayMemberPath="DisplayName"
+                SelectionMode="Single"
+                AutomationProperties.Name="Wykryte urządzenia Bluetooth LE"
+                AutomationProperties.HelpText="Jeżeli lista jest pusta, wybudź kapsel przyciskiem i wybierz Znajdź Triki." />
+
+            <CommandBar Grid.Row="5" Margin="0,12,0,0" DefaultLabelPosition="Right">
+                <AppBarButton Icon="Find" Label="Znajdź Triki" Click="Scan_Click" />
+                <AppBarButton Icon="Accept" Label="Połącz" Click="Connect_Click" />
+                <AppBarButton Icon="Cancel" Label="Rozłącz" Click="Disconnect_Click" />
+                <AppBarButton Icon="Delete" Label="Zapomnij" Click="Forget_Click" />
+                <AppBarSeparator />
+                <AppBarToggleButton Icon="Highlight" Label="Dioda LED" Click="Led_Click" />
+            </CommandBar>
+        </Grid>
     </Grid>
 </Page>

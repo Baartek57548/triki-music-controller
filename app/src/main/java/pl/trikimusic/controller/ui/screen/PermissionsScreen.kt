@@ -56,16 +56,16 @@ fun PermissionsScreen(state: MainUiState, viewModel: MainViewModel, onBack: () -
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Każdy dostęp ma konkretny cel. Aplikacja nie używa lokalizacji ani nie wysyła danych IMU poza telefon.",
+                "Nadaj tylko dostępy potrzebne do wybranych funkcji. Dane ruchu pozostają na telefonie.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             PermissionCard(
                 icon = Icons.Default.Bluetooth,
                 title = "Urządzenia w pobliżu",
                 description = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    "BLUETOOTH_SCAN wyszukuje Triki, a BLUETOOTH_CONNECT obsługuje GATT. Flaga neverForLocation deklaruje brak użycia do lokalizacji."
+                    "Pozwala znaleźć Triki i utrzymywać połączenie Bluetooth. Dostęp nie służy do ustalania lokalizacji."
                 } else {
-                    "Android 8–11 wymaga lokalizacji podczas skanowania BLE; aplikacja nie pobiera pozycji GPS."
+                    "Android 8–11 wymaga tego dostępu podczas wyszukiwania Bluetooth. Aplikacja nie odczytuje pozycji GPS."
                 },
                 granted = state.permissions.bluetoothPermissionsGranted,
                 actionLabel = "Nadaj dostęp",
@@ -94,7 +94,7 @@ fun PermissionsScreen(state: MainUiState, viewModel: MainViewModel, onBack: () -
             PermissionCard(
                 icon = Icons.Default.PlayCircle,
                 title = "Informacje o odtwarzanym utworze",
-                description = "Dostęp jest opcjonalny: pokazuje tytuł, wykonawcę i okładkę. Play/Pauza, Następny, Poprzedni oraz głośność działają także bez niego przez systemowe przyciski multimedialne.",
+                description = "Opcjonalnie pokazuje tytuł, wykonawcę i okładkę. Podstawowe sterowanie muzyką działa także bez niego.",
                 granted = state.permissions.mediaSessionGranted,
                 optional = true,
                 actionLabel = "Opcjonalnie włącz",
@@ -127,19 +127,26 @@ private fun PermissionCard(
     actionLabel: String,
     onAction: () -> Unit,
 ) {
-    Card(shape = RoundedCornerShape(24.dp)) {
+    val statusLabel = when {
+        granted -> "Gotowe"
+        optional -> "Opcjonalne"
+        else -> "Wymagane"
+    }
+    val statusColor = if (granted || optional) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Card(shape = RoundedCornerShape(20.dp)) {
         Column(Modifier.fillMaxWidth().padding(19.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Text(statusLabel, style = MaterialTheme.typography.labelLarge, color = statusColor)
                 Icon(
                     when {
                         granted -> Icons.Default.CheckCircle
                         optional -> Icons.Default.Info
                         else -> Icons.Default.ErrorOutline
                     },
-                    null,
-                    tint = if (granted || optional) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    contentDescription = statusLabel,
+                    tint = statusColor,
                 )
             }
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

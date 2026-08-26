@@ -2,7 +2,9 @@ package pl.trikimusic.controller.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,20 +34,30 @@ fun InfoScreen(
 ) {
     Scaffold(topBar = { DetailTopBar("Informacje", onBack) }) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp).verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp, vertical = 12.dp).verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Icon(Icons.Default.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
-            Text("Triki Music Controller", style = MaterialTheme.typography.headlineMedium)
-            Text("Wersja ${BuildConfig.VERSION_NAME}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Icon(Icons.Default.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Column {
+                    Text("Triki Music Controller", style = MaterialTheme.typography.titleLarge)
+                    Text("Wersja ${BuildConfig.VERSION_NAME}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             OutlinedButton(
                 onClick = onCheckForUpdates,
                 enabled = updateState.stage !in setOf(UpdateStage.CHECKING, UpdateStage.DOWNLOADING),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (updateState.stage == UpdateStage.CHECKING) "Sprawdzanie…" else "Sprawdź aktualizacje")
             }
-            Card(shape = RoundedCornerShape(24.dp)) {
+            Text(
+                updateStatus(updateState),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     InfoSection(
                         "Połączenie",
@@ -56,8 +68,8 @@ fun InfoScreen(
                         "Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy. Kapsel nie musi leżeć nieruchomo, ale gwałtowne przyspieszenie poza 0,80–1,20 g wstrzymuje regulację i rozpoczyna stabilizację od nowa. Po aktywacji wygładzona wartość żyroskopu osi Z łagodnie reguluje głośność.",
                     )
                     InfoSection(
-                        "Like i Dislike",
-                        "Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają. Niezależnie od przycisku możesz odwrócić kapsel, odczekać pół sekundy i wykonać jeden pełny obrót wokół osi Z: w prawo przechodzi do następnego utworu, w lewo wraca do poprzedniego.",
+                        "Sterowanie utworem",
+                        "Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają. Aby zmienić utwór bez przycisku, odwróć kapsel i odczekaj pół sekundy. Następnie obróć go o 270° zgodnie z ruchem dłoni: w lewo przejdziesz do następnego utworu, a w prawo wrócisz do poprzedniego.",
                     )
                     InfoSection(
                         "Prywatność i zgodność",
@@ -71,6 +83,16 @@ fun InfoScreen(
             }
         }
     }
+}
+
+private fun updateStatus(state: UpdateUiState): String = when (state.stage) {
+    UpdateStage.IDLE -> "Aplikacja sprawdza nowe stabilne wydanie także przy uruchomieniu."
+    UpdateStage.CHECKING -> "Sprawdzam najnowsze wydanie…"
+    UpdateStage.AVAILABLE -> "Dostępna jest wersja ${state.info?.versionName ?: "nowsza"}."
+    UpdateStage.DOWNLOADING -> "Pobieranie ${Math.round(state.downloadProgress.coerceIn(0f, 1f) * 100f)}%."
+    UpdateStage.AWAITING_INSTALL_PERMISSION -> "Wymagana jest zgoda na instalowanie aktualizacji z tej aplikacji."
+    UpdateStage.READY_TO_INSTALL -> "Aktualizacja jest gotowa do instalacji."
+    UpdateStage.ERROR -> state.errorMessage ?: "Nie udało się sprawdzić aktualizacji."
 }
 
 @Composable

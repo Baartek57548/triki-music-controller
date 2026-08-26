@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Microsoft.UI.Dispatching;
+using TrikiMusicController_Windows.Core;
 using TrikiMusicController_Windows.Models;
 using TrikiMusicController_Windows.Runtime;
 using TrikiMusicController_Windows.Services;
@@ -73,62 +74,138 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ => "Triki rozłączone",
     };
 
-    public string ConnectionDetails => _lastBluetooth.ConnectionState == TrikiConnectionState.Ready
-        ? $"{_lastBluetooth.ConnectedDevice?.Name} • {_lastBluetooth.SampleRateHz?.ToString("0.0") ?? "—"} Hz • bateria {_lastBluetooth.BatteryPercent?.ToString() ?? "—"}%"
-        : _lastBluetooth.ErrorMessage ?? (_settings.Current.KnownDeviceAddress is not null
-            ? (_lastBluetooth.ConnectionState == TrikiConnectionState.WaitingForWake && !_lastBluetooth.WakeWatcherArmed
-                ? "Kończę poprzednią sesję. Nasłuch uzbroi się, gdy kapsel całkowicie zaśnie."
-                : "Naciśnij przycisk kapsla. Aplikacja połączy się, gdy urządzenie zacznie nadawać.")
-            : "Wybierz urządzenie z listy i połącz je po raz pierwszy.");
+    public string ConnectionDetails => _lastBluetooth.ErrorMessage ?? _lastBluetooth.ConnectionState switch
+    {
+        TrikiConnectionState.Ready => "Kontroler jest gotowy do sterowania muzyką.",
+        TrikiConnectionState.Scanning => "Szukam aktywnego kontrolera Triki…",
+        TrikiConnectionState.Connecting => "Przygotowuję bezpieczne połączenie…",
+        TrikiConnectionState.WaitingForDevice or TrikiConnectionState.WaitingForWake =>
+            "Naciśnij przycisk kontrolera, aby go wybudzić.",
+        TrikiConnectionState.Error => "Sprawdź Bluetooth i spróbuj ponownie.",
+        _ when _settings.Current.KnownDeviceAddress is not null =>
+            "Naciśnij przycisk zapamiętanego Triki, aby połączyć je automatycznie.",
+        _ => "Obudź Triki przyciskiem, a następnie znajdź i połącz je pierwszy raz.",
+    };
+    public string BatteryText => _lastBluetooth.BatteryPercent is int battery ? $"{battery}%" : "Brak danych";
+    public string SignalQuality => _lastBluetooth.ConnectedDevice?.Rssi switch
+    {
+        >= -60 => "Bardzo dobry",
+        >= -72 => "Dobry",
+        >= -84 => "Słaby",
+        short.MinValue => "Brak danych",
+        null => "Brak danych",
+        _ => "Bardzo słaby",
+    };
 
     public string MediaTitle => _lastMedia.Title;
     public string MediaDetails => $"{_lastMedia.Artist} • {_lastMedia.SourceApp}";
     public string PlaybackStatus => _lastMedia.HasSession
         ? (_lastMedia.IsPlaying ? "Odtwarzanie" : "Wstrzymano")
         : "Brak aktywnej sesji multimedialnej";
+    public string PlayPauseGlyph => _lastMedia.IsPlaying ? "\uE769" : "\uE768";
+    public string PlayPauseLabel => _lastMedia.IsPlaying ? "Wstrzymaj" : "Odtwórz";
     public string VolumeText => $"Głośność systemowa: {_lastMedia.VolumePercent:0}%{(_lastMedia.IsMuted ? " (wyciszona)" : string.Empty)}";
 
     public double VolumeProgress => _lastRuntime.Volume?.StabilizationProgress ?? 0;
     public string VolumeControlTitle => _lastRuntime.Volume switch
     {
-        null => "Regulator oczekuje na dane",
-        { SensorValid: false } => "Nieprawidłowe dane czujnika",
-        { WithinTiltRange: false } volume => $"Poza zakresem: {volume.TiltDegrees:0.0}°",
-        { AccelerationStable: false } => "Gwałtowny ruch — stabilizacja od nowa",
-        { TiltStable: false } volume => $"Stabilizacja kąta {volume.StabilizationProgress * 100:0}%",
-        _ => "Regulator głośności gotowy",
+        null => "Sterowanie nieaktywne",
+        { SensorValid: false } => "Sprawdź połączenie",
+        { WithinTiltRange: false } => "Ustaw Triki prawie poziomo",
+        { AccelerationStable: false } => "Ustabilizuj Triki",
+        { TiltStable: false } => "Przygotowywanie sterowania…",
+        _ => "Gotowe",
     };
     public string VolumeControlDetails => _lastRuntime.Volume is { } volume
+        ? volume switch
+        {
+            { SensorValid: false } => "Nie otrzymuję prawidłowych danych ruchu z Triki.",
+            { WithinTiltRange: false } => "Utrzymuj kapsel górną stroną do góry w zakresie 0–25°.",
+            { AccelerationStable: false } => "Gwałtowny ruch przerwał przygotowanie. Trzymaj kapsel spokojnie.",
+            { TiltStable: false } => "Utrzymaj pozycję przez 2 sekundy i unikaj szarpnięć.",
+            _ => "Obracaj kapsel łagodnie wokół osi Z, aby zmieniać głośność systemową.",
+        }
+        : "Połącz Triki, aby uruchomić gesty i przycisk.";
+    public string VolumeTechnicalDetails => _lastRuntime.Volume is { } volume
         ? $"Przechył {volume.TiltDegrees:0.0}° • |ACC| {_lastRuntime.LatestSample?.AccelerationMagnitude ?? 0:0.00} g • żyroskop Z {volume.GyroscopeZDps:+0.0;-0.0;0.0}°/s"
-        : "Utrzymuj kapsel w zakresie 0–25° przez 2 sekundy i unikaj gwałtownych ruchów.";
+        : "Regulator głośności: brak danych IMU.";
+    public double GestureProgress => _lastRuntime.Gesture.Phase switch
+    {
+        HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => _lastRuntime.Gesture.StabilizationProgress,
+        HoldGesturePhase.Tracking or HoldGesturePhase.Completing => _lastRuntime.Gesture.StabilizationProgress,
+        HoldGesturePhase.Triggered => 1,
+        _ => 0,
+    };
     public string GestureStatus => _lastRuntime.Gesture.Phase switch
     {
         HoldGesturePhase.Holding => _lastRuntime.Gesture.FaceDown
             ? $"Odwrócenie potwierdzone • stabilizacja {_lastRuntime.Gesture.StabilizationProgress * 100:0}%"
             : "Odwróć kapsel górą w dół i uspokój go przed ruchem",
-        HoldGesturePhase.Ready => "Stabilizacja gotowa — wykonaj pełny obrót w lewo lub w prawo",
+        HoldGesturePhase.Ready => "Gotowe — obróć o 270°: lewo = następny, prawo = poprzedni",
         HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction switch
         {
-            RotationGestureDirection.Right => $"Obrót w prawo: {Math.Abs(_lastRuntime.Gesture.EstimatedRotationDegrees):0}° / 330°",
-            RotationGestureDirection.Left => $"Obrót w lewo: {Math.Abs(_lastRuntime.Gesture.EstimatedRotationDegrees):0}° / 330°",
+            RotationGestureDirection.Left => $"Następny utwór • ruch w lewo: {GestureProgress * FullRotationGestureDetector.PhysicalRotationTargetDegrees:0}° / 270°",
+            RotationGestureDirection.Right => $"Poprzedni utwór • ruch w prawo: {GestureProgress * FullRotationGestureDetector.PhysicalRotationTargetDegrees:0}° / 270°",
             _ => "Potwierdzam kierunek obrotu…",
         },
         HoldGesturePhase.Completing => _lastRuntime.Gesture.Direction switch
         {
-            RotationGestureDirection.Right => "Prawo potwierdzone — dokończ pełny obrót",
-            RotationGestureDirection.Left => "Lewo potwierdzone — dokończ pełny obrót",
-            _ => "Dokończ pełny obrót",
+            RotationGestureDirection.Left => "Następny utwór — dokończ ruch w lewo do 270°",
+            RotationGestureDirection.Right => "Poprzedni utwór — dokończ ruch w prawo do 270°",
+            _ => "Dokończ obrót do 270°",
         },
         HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
-        HoldGesturePhase.Triggered => "Gest oceny rozpoznany",
-        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i wykonaj pełny obrót: prawo = następny, lewo = poprzedni",
+        HoldGesturePhase.Triggered => _lastRuntime.Gesture.Direction switch
+        {
+            RotationGestureDirection.Left => "Następny utwór — rozpoznano ruch w lewo",
+            RotationGestureDirection.Right => "Poprzedni utwór — rozpoznano ruch w prawo",
+            _ => "Zmiana utworu wysłana",
+        },
+        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i obróć o 270°: lewo = następny, prawo = poprzedni",
     };
+    public double ControllerProgress => _lastRuntime.Gesture.Phase switch
+    {
+        HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => _lastRuntime.Gesture.StabilizationProgress,
+        HoldGesturePhase.Tracking or HoldGesturePhase.Completing => _lastRuntime.Gesture.StabilizationProgress,
+        _ => _lastRuntime.Volume is { TiltStable: false } volume ? volume.StabilizationProgress : 0,
+    };
+    public string ControllerStatusTitle => _lastBluetooth.ConnectionState != TrikiConnectionState.Ready
+        ? "Sterowanie nieaktywne"
+        : _lastRuntime.Gesture.Phase switch
+        {
+            HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => "Przygotowywanie zmiany utworu…",
+            HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction == RotationGestureDirection.Left
+                ? "Następny utwór"
+                : "Poprzedni utwór",
+            HoldGesturePhase.Rearming => "Ustabilizuj Triki",
+            HoldGesturePhase.Triggered => "Gest rozpoznany",
+            _ => VolumeControlTitle,
+        };
+    public string ControllerStatusDetails => _lastBluetooth.ConnectionState != TrikiConnectionState.Ready
+        ? "Połącz Triki, aby uruchomić gesty i przycisk."
+        : _lastRuntime.Gesture.Phase switch
+        {
+            HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => "Trzymaj odwrócony kapsel stabilnie przez chwilę.",
+            HoldGesturePhase.Tracking => "Kontynuuj płynny obrót do 270°.",
+            HoldGesturePhase.Rearming => "Uspokój ruch przed kolejnym gestem.",
+            HoldGesturePhase.Triggered => "Zmiana utworu została wysłana.",
+            _ => VolumeControlDetails,
+        };
+    public string LastActionCompact => _lastRuntime.LastAction is MediaAction action && action != MediaAction.None
+        ? $"Ostatnio: {action.DisplayName()}"
+        : "Oczekiwanie na sterowanie";
     public string LastActionStatus => _lastRuntime.LastActionStatus;
     public string SensorDetails => _lastRuntime.LatestSample is { } sample
         ? $"ACC  X {sample.AccelerometerG.X:+0.000;-0.000;0.000}  Y {sample.AccelerometerG.Y:+0.000;-0.000;0.000}  Z {sample.AccelerometerG.Z:+0.000;-0.000;0.000} g\n" +
           $"GYRO X {sample.GyroscopeDps.X:+0.0;-0.0;0.0}  Y {sample.GyroscopeDps.Y:+0.0;-0.0;0.0}  Z {sample.GyroscopeDps.Z:+0.0;-0.0;0.0} °/s"
         : "Brak próbek IMU.";
-    public string ProtocolDetails => $"Tryb przycisku: {_lastRuntime.ButtonProtocol} • ramki: {_lastBluetooth.DecodedFrames} • odrzucone przy starcie: {_lastBluetooth.DiscardedStartupFrames} • pominięte bajty: {_lastBluetooth.DroppedProtocolBytes}";
+    public string ProtocolDetails => $"Tryb przycisku: {ButtonProtocolLabel} • ramki: {_lastBluetooth.DecodedFrames} • odrzucone przy starcie: {_lastBluetooth.DiscardedStartupFrames} • pominięte bajty: {_lastBluetooth.DroppedProtocolBytes}";
+    private string ButtonProtocolLabel => _lastRuntime.ButtonProtocol switch
+    {
+        TrikiButtonProtocolMode.ButtonFlag => "flaga przycisku",
+        TrikiButtonProtocolMode.SequenceCounter => "licznik sekwencji",
+        _ => "nieustalony",
+    };
     public string RememberedDevice => _settings.Current.KnownDeviceAddress is ulong address
         ? $"{_settings.Current.KnownDeviceName ?? "Triki"} • {address:X12}"
         : "Brak zapamiętanego urządzenia";

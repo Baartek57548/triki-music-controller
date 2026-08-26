@@ -30,49 +30,45 @@ fun MainUiState.volumeControlPresentation(): VolumeControlPresentation = when {
 
     !runtime.volumeSensorValid -> VolumeControlPresentation(
         VolumeGateState.SENSOR_INVALID,
-        "Brak prawidłowych danych IMU",
-        "Sprawdź połączenie z Triki i transmisję czujników.",
+        "Sprawdź połączenie",
+        "Nie otrzymuję prawidłowych danych ruchu z Triki.",
         false,
     )
 
     runtime.volumeTiltDegrees >= UPSIDE_DOWN_TILT_DEGREES -> VolumeControlPresentation(
         VolumeGateState.UPSIDE_DOWN,
-        "Triki jest odwrócone",
-        "Ustaw kapsel górną stroną do góry.",
+        "Tryb zmiany utworu",
+        "Ustabilizuj odwrócone Triki, a następnie obróć je o 270°.",
         false,
     )
 
     !runtime.volumeWithinTiltRange -> VolumeControlPresentation(
         VolumeGateState.OUTSIDE_TILT_RANGE,
-        "Przechył poza zakresem",
-        "Utrzymuj Triki w zakresie 0–25°; teraz ${runtime.volumeTiltDegrees.rounded()}°.",
+        "Ustaw Triki prawie poziomo",
+        "Utrzymuj kapsel górną stroną do góry w zakresie 0–25°.",
         false,
     )
 
     !runtime.volumeAccelerationStable -> VolumeControlPresentation(
         VolumeGateState.SUDDEN_MOTION,
-        "Wykryto gwałtowny ruch",
-        "Regulacja jest wstrzymana. Utrzymuj przechył 0–25° przez kolejne 2 sekundy.",
+        "Ustabilizuj Triki",
+        "Gwałtowny ruch przerwał przygotowanie. Trzymaj kapsel spokojnie przez 2 sekundy.",
         false,
     )
 
     !runtime.volumeTiltStable -> VolumeControlPresentation(
         VolumeGateState.STABILIZING,
-        "Stabilizacja kąta ${runtime.volumeStabilizationProgress.percent()}%",
-        "Utrzymuj przechył 0–25° przez 2 sekundy i unikaj gwałtownych ruchów.",
+        "Przygotowywanie sterowania…",
+        "Trzymaj Triki prawie poziomo i unikaj gwałtownych ruchów.",
         false,
     )
 
     else -> VolumeControlPresentation(
         VolumeGateState.READY,
-        "Regulator gotowy",
-        "Obracaj kapsel łagodnie wokół osi Z. Szarpnięcie wstrzyma regulację.",
+        "Gotowe",
+        "Obracaj kapsel łagodnie wokół osi Z, aby zmieniać głośność.",
         true,
     )
 }
-
-private fun Float.rounded(): Int = if (isFinite()) Math.round(this) else 180
-
-private fun Float.percent(): Int = (coerceIn(0f, 1f) * 100f).toInt().coerceIn(0, 100)
 
 private const val UPSIDE_DOWN_TILT_DEGREES = 135f
