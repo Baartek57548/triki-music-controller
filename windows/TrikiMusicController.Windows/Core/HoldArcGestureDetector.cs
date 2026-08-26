@@ -4,7 +4,7 @@ namespace TrikiMusicController_Windows.Core;
 
 public sealed record HoldGestureConfiguration(
     long HoldMillis = 500,
-    float TriggerDisplacementMeters = 0.20f,
+    float TriggerDisplacementMeters = 0.10f,
     float MotionStartAccelerationG = 0.08f,
     float AccelerationDeadZoneG = 0.05f,
     float VerticalAccelerationDeadZoneG = 0.035f,
@@ -18,7 +18,7 @@ public sealed record HoldGestureConfiguration(
     float MinimumDirectionPeakAccelerationG = 0.12f,
     int MaximumCandidateDirectionChanges = 1,
     float BrakingAccelerationG = 0.08f,
-    float MinimumDisplacementBeforeBrakingMeters = 0.06f,
+    float MinimumDisplacementBeforeBrakingMeters = 0.04f,
     float MinimumBrakingImpulseGSeconds = 0.025f,
     float MinimumArcDepthMeters = 0.020f,
     float MaximumArcDepthMeters = 0.12f,
@@ -26,10 +26,10 @@ public sealed record HoldGestureConfiguration(
     float MaximumFinalVerticalOffsetMeters = 0.07f,
     float MaximumForwardDisplacementMeters = 0.10f,
     long MinimumMotionMillis = 280,
-    float DirectionMismatchToleranceMeters = 0.06f,
+    float DirectionMismatchToleranceMeters = 0.04f,
     float MaximumTriggerVelocityMetersPerSecond = 0.70f,
     float MaximumVerticalVelocityMetersPerSecond = 0.70f,
-    float MaximumTriggerDisplacementMeters = 0.34f,
+    float MaximumTriggerDisplacementMeters = 0.16f,
     float MaximumMotionAngularRateDps = 120f,
     long MaximumRotationMillis = 80,
     long RearmQuietMillis = 140);

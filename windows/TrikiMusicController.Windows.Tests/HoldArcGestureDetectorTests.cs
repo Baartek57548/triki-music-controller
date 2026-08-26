@@ -18,8 +18,10 @@ public sealed class HoldArcGestureDetectorTests
 
         Assert.Equal([RatingGestureAction.Like], right.Actions);
         Assert.Equal([RatingGestureAction.Dislike], left.Actions);
-        Assert.True(right.Latest.EstimatedHorizontalDisplacementMeters >= 0.20f);
-        Assert.True(left.Latest.EstimatedHorizontalDisplacementMeters <= -0.20f);
+        Assert.True(right.Latest.EstimatedHorizontalDisplacementMeters >= 0.10f);
+        Assert.True(right.Latest.EstimatedHorizontalDisplacementMeters <= 0.16f);
+        Assert.True(left.Latest.EstimatedHorizontalDisplacementMeters <= -0.10f);
+        Assert.True(left.Latest.EstimatedHorizontalDisplacementMeters >= -0.16f);
         Assert.True(right.Latest.EstimatedArcDepthMeters >= 0.020f);
     }
 
@@ -84,11 +86,11 @@ public sealed class HoldArcGestureDetectorTests
     }
 
     [Fact]
-    public void ShortArcBelowTwentyCentimeters_IsIgnored()
+    public void ShortArcBelowTenCentimeters_IsIgnored()
     {
         var fixture = new Fixture();
         fixture.HoldAtRest();
-        fixture.ParabolicArc(rightward: true, horizontalAccelerationG: 0.20f, quarterFrames: 5);
+        fixture.ParabolicArc(rightward: true, horizontalAccelerationG: 0.14f, quarterFrames: 4);
 
         Assert.Empty(fixture.Actions);
         Assert.Null(fixture.Latest.Action);
@@ -123,7 +125,7 @@ public sealed class HoldArcGestureDetectorTests
     public void MovementBeforeFullHold_CannotRateTrack()
     {
         var fixture = new Fixture();
-        fixture.ParabolicArc(rightward: true);
+        fixture.ParabolicArc(rightward: true, quarterFrames: 3);
 
         Assert.Empty(fixture.Actions);
         Assert.Equal(HoldGesturePhase.Holding, fixture.Latest.Phase);
@@ -208,9 +210,9 @@ public sealed class HoldArcGestureDetectorTests
 
         public void ParabolicArc(
             bool rightward,
-            float horizontalAccelerationG = 0.30f,
-            float verticalAccelerationG = 0.15f,
-            int quarterFrames = 7,
+            float horizontalAccelerationG = 0.35f,
+            float verticalAccelerationG = 0.23f,
+            int quarterFrames = 5,
             float gyroscopeZ = 0)
         {
             var horizontal = rightward ? horizontalAccelerationG : -horizontalAccelerationG;

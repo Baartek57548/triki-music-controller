@@ -49,7 +49,7 @@ private val pages = listOf(
     OnboardingPage("Triki Music", "Bezpiecznie reguluj głośność obrotem kapsla i steruj odtwarzaniem jego fizycznym przyciskiem.", Icons.Default.MusicNote),
     OnboardingPage("Połącz i zapamiętaj", "Pierwsze połączenie wybierzesz w aplikacji. Później wystarczy nacisnąć przycisk uśpionego Triki, a telefon połączy się z nim automatycznie.", Icons.AutoMirrored.Filled.BluetoothSearching),
     OnboardingPage("Płynna głośność", "Utrzymuj kapsel górą do góry w zakresie 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć — gwałtowny ruch zeruje stabilizację. Po aktywacji łagodny obrót wokół osi Z płynnie zmieni głośność.", Icons.Default.GraphicEq),
-    OnboardingPage("Oceń utwór łukiem", "Odwróć kapsel i ustaw znacznik od siebie. Ustabilizuj go około pół sekundy, potem bez wciskania przycisku wykonaj płytki łuk 20–30 cm i łagodnie wyhamuj. Prawo polubi utwór, a lewo go odrzuci — jeśli odtwarzacz udostępnia ocenianie.", Icons.Default.Favorite),
+    OnboardingPage("Oceń utwór łukiem", "Odwróć kapsel i ustaw znacznik od siebie. Ustabilizuj go około pół sekundy, potem bez wciskania przycisku wykonaj płytki łuk około 10 cm od pozycji początkowej do końcowej i łagodnie wyhamuj. Prawo polubi utwór, a lewo go odrzuci — jeśli odtwarzacz udostępnia ocenianie.", Icons.Default.Favorite),
     OnboardingPage("Kalibracja", "Kalibracja na równej powierzchni dopasuje czujniki do Twojego egzemplarza Triki i dodatkowo ograniczy przypadkowe zmiany głośności.", Icons.Default.Tune),
 )
 

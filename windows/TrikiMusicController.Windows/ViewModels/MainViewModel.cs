@@ -121,7 +121,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         },
         HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
         HoldGesturePhase.Triggered => "Gest oceny rozpoznany",
-        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i wykonaj łuk 20–30 cm: lewo Dislike, prawo Like",
+        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i wykonaj łuk około 10 cm: lewo Dislike, prawo Like",
     };
     public string LastActionStatus => _lastRuntime.LastActionStatus;
     public string SensorDetails => _lastRuntime.LatestSample is { } sample

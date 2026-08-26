@@ -139,7 +139,7 @@ fun ControlsScreen(
                         Text("Łuk w lewo → odrzuć utwór", Modifier.weight(1f))
                     }
                     Text(
-                        "Ustaw odwrócony kapsel znacznikiem od siebie, ustabilizuj go przez 0,5 s i poprowadź płytki łuk 20–30 cm.",
+                        "Ustaw odwrócony kapsel znacznikiem od siebie, ustabilizuj go przez 0,5 s i poprowadź płytki łuk około 10 cm od pozycji początkowej do końcowej.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

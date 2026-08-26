@@ -23,9 +23,11 @@ class HoldArcGestureDetectorTest {
         left.parabolicArc(rightward = false)
 
         assertEquals(listOf(RatingGestureAction.LIKE), right.actions)
-        assertEquals("left latest=${left.latest}", listOf(RatingGestureAction.DISLIKE), left.actions)
-        assertTrue(right.latest.estimatedHorizontalDisplacementMeters >= 0.20f)
-        assertTrue(left.latest.estimatedHorizontalDisplacementMeters <= -0.20f)
+        assertEquals(listOf(RatingGestureAction.DISLIKE), left.actions)
+        assertTrue(right.latest.estimatedHorizontalDisplacementMeters >= 0.10f)
+        assertTrue(right.latest.estimatedHorizontalDisplacementMeters <= 0.16f)
+        assertTrue(left.latest.estimatedHorizontalDisplacementMeters <= -0.10f)
+        assertTrue(left.latest.estimatedHorizontalDisplacementMeters >= -0.16f)
         assertTrue(right.latest.estimatedArcDepthMeters >= 0.020f)
     }
 
@@ -85,10 +87,10 @@ class HoldArcGestureDetectorTest {
     }
 
     @Test
-    fun `short arc below twenty centimeters is ignored`() {
+    fun `short arc below ten centimeters is ignored`() {
         val fixture = Fixture()
         fixture.holdAtRest()
-        fixture.parabolicArc(rightward = true, horizontalAccelerationG = 0.20f, quarterFrames = 5)
+        fixture.parabolicArc(rightward = true, horizontalAccelerationG = 0.14f, quarterFrames = 4)
 
         assertTrue(fixture.actions.isEmpty())
         assertNull(fixture.latest.action)
@@ -120,7 +122,7 @@ class HoldArcGestureDetectorTest {
     @Test
     fun `movement before full hold cannot rate track`() {
         val fixture = Fixture()
-        fixture.parabolicArc(rightward = true)
+        fixture.parabolicArc(rightward = true, quarterFrames = 3)
 
         assertTrue(fixture.actions.isEmpty())
         assertEquals(HoldGesturePhase.HOLDING, fixture.latest.phase)
@@ -199,9 +201,9 @@ class HoldArcGestureDetectorTest {
 
         fun parabolicArc(
             rightward: Boolean,
-            horizontalAccelerationG: Float = 0.30f,
-            verticalAccelerationG: Float = 0.15f,
-            quarterFrames: Int = 7,
+            horizontalAccelerationG: Float = 0.35f,
+            verticalAccelerationG: Float = 0.23f,
+            quarterFrames: Int = 5,
             gyroscopeZ: Float = 0f,
         ) {
             val horizontal = if (rightward) horizontalAccelerationG else -horizontalAccelerationG
