@@ -57,7 +57,7 @@ fun InfoScreen(
                     )
                     InfoSection(
                         "Like i Dislike",
-                        "Przytrzymaj przycisk około pół sekundy. Podnieś kapsel o 20–30 cm, aby polubić utwór, albo opuść go o 20–30 cm, aby wysłać Dislike. Osobne krótkie sygnały dźwiękowe potwierdzają obie akcje.",
+                        "Przytrzymaj przycisk około pół sekundy. Podnieś kapsel o 20–30 cm, aby polubić utwór, albo opuść go o 20–30 cm, aby wysłać Dislike. Detektor potwierdza kierunek i wyhamowanie ruchu; po szarpnięciu lub obrocie uspokój kapsel na moment. Osobne krótkie sygnały dźwiękowe potwierdzają obie akcje.",
                     )
                     InfoSection(
                         "Prywatność i zgodność",

@@ -85,11 +85,13 @@ public enum HoldGesturePhase
     Holding,
     Ready,
     Tracking,
+    Rearming,
     Triggered,
 }
 
 public sealed record HoldVerticalGestureResult(
     RatingGestureAction? Action,
+    RatingGestureAction? Direction,
     HoldGesturePhase Phase,
     float HoldProgress,
     float EstimatedDisplacementMeters);

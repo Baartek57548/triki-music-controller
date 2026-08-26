@@ -45,6 +45,7 @@ data class RuntimeState(
     val volumeTiltDegrees: Float = 180f,
     val volumeGyroscopeZDps: Float = 0f,
     val ratingGesturePhase: HoldGesturePhase = HoldGesturePhase.IDLE,
+    val ratingGestureDirection: RatingGestureAction? = null,
     val ratingGestureHoldProgress: Float = 0f,
     val ratingGestureDisplacementCentimeters: Float = 0f,
     val buttonProtocolMode: TrikiButtonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
@@ -122,6 +123,7 @@ class TrikiRuntime(
                 volumeTiltDegrees = 180f,
                 volumeGyroscopeZDps = 0f,
                 ratingGesturePhase = HoldGesturePhase.IDLE,
+                ratingGestureDirection = null,
                 ratingGestureHoldProgress = 0f,
                 ratingGestureDisplacementCentimeters = 0f,
                 buttonProtocolMode = TrikiButtonProtocolMode.UNKNOWN,
@@ -147,6 +149,7 @@ class TrikiRuntime(
                 history = (current.history + filtered).takeLast(MAX_HISTORY_SAMPLES),
                 buttonProtocolMode = buttonMode,
                 ratingGesturePhase = ratingGestureResult.phase,
+                ratingGestureDirection = ratingGestureResult.direction,
                 ratingGestureHoldProgress = ratingGestureResult.holdProgress,
                 ratingGestureDisplacementCentimeters = ratingGestureResult.estimatedDisplacementMeters * 100f,
             )

@@ -8,7 +8,16 @@ public sealed record HoldGestureConfiguration(
     float MotionStartAccelerationG = 0.12f,
     float AccelerationDeadZoneG = 0.06f,
     long MaximumMotionMillis = 1_800,
-    float LinearAccelerationSmoothingAlpha = 0.35f);
+    float LinearAccelerationSmoothingAlpha = 0.35f,
+    float ArmingAccelerationToleranceG = 0.18f,
+    float ArmingMaximumAngularRateDps = 45f,
+    long DirectionConfirmationMillis = 80,
+    float BrakingAccelerationG = 0.08f,
+    long MinimumMotionMillis = 220,
+    float DirectionMismatchToleranceMeters = 0.06f,
+    float MaximumMotionAngularRateDps = 120f,
+    long MaximumRotationMillis = 80,
+    long RearmQuietMillis = 140);
 
 public sealed class HoldVerticalGestureDetector
 {
@@ -22,6 +31,13 @@ public sealed class HoldVerticalGestureDetector
     private float _filteredLinearAccelerationG;
     private float _verticalVelocityMetersPerSecond;
     private float _displacementMeters;
+    private RatingGestureAction? _candidateAction;
+    private RatingGestureAction? _confirmedAction;
+    private long _directionConfirmationNanos;
+    private bool _brakingObserved;
+    private long? _excessiveRotationSinceNanos;
+    private bool _awaitingQuietRearm;
+    private long? _quietRearmSinceNanos;
     private bool _triggered;
 
     public HoldVerticalGestureDetector(HoldGestureConfiguration? configuration = null)
@@ -33,7 +49,23 @@ public sealed class HoldVerticalGestureDetector
             !float.IsFinite(_configuration.AccelerationDeadZoneG) || _configuration.AccelerationDeadZoneG < 0.01f ||
             _configuration.AccelerationDeadZoneG > _configuration.MotionStartAccelerationG ||
             _configuration.MaximumMotionMillis is < 500 or > 4_000 ||
-            !float.IsFinite(_configuration.LinearAccelerationSmoothingAlpha) || _configuration.LinearAccelerationSmoothingAlpha is < 0.05f or > 1f)
+            !float.IsFinite(_configuration.LinearAccelerationSmoothingAlpha) || _configuration.LinearAccelerationSmoothingAlpha is < 0.05f or > 1f ||
+            !float.IsFinite(_configuration.ArmingAccelerationToleranceG) || _configuration.ArmingAccelerationToleranceG is < 0.05f or > 0.40f ||
+            !float.IsFinite(_configuration.ArmingMaximumAngularRateDps) || _configuration.ArmingMaximumAngularRateDps is < 10f or > 120f ||
+            _configuration.DirectionConfirmationMillis is < 40 or > 300 ||
+            !float.IsFinite(_configuration.BrakingAccelerationG) ||
+            _configuration.BrakingAccelerationG < _configuration.AccelerationDeadZoneG ||
+            _configuration.BrakingAccelerationG > _configuration.MotionStartAccelerationG ||
+            _configuration.MinimumMotionMillis < _configuration.DirectionConfirmationMillis ||
+            _configuration.MinimumMotionMillis > _configuration.MaximumMotionMillis ||
+            !float.IsFinite(_configuration.DirectionMismatchToleranceMeters) ||
+            _configuration.DirectionMismatchToleranceMeters is < 0.02f ||
+            _configuration.DirectionMismatchToleranceMeters > _configuration.TriggerDisplacementMeters ||
+            !float.IsFinite(_configuration.MaximumMotionAngularRateDps) ||
+            _configuration.MaximumMotionAngularRateDps is < 60f or > 360f ||
+            _configuration.MaximumMotionAngularRateDps <= _configuration.ArmingMaximumAngularRateDps ||
+            _configuration.MaximumRotationMillis is < 40 or > 300 ||
+            _configuration.RearmQuietMillis is < 80 or > 500)
             throw new ArgumentOutOfRangeException(nameof(configuration));
     }
 
@@ -55,11 +87,12 @@ public sealed class HoldVerticalGestureDetector
         }
 
         var timestamp = sample.Source.TimestampNanos;
+        if (_triggered) return Result(HoldGesturePhase.Triggered, 1);
+
         var acceleration = sample.AccelerometerG;
         if (!IsUsableAcceleration(acceleration))
         {
-            ResetMotion();
-            _previousTimestampNanos = timestamp;
+            RestartArming(timestamp, null);
             return Result(HoldGesturePhase.Holding, 0);
         }
 
@@ -74,22 +107,23 @@ public sealed class HoldVerticalGestureDetector
         var pressStart = _pressedSinceNanos.Value;
         if (_previousTimestampNanos is not long previous || timestamp <= previous || timestamp - previous > MaximumSampleGapNanos)
         {
-            _pressedSinceNanos = timestamp;
-            _previousTimestampNanos = timestamp;
-            _gravityBaseline = acceleration;
-            ResetMotion();
-            _triggered = false;
+            RestartArming(timestamp, acceleration);
             return Result(HoldGesturePhase.Holding, 0);
         }
-        var deltaSeconds = (timestamp - previous) / 1_000_000_000f;
+        var deltaNanos = timestamp - previous;
+        var deltaSeconds = deltaNanos / 1_000_000_000f;
         _previousTimestampNanos = timestamp;
-        if (_triggered) return Result(HoldGesturePhase.Triggered, 1);
 
         var holdNanos = _configuration.HoldMillis * 1_000_000;
         var heldNanos = Math.Max(0, timestamp - pressStart);
         var holdProgress = Math.Clamp((float)((double)heldNanos / holdNanos), 0, 1);
         if (heldNanos < holdNanos)
         {
+            if (!IsStableForArming(sample))
+            {
+                RestartArming(timestamp, acceleration);
+                return Result(HoldGesturePhase.Holding, 0);
+            }
             _gravityBaseline = LowPass(_gravityBaseline, acceleration, 0.12f);
             ResetMotion();
             return Result(HoldGesturePhase.Holding, holdProgress);
@@ -108,6 +142,36 @@ public sealed class HoldVerticalGestureDetector
         _filteredLinearAccelerationG += _configuration.LinearAccelerationSmoothingAlpha *
             (rawLinearAccelerationG - _filteredLinearAccelerationG);
 
+        if (_awaitingQuietRearm)
+        {
+            var quiet = Math.Abs(_filteredLinearAccelerationG) < _configuration.AccelerationDeadZoneG &&
+                sample.GyroscopeMagnitude <= _configuration.ArmingMaximumAngularRateDps;
+            if (quiet)
+            {
+                _quietRearmSinceNanos ??= timestamp;
+                _gravityBaseline = LowPass(_gravityBaseline, acceleration, 0.025f);
+                if (timestamp - _quietRearmSinceNanos.Value >= _configuration.RearmQuietMillis * 1_000_000)
+                    ResetMotion();
+            }
+            else
+            {
+                _quietRearmSinceNanos = null;
+            }
+            return Result(HoldGesturePhase.Rearming, 1);
+        }
+
+        if (sample.GyroscopeMagnitude > _configuration.MaximumMotionAngularRateDps)
+        {
+            _excessiveRotationSinceNanos ??= timestamp;
+            if (timestamp - _excessiveRotationSinceNanos.Value >= _configuration.MaximumRotationMillis * 1_000_000)
+            {
+                InvalidateMotion();
+                return Result(HoldGesturePhase.Rearming, 1);
+            }
+            return Result(_motionStartedNanos is null ? HoldGesturePhase.Ready : HoldGesturePhase.Tracking, 1);
+        }
+        _excessiveRotationSinceNanos = null;
+
         if (_motionStartedNanos is null)
         {
             if (Math.Abs(_filteredLinearAccelerationG) < _configuration.MotionStartAccelerationG)
@@ -116,21 +180,47 @@ public sealed class HoldVerticalGestureDetector
                 ResetMotion();
                 return Result(HoldGesturePhase.Ready, 1);
             }
-            _motionStartedNanos = timestamp;
-            _verticalVelocityMetersPerSecond = 0;
-            _displacementMeters = 0;
+            StartMotion(timestamp, ActionForAcceleration(_filteredLinearAccelerationG));
         }
 
-        if (timestamp - _motionStartedNanos.Value > _configuration.MaximumMotionMillis * 1_000_000)
+        var motionStarted = _motionStartedNanos ??
+            throw new InvalidOperationException("Stan ruchu nie został zainicjalizowany.");
+        var motionElapsedNanos = timestamp - motionStarted;
+        if (motionElapsedNanos > _configuration.MaximumMotionMillis * 1_000_000)
         {
-            _gravityBaseline = acceleration;
-            ResetMotion();
-            return Result(HoldGesturePhase.Ready, 1);
+            InvalidateMotion();
+            return Result(HoldGesturePhase.Rearming, 1);
         }
 
         var effectiveAccelerationG = Math.Abs(_filteredLinearAccelerationG) < _configuration.AccelerationDeadZoneG
             ? 0
             : _filteredLinearAccelerationG;
+        if (_confirmedAction is null)
+        {
+            if (effectiveAccelerationG == 0)
+            {
+                InvalidateMotion();
+                return Result(HoldGesturePhase.Rearming, 1);
+            }
+            var currentAction = ActionForAcceleration(effectiveAccelerationG);
+            if (currentAction != _candidateAction)
+            {
+                StartMotion(timestamp, currentAction);
+                motionElapsedNanos = 0;
+            }
+            else
+            {
+                _directionConfirmationNanos += deltaNanos;
+                if (_directionConfirmationNanos >= _configuration.DirectionConfirmationMillis * 1_000_000)
+                    _confirmedAction = currentAction;
+            }
+        }
+        else if (IsAccelerationOppositeTo(effectiveAccelerationG, _confirmedAction.Value) &&
+                 Math.Abs(effectiveAccelerationG) >= _configuration.BrakingAccelerationG)
+        {
+            _brakingObserved = true;
+        }
+
         var accelerationMetersPerSecondSquared = effectiveAccelerationG * StandardGravity;
         _displacementMeters += _verticalVelocityMetersPerSecond * deltaSeconds +
             0.5f * accelerationMetersPerSecondSquared * deltaSeconds * deltaSeconds;
@@ -139,27 +229,97 @@ public sealed class HoldVerticalGestureDetector
         if (effectiveAccelerationG == 0) _verticalVelocityMetersPerSecond *= 0.92f;
         _displacementMeters = Math.Clamp(_displacementMeters, -0.60f, 0.60f);
 
-        RatingGestureAction? action = null;
-        // Physical Triki captures establish this sign convention: lift is negative, lowering positive.
-        if (_displacementMeters <= -_configuration.TriggerDisplacementMeters) action = RatingGestureAction.Like;
-        else if (_displacementMeters >= _configuration.TriggerDisplacementMeters) action = RatingGestureAction.Dislike;
+        var lockedAction = _confirmedAction;
+        if (lockedAction is RatingGestureAction confirmed &&
+            DirectionalDisplacement(confirmed) < -_configuration.DirectionMismatchToleranceMeters)
+        {
+            InvalidateMotion();
+            return Result(HoldGesturePhase.Rearming, 1);
+        }
+
+        RatingGestureAction? action = lockedAction is RatingGestureAction locked &&
+                                      _brakingObserved &&
+                                      motionElapsedNanos >= _configuration.MinimumMotionMillis * 1_000_000 &&
+                                      DirectionalDisplacement(locked) >= _configuration.TriggerDisplacementMeters
+            ? locked
+            : null;
         if (action is not null) _triggered = true;
         return Result(_triggered ? HoldGesturePhase.Triggered : HoldGesturePhase.Tracking, 1, action);
     }
 
     private HoldVerticalGestureResult Result(HoldGesturePhase phase, float progress, RatingGestureAction? action = null) =>
-        new(action, phase, progress, _displacementMeters);
+        new(action, _confirmedAction, phase, progress, _displacementMeters);
 
     private void ResetMotion()
+    {
+        ClearMotionState();
+        _awaitingQuietRearm = false;
+        _quietRearmSinceNanos = null;
+    }
+
+    private void ClearMotionState()
     {
         _motionStartedNanos = null;
         _filteredLinearAccelerationG = 0;
         _verticalVelocityMetersPerSecond = 0;
         _displacementMeters = 0;
+        _candidateAction = null;
+        _confirmedAction = null;
+        _directionConfirmationNanos = 0;
+        _brakingObserved = false;
+        _excessiveRotationSinceNanos = null;
+    }
+
+    private void InvalidateMotion()
+    {
+        ClearMotionState();
+        _awaitingQuietRearm = true;
+        _quietRearmSinceNanos = null;
+    }
+
+    private void StartMotion(long timestamp, RatingGestureAction action)
+    {
+        _motionStartedNanos = timestamp;
+        _verticalVelocityMetersPerSecond = 0;
+        _displacementMeters = 0;
+        _candidateAction = action;
+        _confirmedAction = null;
+        _directionConfirmationNanos = 0;
+        _brakingObserved = false;
+    }
+
+    private void RestartArming(long timestamp, Vector3f? acceleration)
+    {
+        _pressedSinceNanos = timestamp;
+        _previousTimestampNanos = timestamp;
+        _gravityBaseline = acceleration;
+        ResetMotion();
+        _triggered = false;
     }
 
     private static bool IsUsableAcceleration(Vector3f value) =>
         float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z) && value.Magnitude is >= 0.20f and <= 2.50f;
+
+    private bool IsStableForArming(FilteredSensorData sample) =>
+        Math.Abs(sample.AccelerationMagnitude - 1) <= _configuration.ArmingAccelerationToleranceG &&
+        sample.GyroscopeMagnitude <= _configuration.ArmingMaximumAngularRateDps;
+
+    private static RatingGestureAction ActionForAcceleration(float accelerationG) =>
+        accelerationG < 0 ? RatingGestureAction.Like : RatingGestureAction.Dislike;
+
+    private static bool IsAccelerationOppositeTo(float accelerationG, RatingGestureAction action) => action switch
+    {
+        RatingGestureAction.Like => accelerationG > 0,
+        RatingGestureAction.Dislike => accelerationG < 0,
+        _ => false,
+    };
+
+    private float DirectionalDisplacement(RatingGestureAction action) => action switch
+    {
+        RatingGestureAction.Like => -_displacementMeters,
+        RatingGestureAction.Dislike => _displacementMeters,
+        _ => 0,
+    };
 
     private static Vector3f LowPass(Vector3f? previous, Vector3f current, float alpha) => previous is not Vector3f value
         ? current

@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
+import pl.trikimusic.controller.core.gesture.RatingGestureAction
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
@@ -138,9 +140,16 @@ fun ControlsScreen(
                                 state.runtime.ratingGestureHoldProgress * 100f,
                             )
                             HoldGesturePhase.READY -> "Przycisk przytrzymany — przesuń kapsel w górę lub w dół."
-                            HoldGesturePhase.TRACKING -> "Wykryty ruch: %+.0f cm".format(
-                                state.runtime.ratingGestureDisplacementCentimeters,
-                            )
+                            HoldGesturePhase.TRACKING -> when (state.runtime.ratingGestureDirection) {
+                                RatingGestureAction.LIKE -> "Ruch w górę: %.0f cm".format(
+                                    abs(state.runtime.ratingGestureDisplacementCentimeters),
+                                )
+                                RatingGestureAction.DISLIKE -> "Ruch w dół: %.0f cm".format(
+                                    abs(state.runtime.ratingGestureDisplacementCentimeters),
+                                )
+                                null -> "Potwierdzam kierunek ruchu…"
+                            }
+                            HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
                             HoldGesturePhase.TRIGGERED -> "Ocena wysłana — puść przycisk przed następną akcją."
                         },
                         style = MaterialTheme.typography.labelLarge,

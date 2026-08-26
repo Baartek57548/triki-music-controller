@@ -97,7 +97,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         HoldGesturePhase.Holding => $"Przytrzymanie: {_lastRuntime.Gesture.HoldProgress * 100:0}%",
         HoldGesturePhase.Ready => "Przycisk przytrzymany — podnieś lub opuść kapsel",
-        HoldGesturePhase.Tracking => $"Ruch: {_lastRuntime.Gesture.EstimatedDisplacementMeters * 100:+0.0;-0.0;0.0} cm",
+        HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction switch
+        {
+            RatingGestureAction.Like => $"Ruch w górę: {Math.Abs(_lastRuntime.Gesture.EstimatedDisplacementMeters * 100):0.0} cm",
+            RatingGestureAction.Dislike => $"Ruch w dół: {Math.Abs(_lastRuntime.Gesture.EstimatedDisplacementMeters * 100):0.0} cm",
+            _ => "Potwierdzam kierunek ruchu…",
+        },
+        HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
         HoldGesturePhase.Triggered => "Gest oceny rozpoznany",
         _ => "Przytrzymaj 0,5 s, potem wykonaj ruch pionowy 20–30 cm",
     };
