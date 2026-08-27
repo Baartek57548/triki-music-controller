@@ -114,7 +114,7 @@
                         <TextBlock Text="PRZYCISK" Style="{StaticResource EyebrowTextStyle}" />
                         <TextBlock Text="Akcje kliknięć" Style="{StaticResource SectionTitleStyle}" />
                     </StackPanel>
-                    <TextBlock Text="Domyślnie dwa kliknięcia lubią utwór, a trzy oznaczają dislike. Każdą akcję możesz zmienić." Style="{StaticResource MetadataTextStyle}" />
+                    <TextBlock Text="Domyślnie dwa kliknięcia lubią utwór, a trzy oznaczają dislike. Krótki sygnał potwierdza rozpoznanie każdej oceny." Style="{StaticResource MetadataTextStyle}" />
                     <Grid x:Name="MappingGrid" ColumnSpacing="12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />

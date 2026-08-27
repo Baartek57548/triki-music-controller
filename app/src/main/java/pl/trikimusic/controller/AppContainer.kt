@@ -12,6 +12,7 @@ import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.core.permissions.PermissionManager
 import pl.trikimusic.controller.data.bluetooth.FakeTrikiDataSource
 import pl.trikimusic.controller.data.media.AndroidMediaControllerGateway
+import pl.trikimusic.controller.data.media.RatingFeedbackPlayer
 import pl.trikimusic.controller.data.repository.DataStoreSettingsRepository
 import pl.trikimusic.controller.data.update.GitHubUpdateManager
 import pl.trikimusic.controller.domain.model.AppSettings
@@ -33,6 +34,7 @@ class AppContainer(application: Application) {
     val bleManager = TrikiBleManager(application, scope, permissionManager, logger)
     val mediaController = AndroidMediaControllerGateway(application, logger)
     val actionMapper = ActionMapper(mediaController)
-    val runtime = TrikiRuntime(scope, bleManager, settingsRepository, actionMapper, logger)
+    val ratingFeedback = RatingFeedbackPlayer(logger)
+    val runtime = TrikiRuntime(scope, bleManager, settingsRepository, actionMapper, ratingFeedback, logger)
     val fakeTrikiDataSource = FakeTrikiDataSource()
 }

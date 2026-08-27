@@ -160,7 +160,7 @@ fun ControlsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Dwa kliknięcia przycisku → Like · trzy kliknięcia → Dislike",
+                        "Dwa kliknięcia → Like · trzy kliknięcia → Dislike · osobny krótki sygnał potwierdza każdą ocenę",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

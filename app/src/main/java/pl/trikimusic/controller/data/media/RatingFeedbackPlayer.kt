@@ -2,13 +2,14 @@ package pl.trikimusic.controller.data.media
 
 import android.media.AudioManager
 import android.media.ToneGenerator
-import pl.trikimusic.controller.core.gesture.RatingGestureAction
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.domain.model.LogCategory
+import pl.trikimusic.controller.domain.model.MediaAction
+import pl.trikimusic.controller.domain.repository.RatingFeedback
 
 class RatingFeedbackPlayer(
     private val logger: AppLogger,
-) {
+) : RatingFeedback {
     private val toneGenerator: ToneGenerator? = runCatching {
         ToneGenerator(AudioManager.STREAM_MUSIC, TONE_VOLUME_PERCENT)
     }.onFailure { error ->
@@ -16,15 +17,10 @@ class RatingFeedbackPlayer(
     }.getOrNull()
 
     @Synchronized
-    fun play(action: RatingGestureAction, succeeded: Boolean) {
-        val tone = when {
-            !succeeded -> ToneGenerator.TONE_SUP_ERROR
-            action == RatingGestureAction.LIKE -> ToneGenerator.TONE_PROP_ACK
-            else -> ToneGenerator.TONE_PROP_NACK
-        }
-        val durationMillis = if (succeeded) SUCCESS_TONE_DURATION_MILLIS else ERROR_TONE_DURATION_MILLIS
+    override fun play(action: MediaAction) {
+        val signal = signalFor(action)
         runCatching {
-            check(toneGenerator?.startTone(tone, durationMillis) == true) {
+            check(toneGenerator?.startTone(signal.tone, signal.durationMillis) == true) {
                 "Generator sygnału dźwiękowego nie przyjął polecenia."
             }
         }.onFailure { error ->
@@ -32,9 +28,20 @@ class RatingFeedbackPlayer(
         }
     }
 
-    private companion object {
+    internal data class RatingSignal(
+        val tone: Int,
+        val durationMillis: Int,
+    )
+
+    internal companion object {
         const val TONE_VOLUME_PERCENT = 55
-        const val SUCCESS_TONE_DURATION_MILLIS = 130
-        const val ERROR_TONE_DURATION_MILLIS = 180
+        const val LIKE_TONE_DURATION_MILLIS = 110
+        const val DISLIKE_TONE_DURATION_MILLIS = 120
+
+        fun signalFor(action: MediaAction): RatingSignal = when (action) {
+            MediaAction.LIKE -> RatingSignal(ToneGenerator.TONE_PROP_ACK, LIKE_TONE_DURATION_MILLIS)
+            MediaAction.DISLIKE -> RatingSignal(ToneGenerator.TONE_PROP_NACK, DISLIKE_TONE_DURATION_MILLIS)
+            else -> throw IllegalArgumentException("Sygnał oceny wymaga akcji Like albo Dislike.")
+        }
     }
 }

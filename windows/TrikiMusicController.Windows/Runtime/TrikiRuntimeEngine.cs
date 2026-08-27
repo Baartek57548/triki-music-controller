@@ -11,6 +11,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly MediaControlService _media;
     private readonly SystemVolumeService _systemVolume;
     private readonly SettingsService _settings;
+    private readonly FeedbackToneService _ratingFeedback;
     private readonly SensorFilter _sensorFilter = new();
     private readonly GyroscopeVolumeController _volumeController = new();
     private readonly FullRotationGestureDetector _rotationGestureDetector = new();
@@ -23,12 +24,14 @@ public sealed class TrikiRuntimeEngine : IDisposable
         BluetoothService bluetooth,
         MediaControlService media,
         SystemVolumeService systemVolume,
-        SettingsService settings)
+        SettingsService settings,
+        FeedbackToneService ratingFeedback)
     {
         _bluetooth = bluetooth;
         _media = media;
         _systemVolume = systemVolume;
         _settings = settings;
+        _ratingFeedback = ratingFeedback;
         _bluetooth.SampleReceived += BluetoothOnSampleReceived;
         _bluetooth.StateChanged += BluetoothOnStateChanged;
     }
@@ -177,6 +180,8 @@ public sealed class TrikiRuntimeEngine : IDisposable
             result = (false, error.Message);
             System.Diagnostics.Debug.WriteLine($"Wykonanie akcji {action} nie powiodło się: {error}");
         }
+        if (action is MediaAction.Like or MediaAction.Dislike)
+            _ratingFeedback.PlayRatingAction(action);
         lock (_sync)
         {
             State = State with

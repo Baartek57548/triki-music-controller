@@ -14,7 +14,8 @@ public sealed class AppServices : IDisposable
         Media = new MediaControlService(Volume);
         Updates = new UpdateService();
         Bluetooth = new BluetoothService();
-        Runtime = new TrikiRuntimeEngine(Bluetooth, Media, Volume, Settings);
+        RatingFeedback = new FeedbackToneService();
+        Runtime = new TrikiRuntimeEngine(Bluetooth, Media, Volume, Settings, RatingFeedback);
         ViewModel = new MainViewModel(dispatcherQueue, Settings, Bluetooth, Media, Runtime);
     }
 
@@ -23,6 +24,7 @@ public sealed class AppServices : IDisposable
     public MediaControlService Media { get; }
     public UpdateService Updates { get; }
     public BluetoothService Bluetooth { get; }
+    public FeedbackToneService RatingFeedback { get; }
     public TrikiRuntimeEngine Runtime { get; }
     public MainViewModel ViewModel { get; }
 
@@ -30,6 +32,7 @@ public sealed class AppServices : IDisposable
     {
         ViewModel.Dispose();
         Runtime.Dispose();
+        RatingFeedback.Dispose();
         Bluetooth.Dispose();
         Media.Dispose();
         Updates.Dispose();

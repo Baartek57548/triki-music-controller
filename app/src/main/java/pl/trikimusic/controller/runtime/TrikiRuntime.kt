@@ -28,6 +28,7 @@ import pl.trikimusic.controller.domain.model.LogCategory
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.TrikiConnectionState
 import pl.trikimusic.controller.domain.model.TrikiSensorData
+import pl.trikimusic.controller.domain.repository.RatingFeedback
 import pl.trikimusic.controller.domain.repository.SettingsRepository
 import pl.trikimusic.controller.domain.usecase.ActionMapper
 
@@ -58,6 +59,7 @@ class TrikiRuntime(
     private val bleManager: TrikiBleManager,
     settingsRepository: SettingsRepository,
     private val actionMapper: ActionMapper,
+    private val ratingFeedback: RatingFeedback,
     private val logger: AppLogger,
 ) {
     private val sensorFilter = SensorFilter()
@@ -214,6 +216,7 @@ class TrikiRuntime(
         if (buttonEvent != null) {
             mutableButtonEvents.tryEmit(buttonEvent)
             val execution = actionMapper.execute(buttonEvent, settings.activeProfile)
+            if (execution.action.isRatingAction) ratingFeedback.play(execution.action)
             logger.log(
                 LogCategory.CONTROL,
                 "BUTTON_${buttonEvent.type.name}: ${execution.action.name}",
@@ -274,5 +277,8 @@ class TrikiRuntime(
 
     private companion object {
         const val MAX_HISTORY_SAMPLES = 360
+
+        val MediaAction.isRatingAction: Boolean
+            get() = this == MediaAction.LIKE || this == MediaAction.DISLIKE
     }
 }

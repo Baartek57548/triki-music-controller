@@ -69,7 +69,7 @@ fun InfoScreen(
                     )
                     InfoSection(
                         "Sterowanie utworem",
-                        "Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają. Aby zmienić utwór bez przycisku, odwróć kapsel i odczekaj pół sekundy. Następnie obróć go o 270° zgodnie z ruchem dłoni: w lewo przejdziesz do następnego utworu, a w prawo wrócisz do poprzedniego.",
+                        "Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają; każdą rozpoznaną ocenę potwierdza osobny krótki sygnał dźwiękowy. Aby zmienić utwór bez przycisku, odwróć kapsel i odczekaj pół sekundy. Następnie obróć go o 270° zgodnie z ruchem dłoni: w lewo przejdziesz do następnego utworu, a w prawo wrócisz do poprzedniego.",
                     )
                     InfoSection(
                         "Prywatność i zgodność",

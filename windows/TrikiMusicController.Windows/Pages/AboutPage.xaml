@@ -26,14 +26,14 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
                     <TextBlock Text="Sterowanie utworem" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają. Aby zmienić utwór bez przycisku, odwróć kapsel i odczekaj około pół sekundy. Następnie obróć go o 270° zgodnie z ruchem dłoni: w lewo przejdziesz do następnego utworu, a w prawo wrócisz do poprzedniego." TextWrapping="Wrap" />
+                    <TextBlock Text="Dwa kliknięcia przycisku lubią utwór, a trzy kliknięcia go odrzucają; każda rozpoznana ocena ma własny krótki sygnał dźwiękowy. Aby zmienić utwór bez przycisku, odwróć kapsel i odczekaj około pół sekundy. Następnie obróć go o 270° zgodnie z ruchem dłoni: w lewo przejdziesz do następnego utworu, a w prawo wrócisz do poprzedniego." TextWrapping="Wrap" />
                     <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Oceny utworów" Message="Windows nie udostępnia systemowej komendy Like/Dislike. Kliknięcia zostaną rozpoznane, ale zastosowanie oceny zależy od aktywnego odtwarzacza." />
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
                     <TextBlock Text="Zappki — Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Wersja 2.6.3 • Windows x64" />
+                    <TextBlock Text="Wersja 2.6.4 • Windows x64" />
                     <TextBlock Text="Natywna aplikacja WinUI 3 sterująca globalną sesją multimedialną i głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
                     <TextBlock Text="Dane czujników pozostają lokalnie na komputerze. Sieć jest używana wyłącznie do sprawdzania publicznych wydań GitHub; aplikacja sprawdza nową wersję po uruchomieniu." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <StackPanel Orientation="Horizontal" Spacing="10">
