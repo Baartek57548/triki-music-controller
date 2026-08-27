@@ -5,9 +5,9 @@
     <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
     <RootNamespace>TrikiMusicController_Windows</RootNamespace>
     <AssemblyName>TrikiMusicController.Windows</AssemblyName>
-    <Version>2.6.2</Version>
-    <FileVersion>2.6.2.0</FileVersion>
-    <AssemblyVersion>2.6.2.0</AssemblyVersion>
+    <Version>2.6.3</Version>
+    <FileVersion>2.6.3.0</FileVersion>
+    <AssemblyVersion>2.6.3.0</AssemblyVersion>
     <Product>Triki Music Controller</Product>
     <Company>Bartek</Company>
     <Description>Sterowanie muzyką w Windows 11 za pomocą urządzenia Triki.</Description>
@@ -38,10 +38,16 @@
     <Content Include="Assets\StoreLogo.png" />
     <Content Include="Assets\AppIcon.ico" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+    <Content Remove="Assets\AppIconSource-v2.png" />
+    <None Include="Assets\AppIconSource-v2.png" />
   </ItemGroup>
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
   </ItemGroup>
 
   <ItemGroup>

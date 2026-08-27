@@ -126,7 +126,24 @@ class GyroscopeVolumeControllerTest {
         }
 
         assertTrue(early.none { it.action != null })
-        assertTrue(later.any { it.action == MediaAction.VOLUME_UP })
+        assertEquals(1, later.count { it.action == MediaAction.VOLUME_UP })
+    }
+
+    @Test
+    fun `default controller ignores deliberate low speed rotation`() {
+        val controller = GyroscopeVolumeController()
+        for (index in 0..40) {
+            controller.process(sample(index * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 0f), FACE_UP_GRAVITY))
+        }
+
+        val outputs = List(40) { index ->
+            controller.process(
+                sample((41L + index) * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 24f), FACE_UP_GRAVITY),
+            )
+        }
+
+        assertTrue(outputs.all { it.action == null })
+        assertTrue(outputs.all { it.active })
     }
 
     @Test

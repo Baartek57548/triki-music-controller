@@ -9,6 +9,14 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+            <Color x:Key="SystemAccentColorDark3">#FF064E3B</Color>
+            <Color x:Key="SystemAccentColorDark2">#FF047857</Color>
+            <Color x:Key="SystemAccentColorDark1">#FF059669</Color>
+            <Color x:Key="SystemAccentColor">#FF16A34A</Color>
+            <Color x:Key="SystemAccentColorLight1">#FF22C55E</Color>
+            <Color x:Key="SystemAccentColorLight2">#FF4ADE80</Color>
+            <Color x:Key="SystemAccentColorLight3">#FF86EFAC</Color>
+            <SolidColorBrush x:Key="BrandAccentBrush" Color="#FF22C55E" />
             <Style x:Key="CardBorderStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
@@ -34,7 +42,7 @@
             <Style x:Key="EyebrowTextStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource BrandAccentBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
             <Style x:Key="MetadataTextStyle" TargetType="TextBlock">

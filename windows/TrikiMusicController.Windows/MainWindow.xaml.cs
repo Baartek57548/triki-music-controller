@@ -127,7 +127,7 @@ public sealed partial class MainWindow : Window
                 progressDialog.Hide();
                 await progressOperation;
                 App.Services.Updates.LaunchInstaller(installer);
-                Application.Current.Exit();
+                ((App)Microsoft.UI.Xaml.Application.Current).Shutdown();
             }
             catch (Exception error)
             {

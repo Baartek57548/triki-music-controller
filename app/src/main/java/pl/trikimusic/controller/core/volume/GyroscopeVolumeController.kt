@@ -31,11 +31,11 @@ class GyroscopeVolumeController(
         val maximumTiltDegrees: Float = 25f,
         val tiltStabilizationMillis: Long = 2_000L,
         val maximumAccelerationDeviationG: Float = 0.20f,
-        val activationGyroscopeDps: Float = 22f,
-        val releaseGyroscopeDps: Float = 12f,
-        val degreesPerVolumeStep: Float = 22f,
-        val gyroscopeSmoothingAlpha: Float = 0.16f,
-        val minimumStepIntervalMillis: Long = 140L,
+        val activationGyroscopeDps: Float = 28f,
+        val releaseGyroscopeDps: Float = 15f,
+        val degreesPerVolumeStep: Float = 30f,
+        val gyroscopeSmoothingAlpha: Float = 0.13f,
+        val minimumStepIntervalMillis: Long = 180L,
     ) {
         init {
             require(maximumTiltDegrees.isFinite() && maximumTiltDegrees in 0f..90f)

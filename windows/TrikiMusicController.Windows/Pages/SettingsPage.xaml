@@ -33,10 +33,13 @@
             <TextBlock Text="Aplikacja" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
-                    <ToggleSwitch Header="Uruchamiaj razem z Windows"
+                    <ToggleSwitch Header="Uruchamiaj w tle razem z Windows"
                                   OffContent="Wyłączone"
                                   OnContent="Włączone"
-                                  IsOn="{Binding StartWithWindows, Mode=TwoWay}" />
+                                  IsOn="{Binding StartWithWindows, Mode=TwoWay}"
+                                  AutomationProperties.HelpText="Uruchamia Triki bez otwierania okna i pozostawia aplikację w zasobniku systemowym." />
+                    <TextBlock Text="Po zalogowaniu aplikacja uruchomi się po cichu w obszarze ukrytych ikon. Dwukrotnie kliknij ikonę Triki, aby otworzyć okno."
+                               Style="{StaticResource MetadataTextStyle}" />
                     <ComboBox Header="Motyw"
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"

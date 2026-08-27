@@ -17,7 +17,7 @@ public sealed partial class SettingsPage : Page
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
-        if (((App)Application.Current).MainWindow is { } window)
+        if (((App)Microsoft.UI.Xaml.Application.Current).MainWindow is { } window)
             await window.CheckForUpdatesAsync(showUpToDateMessage: true);
     }
 }

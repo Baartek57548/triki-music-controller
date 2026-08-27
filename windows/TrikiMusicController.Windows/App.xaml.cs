@@ -7,7 +7,7 @@ using ILaunchActivatedEventArgs = Windows.ApplicationModel.Activation.ILaunchAct
 
 namespace TrikiMusicController_Windows;
 
-public partial class App : Application
+public partial class App : Microsoft.UI.Xaml.Application
 {
     private const string SingleInstanceMutexName = @"Local\TrikiMusicController.BAEDA449-C844-43F1-8888-AE0EFE5FBB13";
     private Window? _window;
@@ -16,6 +16,9 @@ public partial class App : Application
     private bool _singleInstanceMutexDisposed;
     private AppInstance? _mainInstance;
     private DispatcherQueue? _dispatcherQueue;
+    private TrayIconService? _trayIcon;
+    private bool _applicationResourcesDisposed;
+    private bool _shutdownStarted;
     public static AppServices Services { get; private set; } = null!;
     public MainWindow? MainWindow => _window as MainWindow;
 
@@ -49,18 +52,21 @@ public partial class App : Application
             _mainInstance.Activated += MainInstance_Activated;
             Services = new AppServices(settings, _dispatcherQueue);
             _window = new MainWindow();
-            _window.Closed += (_, _) =>
+            _window.Closed += Window_Closed;
+            _trayIcon = new TrayIconService(
+                _dispatcherQueue,
+                Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"),
+                ShowMainWindow,
+                Shutdown);
+
+            if (IsBackgroundLaunch(args.Arguments))
             {
-                Services.Dispose();
-                if (_mainInstance is not null) _mainInstance.Activated -= MainInstance_Activated;
-                ReleaseSingleInstanceMutex();
-            };
-            _window.Activate();
-            if (args.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Any(argument => argument.Equals("--background", StringComparison.OrdinalIgnoreCase))
-                && _window.AppWindow.Presenter is OverlappedPresenter presenter)
+                _window.AppWindow.IsShownInSwitchers = false;
+                await Services.ViewModel.InitializeAsync();
+            }
+            else
             {
-                presenter.Minimize();
+                ShowMainWindow();
             }
         }
         catch (Exception error)
@@ -76,17 +82,55 @@ public partial class App : Application
     {
         if (args.Kind != ExtendedActivationKind.Launch ||
             args.Data is not ILaunchActivatedEventArgs launch ||
-            launch.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Any(argument => argument.Equals("--background", StringComparison.OrdinalIgnoreCase)))
+            IsBackgroundLaunch(launch.Arguments))
             return;
-        _dispatcherQueue?.TryEnqueue(() =>
-        {
-            if (_window is null) return;
-            _window.Activate();
-            if (_window.AppWindow.Presenter is OverlappedPresenter presenter)
-                presenter.Restore();
-        });
+        _dispatcherQueue?.TryEnqueue(ShowMainWindow);
     }
+
+    public void Shutdown()
+    {
+        if (_shutdownStarted) return;
+        _shutdownStarted = true;
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+        if (_window is not null)
+            _window.Close();
+        else
+            DisposeApplicationResources();
+        Exit();
+    }
+
+    private void ShowMainWindow()
+    {
+        if (_shutdownStarted || _window is null) return;
+        _window.AppWindow.IsShownInSwitchers = true;
+        _window.AppWindow.Show();
+        if (_window.AppWindow.Presenter is OverlappedPresenter presenter)
+            presenter.Restore();
+        _window.Activate();
+    }
+
+    private void Window_Closed(object sender, WindowEventArgs args)
+    {
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+        _window = null;
+        DisposeApplicationResources();
+    }
+
+    private void DisposeApplicationResources()
+    {
+        if (_applicationResourcesDisposed) return;
+        _applicationResourcesDisposed = true;
+        Services?.Dispose();
+        if (_mainInstance is not null)
+            _mainInstance.Activated -= MainInstance_Activated;
+        ReleaseSingleInstanceMutex();
+    }
+
+    private static bool IsBackgroundLaunch(string arguments) =>
+        arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Any(argument => argument.Equals("--background", StringComparison.OrdinalIgnoreCase));
 
     private static void WriteBootstrapError(Exception error)
     {
