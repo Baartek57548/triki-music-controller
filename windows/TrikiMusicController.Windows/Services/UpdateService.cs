@@ -20,26 +20,36 @@ public sealed class UpdateService : IDisposable
     private bool _disposed;
 
     public UpdateService()
+        : this(CreateHttpHandler(), GetDefaultUpdatesDirectory())
     {
-        var handler = new SocketsHttpHandler
-        {
-            AutomaticDecompression = DecompressionMethods.All,
-            AllowAutoRedirect = true,
-            MaxAutomaticRedirections = 5,
-            ConnectTimeout = TimeSpan.FromSeconds(15),
-        };
-        _client = new HttpClient(handler)
+    }
+
+    internal UpdateService(HttpMessageHandler handler, string updatesDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentException.ThrowIfNullOrWhiteSpace(updatesDirectory);
+        _client = new HttpClient(handler, disposeHandler: true)
         {
             Timeout = TimeSpan.FromMinutes(10),
         };
         _client.DefaultRequestHeaders.UserAgent.ParseAdd("TrikiMusicController-Windows/" + AppInfo.Version);
         _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         _client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
-        _updatesDirectory = Path.Combine(
+        _updatesDirectory = Path.GetFullPath(updatesDirectory);
+    }
+
+    private static SocketsHttpHandler CreateHttpHandler() => new()
+    {
+        AutomaticDecompression = DecompressionMethods.All,
+        AllowAutoRedirect = true,
+        MaxAutomaticRedirections = 5,
+        ConnectTimeout = TimeSpan.FromSeconds(15),
+    };
+
+    private static string GetDefaultUpdatesDirectory() => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "TrikiMusicController",
             "Updates");
-    }
 
     public async Task<AppUpdateInfo?> CheckAsync(CancellationToken cancellationToken = default)
     {
@@ -107,43 +117,102 @@ public sealed class UpdateService : IDisposable
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        ValidateDownloadRequest(update);
         Directory.CreateDirectory(_updatesDirectory);
         var destination = Path.Combine(_updatesDirectory, update.AssetName);
         var temporary = destination + ".download";
         try
         {
-            using var response = await _client.GetAsync(update.DownloadUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-                .ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-                throw new UpdateException($"Pobieranie instalatora zakończyło się kodem HTTP {(int)response.StatusCode}.");
-            var declaredLength = response.Content.Headers.ContentLength;
-            if (declaredLength is <= 0 or > MaximumInstallerBytes || declaredLength != update.SizeBytes)
-                throw new UpdateException("Rozmiar instalatora nie zgadza się z metadanymi wydania.");
+            long downloadedLength;
+            using (var response = await _client.GetAsync(update.DownloadUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                       .ConfigureAwait(false))
+            {
+                if (!response.IsSuccessStatusCode)
+                    throw new UpdateException($"Pobieranie instalatora zakończyło się kodem HTTP {(int)response.StatusCode}.");
+                var declaredLength = response.Content.Headers.ContentLength;
+                if (declaredLength is <= 0 or > MaximumInstallerBytes || declaredLength != update.SizeBytes)
+                    throw new UpdateException("Rozmiar instalatora nie zgadza się z metadanymi wydania.");
 
-            await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            await using var target = new FileStream(
-                temporary,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                64 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            await CopyWithLimitAsync(source, target, update.SizeBytes, progress, cancellationToken).ConfigureAwait(false);
-            await target.FlushAsync(cancellationToken).ConfigureAwait(false);
-            if (target.Length != update.SizeBytes)
+                await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+                await using (var target = new FileStream(
+                                 temporary,
+                                 FileMode.Create,
+                                 FileAccess.Write,
+                                 FileShare.None,
+                                 64 * 1024,
+                                 FileOptions.Asynchronous | FileOptions.SequentialScan))
+                {
+                    await CopyWithLimitAsync(source, target, update.SizeBytes, progress, cancellationToken).ConfigureAwait(false);
+                    await target.FlushAsync(cancellationToken).ConfigureAwait(false);
+                    downloadedLength = target.Length;
+                }
+            }
+
+            if (downloadedLength != update.SizeBytes)
                 throw new UpdateException("Pobrany instalator ma inny rozmiar niż plik opublikowany na GitHub.");
 
             var actualHash = await CalculateSha256Async(temporary, cancellationToken).ConfigureAwait(false);
             if (!actualHash.Equals(update.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new UpdateException("Suma SHA-256 instalatora nie zgadza się z metadanymi GitHub.");
             await ValidatePortableExecutableAsync(temporary, cancellationToken).ConfigureAwait(false);
-            File.Move(temporary, destination, overwrite: true);
+            await MoveCompletedDownloadAsync(temporary, destination, cancellationToken).ConfigureAwait(false);
             return destination;
+        }
+        catch (UpdateException)
+        {
+            TryDeleteFile(temporary);
+            throw;
+        }
+        catch (IOException error)
+        {
+            TryDeleteFile(temporary);
+            throw new UpdateException("Nie udało się zapisać instalatora aktualizacji. Zamknij inne uruchomione instalatory i spróbuj ponownie.", error);
+        }
+        catch (UnauthorizedAccessException error)
+        {
+            TryDeleteFile(temporary);
+            throw new UpdateException("Windows odmówił dostępu do katalogu aktualizacji.", error);
         }
         catch
         {
             TryDeleteFile(temporary);
             throw;
+        }
+    }
+
+    private static void ValidateDownloadRequest(AppUpdateInfo update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        if (string.IsNullOrWhiteSpace(update.AssetName)
+            || !Path.GetFileName(update.AssetName).Equals(update.AssetName, StringComparison.Ordinal)
+            || !update.AssetName.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase)
+            || !update.AssetName.EndsWith(InstallerSuffix, StringComparison.OrdinalIgnoreCase))
+            throw new UpdateException("Nazwa instalatora aktualizacji jest nieprawidłowa.");
+        if (update.SizeBytes is <= 0 or > MaximumInstallerBytes)
+            throw new UpdateException("Instalator ma nieprawidłowy lub zbyt duży rozmiar.");
+        if (string.IsNullOrWhiteSpace(update.Sha256)
+            || update.Sha256.Length != 64
+            || update.Sha256.Any(character => !Uri.IsHexDigit(character)))
+            throw new UpdateException("Suma SHA-256 instalatora ma nieprawidłowy format.");
+    }
+
+    private static async Task MoveCompletedDownloadAsync(
+        string temporary,
+        string destination,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 5;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Move(temporary, destination, overwrite: true);
+                return;
+            }
+            catch (IOException) when (attempt < maximumAttempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 150), cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
