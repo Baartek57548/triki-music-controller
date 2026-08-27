@@ -38,7 +38,7 @@
                                   OnContent="Włączone"
                                   IsOn="{Binding StartWithWindows, Mode=TwoWay}"
                                   AutomationProperties.HelpText="Uruchamia Triki bez otwierania okna i pozostawia aplikację w zasobniku systemowym." />
-                    <TextBlock Text="Po zalogowaniu aplikacja uruchomi się po cichu w obszarze ukrytych ikon. Dwukrotnie kliknij ikonę Triki, aby otworzyć okno."
+                    <TextBlock Text="Triki zawsze rozpoczyna pracę po cichu w obszarze powiadomień. Minimalizacja i przycisk X ukrywają okno bez wyłączania sterowania. Dwukrotnie kliknij ikonę Triki, aby ponownie otworzyć okno."
                                Style="{StaticResource MetadataTextStyle}" />
                     <ComboBox Header="Motyw"
                               ItemsSource="{Binding AvailableThemes}"

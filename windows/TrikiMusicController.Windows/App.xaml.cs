@@ -52,6 +52,8 @@ public partial class App : Microsoft.UI.Xaml.Application
             _mainInstance.Activated += MainInstance_Activated;
             Services = new AppServices(settings, _dispatcherQueue);
             _window = new MainWindow();
+            _window.AppWindow.Closing += Window_Closing;
+            _window.AppWindow.Changed += Window_Changed;
             _window.Closed += Window_Closed;
             _trayIcon = new TrayIconService(
                 _dispatcherQueue,
@@ -59,15 +61,8 @@ public partial class App : Microsoft.UI.Xaml.Application
                 ShowMainWindow,
                 Shutdown);
 
-            if (IsBackgroundLaunch(args.Arguments))
-            {
-                _window.AppWindow.IsShownInSwitchers = false;
-                await Services.ViewModel.InitializeAsync();
-            }
-            else
-            {
-                ShowMainWindow();
-            }
+            HideMainWindow();
+            await Services.ViewModel.InitializeAsync();
         }
         catch (Exception error)
         {
@@ -110,8 +105,35 @@ public partial class App : Microsoft.UI.Xaml.Application
         _window.Activate();
     }
 
+    private void HideMainWindow()
+    {
+        if (_shutdownStarted || _window is null) return;
+        _window.AppWindow.IsShownInSwitchers = false;
+        _window.AppWindow.Hide();
+    }
+
+    private void Window_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_shutdownStarted) return;
+        args.Cancel = true;
+        HideMainWindow();
+    }
+
+    private void Window_Changed(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (_shutdownStarted || !args.DidPresenterChange) return;
+        if (sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized })
+            HideMainWindow();
+    }
+
     private void Window_Closed(object sender, WindowEventArgs args)
     {
+        if (sender is Window closedWindow)
+        {
+            closedWindow.AppWindow.Closing -= Window_Closing;
+            closedWindow.AppWindow.Changed -= Window_Changed;
+            closedWindow.Closed -= Window_Closed;
+        }
         _trayIcon?.Dispose();
         _trayIcon = null;
         _window = null;
