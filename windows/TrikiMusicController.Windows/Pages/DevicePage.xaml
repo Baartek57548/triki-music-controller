@@ -160,7 +160,7 @@
                         </ListView.ItemTemplate>
                     </ListView>
 
-                    <TextBlock Text="💡 Jeżeli lista jest pusta, naciśnij fizyczny przycisk na kapslu Triki, a następnie kliknij przycisk „Znajdź Triki”."
+                    <TextBlock Text="Jeżeli lista jest pusta, naciśnij fizyczny przycisk na kapslu Triki, a następnie kliknij przycisk „Znajdź Triki”."
                                Style="{StaticResource MetadataTextStyle}" />
                 </StackPanel>
             </Border>

@@ -502,14 +502,50 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _lastBluetooth = _bluetooth.State;
         _lastMedia = _media.State;
         _lastRuntime = _runtime.State;
-        if (!Devices.SequenceEqual(_lastBluetooth.DiscoveredDevices))
+        var newDiscovered = _lastBluetooth.DiscoveredDevices;
+        var selectedAddress = SelectedDevice?.BluetoothAddress;
+
+        for (var i = Devices.Count - 1; i >= 0; i--)
         {
-            var selectedAddress = SelectedDevice?.BluetoothAddress;
-            Devices.Clear();
-            foreach (var device in _lastBluetooth.DiscoveredDevices) Devices.Add(device);
+            if (!newDiscovered.Any(d => d.BluetoothAddress == Devices[i].BluetoothAddress))
+            {
+                Devices.RemoveAt(i);
+            }
+        }
+
+        for (var i = 0; i < newDiscovered.Count; i++)
+        {
+            var target = newDiscovered[i];
+            var existingIndex = -1;
+            for (var j = 0; j < Devices.Count; j++)
+            {
+                if (Devices[j].BluetoothAddress == target.BluetoothAddress)
+                {
+                    existingIndex = j;
+                    break;
+                }
+            }
+
+            if (existingIndex >= 0)
+            {
+                if (Devices[existingIndex].Name != target.Name || Math.Abs(Devices[existingIndex].Rssi - target.Rssi) >= 4)
+                {
+                    Devices[existingIndex] = target;
+                }
+            }
+            else
+            {
+                Devices.Insert(Math.Min(i, Devices.Count), target);
+            }
+        }
+
+        if (SelectedDevice is null || !Devices.Any(d => d.BluetoothAddress == SelectedDevice.BluetoothAddress))
+        {
             SelectedDevice = selectedAddress is ulong address
-                ? Devices.FirstOrDefault(device => device.BluetoothAddress == address)
-                : null;
+                ? Devices.FirstOrDefault(d => d.BluetoothAddress == address)
+                : (_lastBluetooth.ConnectedDevice is { } conn
+                    ? Devices.FirstOrDefault(d => d.BluetoothAddress == conn.BluetoothAddress)
+                    : Devices.FirstOrDefault());
         }
 
         CheckAndApplyThumbnail(_lastMedia.ThumbnailBytes);
