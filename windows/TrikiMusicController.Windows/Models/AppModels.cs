@@ -50,10 +50,11 @@ public sealed record MediaSnapshot(
     bool CanPrevious,
     float VolumePercent,
     bool IsMuted,
+    byte[]? ThumbnailBytes,
     string? ErrorMessage)
 {
     public static MediaSnapshot Initial { get; } = new(
-        false, false, "Brak aktywnego utworu", "—", "—", false, false, false, false, 0, false, null);
+        false, false, "Brak aktywnego utworu", "—", "—", false, false, false, false, 0, false, null, null);
 }
 
 public sealed record RuntimeSnapshot(
@@ -111,7 +112,7 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "2.9.0";
+    public const string Version = "2.9.1";
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }

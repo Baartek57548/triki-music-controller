@@ -117,7 +117,10 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Border Width="88" Height="88" CornerRadius="12" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Top">
-                                <FontIcon Glyph="&#xE8D6;" FontSize="38" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                <Grid CornerRadius="12">
+                                    <FontIcon Glyph="&#xE8D6;" FontSize="38" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Image Source="{Binding MediaThumbnailSource}" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
                             </Border>
                             <StackPanel Grid.Column="1" Spacing="4">
                                 <TextBlock Text="TERAZ ODTWARZANE" Style="{StaticResource EyebrowTextStyle}" />

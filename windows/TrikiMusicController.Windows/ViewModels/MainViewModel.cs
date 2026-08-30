@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Storage.Streams;
 using TrikiMusicController_Windows.Core;
 using TrikiMusicController_Windows.Models;
 using TrikiMusicController_Windows.Runtime;
@@ -22,6 +24,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private BluetoothSnapshot _lastBluetooth = BluetoothSnapshot.Initial;
     private MediaSnapshot _lastMedia = MediaSnapshot.Initial;
     private RuntimeSnapshot _lastRuntime = RuntimeSnapshot.Initial;
+    private byte[]? _currentThumbnailBytes;
+    private BitmapImage? _mediaThumbnailSource;
     private string _settingsStatus = string.Empty;
     private int _uiRefreshPending = 1;
 
@@ -120,6 +124,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         : "Brak aktywnej sesji multimedialnej";
     public string PlayPauseGlyph => _lastMedia.IsPlaying ? "\uE769" : "\uE768";
     public string PlayPauseLabel => _lastMedia.IsPlaying ? "Wstrzymaj" : "Odtwórz";
+    public BitmapImage? MediaThumbnailSource
+    {
+        get => _mediaThumbnailSource;
+        private set => SetField(ref _mediaThumbnailSource, value);
+    }
+    public bool HasMediaThumbnail => MediaThumbnailSource is not null;
     public string VolumeText => $"Głośność: {_lastMedia.VolumePercent:0}%{(_lastMedia.IsMuted ? " (wyciszona)" : string.Empty)}";
     public double VolumePercentValue => _lastMedia.VolumePercent;
 
@@ -501,7 +511,56 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 ? Devices.FirstOrDefault(device => device.BluetoothAddress == address)
                 : null;
         }
+
+        CheckAndApplyThumbnail(_lastMedia.ThumbnailBytes);
+
         OnPropertyChanged(string.Empty);
+    }
+
+    private void CheckAndApplyThumbnail(byte[]? newBytes)
+    {
+        if (ByteArraysEqual(_currentThumbnailBytes, newBytes)) return;
+        _currentThumbnailBytes = newBytes;
+        if (newBytes is { Length: > 0 })
+        {
+            _ = UpdateThumbnailBitmapAsync(newBytes);
+        }
+        else
+        {
+            MediaThumbnailSource = null;
+            OnPropertyChanged(nameof(HasMediaThumbnail));
+        }
+    }
+
+    private async Task UpdateThumbnailBitmapAsync(byte[] bytes)
+    {
+        try
+        {
+            using var stream = new InMemoryRandomAccessStream();
+            using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+            }
+            stream.Seek(0);
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(stream);
+            MediaThumbnailSource = bitmap;
+            OnPropertyChanged(nameof(HasMediaThumbnail));
+        }
+        catch (Exception error)
+        {
+            System.Diagnostics.Debug.WriteLine($"Błąd ładowania miniatury: {error.Message}");
+            MediaThumbnailSource = null;
+            OnPropertyChanged(nameof(HasMediaThumbnail));
+        }
+    }
+
+    private static bool ByteArraysEqual(byte[]? a, byte[]? b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a is null || b is null) return false;
+        return a.AsSpan().SequenceEqual(b.AsSpan());
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

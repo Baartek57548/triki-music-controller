@@ -97,6 +97,27 @@ public sealed class MediaControlService : IDisposable
             var playbackInfo = session.GetPlaybackInfo();
             var controls = playbackInfo?.Controls;
             var properties = await session.TryGetMediaPropertiesAsync();
+            byte[]? thumbnailBytes = null;
+            if (properties?.Thumbnail is { } thumbRef)
+            {
+                try
+                {
+                    using var streamRef = await thumbRef.OpenReadAsync();
+                    if (streamRef is not null && streamRef.Size > 0 && streamRef.Size < 15_000_000)
+                    {
+                        var buffer = new Windows.Storage.Streams.Buffer((uint)streamRef.Size);
+                        await streamRef.ReadAsync(buffer, (uint)streamRef.Size, Windows.Storage.Streams.InputStreamOptions.None);
+                        using var reader = Windows.Storage.Streams.DataReader.FromBuffer(buffer);
+                        thumbnailBytes = new byte[buffer.Length];
+                        reader.ReadBytes(thumbnailBytes);
+                    }
+                }
+                catch (Exception error)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Nie udało się pobrać miniatury utworu: {error.Message}");
+                }
+            }
+
             Publish(new MediaSnapshot(
                 true,
                 playbackInfo?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
@@ -109,6 +130,7 @@ public sealed class MediaControlService : IDisposable
                 controls?.IsPreviousEnabled == true,
                 volume.Percent,
                 volume.Muted,
+                thumbnailBytes,
                 null));
         }
         catch (Exception error)
