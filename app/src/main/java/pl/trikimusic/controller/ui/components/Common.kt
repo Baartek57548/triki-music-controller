@@ -1,13 +1,14 @@
 package pl.trikimusic.controller.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardColors
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,7 +37,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,12 +53,94 @@ import androidx.compose.ui.unit.dp
 import pl.trikimusic.controller.domain.model.TrikiConnectionState
 
 @Composable
-fun SectionTitle(title: String, modifier: Modifier = Modifier, subtitle: String? = null) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+fun TrikiCard(
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        content = content,
+    )
+}
+
+@Composable
+fun SectionTitle(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+) {
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (icon != null) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
         if (subtitle != null) {
             Spacer(Modifier.height(3.dp))
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+fun MetricTile(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = accentColor.copy(alpha = 0.12f),
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.padding(8.dp).size(18.dp),
+                tint = accentColor,
+            )
+        }
+        Column {
+            Text(
+                value,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -68,16 +153,22 @@ fun StatusPill(state: TrikiConnectionState, modifier: Modifier = Modifier) {
         TrikiConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
         else -> MaterialTheme.colorScheme.tertiary
     }
-    Surface(modifier = modifier, color = color.copy(alpha = 0.14f), shape = RoundedCornerShape(12.dp)) {
+    Surface(
+        modifier = modifier,
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.25f)),
+    ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             Box(Modifier.size(7.dp).background(color, CircleShape))
             Text(
                 text = state.displayName(),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = color,
             )
         }
@@ -104,10 +195,19 @@ fun NavigationRow(
     ListItem(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(enabled = enabled, onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)),
-        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor) },
+        colors = ListItemDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        ),
+        headlineContent = {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = titleColor,
+            )
+        },
         supportingContent = {
             Text(
                 subtitle,
@@ -118,8 +218,16 @@ fun NavigationRow(
             )
         },
         leadingContent = {
-            Surface(shape = RoundedCornerShape(12.dp), color = iconColor.copy(alpha = 0.12f)) {
-                Icon(icon, contentDescription = null, modifier = Modifier.padding(9.dp), tint = iconColor)
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = iconColor.copy(alpha = 0.12f),
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.padding(10.dp).size(20.dp),
+                    tint = iconColor,
+                )
             }
         },
         trailingContent = trailing ?: {
@@ -140,13 +248,23 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(
-            if (error) Icons.Default.ErrorOutline else Icons.Default.Info,
-            contentDescription = null,
-            modifier = Modifier.size(38.dp),
-            tint = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        Surface(
+            shape = CircleShape,
+            color = (if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary).copy(alpha = 0.12f),
+        ) {
+            Icon(
+                if (error) Icons.Default.ErrorOutline else Icons.Default.Info,
+                contentDescription = null,
+                modifier = Modifier.padding(14.dp).size(32.dp),
+                tint = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
         )
-        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
             message,
             style = MaterialTheme.typography.bodyMedium,
@@ -196,7 +314,13 @@ fun LiveLineChart(
 @Composable
 fun DetailTopBar(title: String, onBack: () -> Unit) {
     TopAppBar(
-        title = { Text(title, fontWeight = FontWeight.SemiBold) },
+        title = {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wstecz")
@@ -209,21 +333,41 @@ fun DetailTopBar(title: String, onBack: () -> Unit) {
 @Composable
 fun LoadingInline(label: String, visible: Boolean) {
     AnimatedVisibility(visible) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            Text(label, style = MaterialTheme.typography.bodyMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(vertical = 4.dp),
+        ) {
+            CircularProgressIndicator(
+                Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 fun TrikiConnectionState.displayName(): String = when (this) {
     TrikiConnectionState.DISCONNECTED -> "Rozłączone"
-    TrikiConnectionState.SCANNING -> "Skanowanie"
+    TrikiConnectionState.SCANNING -> "Skanowanie…"
     TrikiConnectionState.FOUND -> "Znaleziono"
-    TrikiConnectionState.CONNECTING -> "Łączenie"
-    TrikiConnectionState.CONNECTED -> "Konfiguracja"
+    TrikiConnectionState.CONNECTING -> "Łączenie…"
+    TrikiConnectionState.CONNECTED -> "Konfiguracja…"
     TrikiConnectionState.READY -> "Połączono"
     TrikiConnectionState.WAITING_FOR_WAKE -> "Czeka na przycisk"
     TrikiConnectionState.RECONNECTING -> "Czekam na Triki"
-    TrikiConnectionState.ERROR -> "Błąd"
+    TrikiConnectionState.ERROR -> "Błąd połączenia"
+}
+
+fun signalQualityLabel(rssi: Int?): String = when {
+    rssi == null -> "Brak danych"
+    rssi >= -60 -> "Bardzo dobry ($rssi dBm)"
+    rssi >= -72 -> "Dobry ($rssi dBm)"
+    rssi >= -84 -> "Średni ($rssi dBm)"
+    else -> "Słaby ($rssi dBm)"
 }

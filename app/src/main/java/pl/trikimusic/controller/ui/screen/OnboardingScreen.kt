@@ -48,7 +48,7 @@ private val pages = listOf(
     OnboardingPage("Triki Music", "Fizyczny kontroler do szybkiego sterowania muzyką bez sięgania do ekranu.", Icons.Default.MusicNote),
     OnboardingPage("Obudź i połącz", "Naciśnij przycisk Triki i połącz je pierwszy raz. Telefon zapamięta kontroler i później połączy go automatycznie.", Icons.AutoMirrored.Filled.BluetoothSearching),
     OnboardingPage("Obrót steruje głośnością", "Trzymaj Triki prawie poziomo przez 2 sekundy. Gdy sterowanie będzie gotowe, obracaj kapsel łagodnie, aby zmieniać głośność.", Icons.Default.GraphicEq),
-    OnboardingPage("Przycisk i utwory", "Jeden klik steruje Play/Pause, dwa oznaczają Like, a trzy Dislike. Odwrócony kapsel i obrót dłoni o 270° zmienia utwór: lewo to następny, prawo to poprzedni.", Icons.Default.Favorite),
+    OnboardingPage("Przycisk i utwory", "Jeden klik steruje Play/Pause, dwa oznaczają Like, a trzy Dislike. Odwrócony kapsel i obrót dłoni o 200° zmienia utwór: lewo to następny, prawo to poprzedni.", Icons.Default.Favorite),
 )
 
 @Composable
