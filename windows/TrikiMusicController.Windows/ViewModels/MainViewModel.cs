@@ -124,6 +124,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public double VolumePercentValue => _lastMedia.VolumePercent;
 
     public double VolumeProgress => _lastRuntime.Volume?.StabilizationProgress ?? 0;
+    public bool IsVolumeReady => _lastRuntime.Volume is { TiltStable: true, AccelerationStable: true, WithinTiltRange: true };
+    public string VolumeTiltAngleText => _lastRuntime.Volume is { } volume ? $"{volume.TiltDegrees:0.0}°" : "—";
+    public string VolumeTiltStatusText => _lastRuntime.Volume is null ? "Brak danych" : (_lastRuntime.Volume.WithinTiltRange ? "Poziom (0–25° OK)" : "Zbyt duży przechył (>25°)");
+    public string VolumeAccStatusText => _lastRuntime.Volume is null ? "Brak danych" : (_lastRuntime.Volume.AccelerationStable ? "Stabilnie" : "Wykryto przyspieszenie");
+
     public string VolumeControlTitle => _lastRuntime.Volume switch
     {
         null => "Sterowanie nieaktywne",
@@ -131,21 +136,32 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         { WithinTiltRange: false } => "Ustaw Triki prawie poziomo",
         { AccelerationStable: false } => "Ustabilizuj Triki",
         { TiltStable: false } => "Przygotowywanie sterowania…",
-        _ => "Gotowe",
+        _ => "Gotowe do regulacji",
     };
     public string VolumeControlDetails => _lastRuntime.Volume is { } volume
         ? volume switch
         {
             { SensorValid: false } => "Nie otrzymuję prawidłowych danych ruchu z Triki.",
-            { WithinTiltRange: false } => "Utrzymuj kapsel górną stroną do góry w zakresie 0–25°.",
+            { WithinTiltRange: false } => "Utrzymuj kapsel górną stroną do góry w zakresie przechyłu 0–25°.",
             { AccelerationStable: false } => "Gwałtowny ruch przerwał przygotowanie. Trzymaj kapsel spokojnie.",
             { TiltStable: false } => "Utrzymaj pozycję przez 2 sekundy i unikaj szarpnięć.",
-            _ => "Obracaj kapsel łagodnie wokół osi Z, aby zmieniać głośność systemową.",
+            _ => "Obracaj kapsel w poziomie wokół osi Z: ↻ w prawo = głośniej, ↺ w lewo = ciszej.",
         }
-        : "Połącz Triki, aby uruchomić gesty i przycisk.";
+        : "Połącz Triki, aby uruchomić gesty i regulację głośności.";
     public string VolumeTechnicalDetails => _lastRuntime.Volume is { } volume
         ? $"Przechył {volume.TiltDegrees:0.0}° • |ACC| {_lastRuntime.LatestSample?.AccelerationMagnitude ?? 0:0.00} g • żyroskop Z {volume.GyroscopeZDps:+0.0;-0.0;0.0}°/s"
         : "Regulator głośności: brak danych IMU.";
+    
+    public bool IsRotationFaceDown => _lastRuntime.Gesture.FaceDown;
+    public string RotationPhaseBadge => _lastRuntime.Gesture.Phase switch
+    {
+        HoldGesturePhase.Holding => "Stabilizacja",
+        HoldGesturePhase.Ready => "Gotowe do obrotu",
+        HoldGesturePhase.Tracking => "Obrót…",
+        HoldGesturePhase.Completing => "Kończenie",
+        HoldGesturePhase.Triggered => "Wykonano!",
+        _ => "Oczekiwanie",
+    };
     public double GestureProgress => _lastRuntime.Gesture.Phase switch
     {
         HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => _lastRuntime.Gesture.StabilizationProgress,
