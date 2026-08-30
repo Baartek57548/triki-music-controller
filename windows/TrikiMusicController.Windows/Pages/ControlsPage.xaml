@@ -59,73 +59,116 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
+                <!-- Karta Głośności -->
                 <Border x:Name="VolumeCard" Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Spacing="12">
-                        <StackPanel Spacing="3">
-                            <TextBlock Text="GŁOŚNOŚĆ SYSTEMOWA" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Text="{Binding VolumeControlTitle}" Style="{StaticResource SectionTitleStyle}" />
-                        </StackPanel>
+                    <StackPanel Spacing="14">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE767;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="GŁOŚNOŚĆ SYSTEMOWA" Style="{StaticResource EyebrowTextStyle}" />
+                                <TextBlock Text="{Binding VolumeControlTitle}" Style="{StaticResource SectionTitleStyle}" />
+                            </StackPanel>
+                        </Grid>
+
                         <ProgressBar Minimum="0"
                                      Maximum="1"
                                      Value="{Binding VolumeProgress}"
                                      Foreground="{StaticResource BrandAccentBrush}"
+                                     Height="6"
+                                     CornerRadius="3"
                                      AutomationProperties.Name="Postęp przygotowania regulacji głośności" />
-                        <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <Expander Header="Szczegóły czujnika">
+
+                        <TextBlock Text="{Binding VolumeControlDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MinHeight="36" />
+                        
+                        <Expander Header="Szczegóły czujnika" HorizontalAlignment="Stretch">
                             <TextBlock Margin="0,8,0,2" Text="{Binding VolumeTechnicalDetails}" FontFamily="Consolas" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </Expander>
                     </StackPanel>
                 </Border>
 
+                <!-- Karta Odwróconego Kapsla -->
                 <Border x:Name="RotationCard" Grid.Column="1" Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Spacing="12">
-                        <StackPanel Spacing="3">
-                            <TextBlock Text="ODWRÓCONY KAPSEL" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Style="{StaticResource SectionTitleStyle}">
-                                <Run Text="Nawigacja obrotem " />
-                                <Run Text="{Binding RotationAngleLabel}" />
-                            </TextBlock>
-                        </StackPanel>
+                    <StackPanel Spacing="14">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE7AD;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="ODWRÓCONY KAPSEL" Style="{StaticResource EyebrowTextStyle}" />
+                                <TextBlock Style="{StaticResource SectionTitleStyle}">
+                                    <Run Text="Nawigacja obrotem " />
+                                    <Run Text="{Binding RotationAngleLabel}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Border Padding="12" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                            <Border Style="{StaticResource TileBorderStyle}">
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="←  Obrót w lewo" FontWeight="SemiBold" TextWrapping="Wrap" />
                                     <TextBlock Text="Następny utwór" Style="{StaticResource MetadataTextStyle}" />
                                 </StackPanel>
                             </Border>
-                            <Border Grid.Column="1" Padding="12" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                            <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="Obrót w prawo  →" FontWeight="SemiBold" TextWrapping="Wrap" />
                                     <TextBlock Text="Poprzedni utwór" Style="{StaticResource MetadataTextStyle}" />
                                 </StackPanel>
                             </Border>
                         </Grid>
+
                         <TextBlock Style="{StaticResource MetadataTextStyle}">
                             <Run Text="Odwróć kapsel, odczekaj 0,5 s i obróć go o " />
                             <Run Text="{Binding RotationAngleLabel}" />
                             <Run Text=" wokół osi Z. Przycisk nie jest potrzebny." />
                         </TextBlock>
+
                         <ProgressBar Minimum="0"
                                      Maximum="1"
                                      Value="{Binding GestureProgress}"
                                      Foreground="{StaticResource BrandAccentBrush}"
+                                     Height="6"
+                                     CornerRadius="3"
                                      AutomationProperties.Name="Postęp gestu obrotu" />
+
                         <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
             </Grid>
 
+            <!-- Karta Mapowania Przycisku -->
             <Border Grid.Row="2" Margin="0,16,0,28" Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Spacing="3">
-                        <TextBlock Text="PRZYCISK" Style="{StaticResource EyebrowTextStyle}" />
-                        <TextBlock Text="Akcje kliknięć" Style="{StaticResource SectionTitleStyle}" />
-                    </StackPanel>
-                    <TextBlock Text="Domyślnie dwa kliknięcia lubią utwór, a trzy oznaczają dislike. Krótki sygnał potwierdza rozpoznanie każdej oceny." Style="{StaticResource MetadataTextStyle}" />
+                <StackPanel Spacing="16">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE700;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="FIZYCZNY PRZYCISK" Style="{StaticResource EyebrowTextStyle}" />
+                            <TextBlock Text="Akcje kliknięć" Style="{StaticResource SectionTitleStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="Domyślnie dwa kliknięcia lubią utwór, a trzy oznaczają dislike. Krótki sygnał dźwiękowy potwierdza rozpoznanie każdej oceny." Style="{StaticResource MetadataTextStyle}" />
+
                     <Grid x:Name="MappingGrid" ColumnSpacing="12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -137,22 +180,33 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <ComboBox Header="Jeden klik"
-                                  ItemsSource="{Binding AvailableActions}"
-                                  SelectedItem="{Binding SingleClickAction, Mode=TwoWay}"
-                                  HorizontalAlignment="Stretch" />
-                        <ComboBox x:Name="DoubleClickMapping"
-                                  Grid.Column="1"
-                                  Header="Dwa kliknięcia"
-                                  ItemsSource="{Binding AvailableActions}"
-                                  SelectedItem="{Binding DoubleClickAction, Mode=TwoWay}"
-                                  HorizontalAlignment="Stretch" />
-                        <ComboBox x:Name="TripleClickMapping"
-                                  Grid.Column="2"
-                                  Header="Trzy kliknięcia"
-                                  ItemsSource="{Binding AvailableActions}"
-                                  SelectedItem="{Binding TripleClickAction, Mode=TwoWay}"
-                                  HorizontalAlignment="Stretch" />
+
+                        <Border Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="1x Kliknięcie" FontWeight="SemiBold" />
+                                <ComboBox ItemsSource="{Binding AvailableActions}"
+                                          SelectedItem="{Binding SingleClickAction, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="DoubleClickMapping" Grid.Column="1" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="2x Kliknięcie" FontWeight="SemiBold" />
+                                <ComboBox ItemsSource="{Binding AvailableActions}"
+                                          SelectedItem="{Binding DoubleClickAction, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="TripleClickMapping" Grid.Column="2" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="3x Kliknięcie" FontWeight="SemiBold" />
+                                <ComboBox ItemsSource="{Binding AvailableActions}"
+                                          SelectedItem="{Binding TripleClickAction, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </StackPanel>
             </Border>

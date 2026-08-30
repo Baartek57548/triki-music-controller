@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
-        <Grid MaxWidth="1180" Padding="32,24,32,32" RowSpacing="20" HorizontalAlignment="Stretch">
+        <Grid MaxWidth="1100" Padding="32,24,32,32" RowSpacing="20" HorizontalAlignment="Stretch">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -13,7 +13,7 @@
 
             <StackPanel Spacing="4">
                 <TextBlock Text="Start" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Najważniejsze informacje i sterowanie muzyką" Style="{StaticResource PageSubtitleStyle}" />
+                <TextBlock Text="Panel kontrolera Żabka Triki i sterowanie muzyką" Style="{StaticResource PageSubtitleStyle}" />
             </StackPanel>
 
             <Grid Grid.Row="1" ColumnSpacing="18" RowSpacing="18">
@@ -46,89 +46,179 @@
                     </VisualStateGroup>
                 </VisualStateManager.VisualStateGroups>
 
-                <Border Style="{StaticResource CardBorderStyle}">
+                <!-- Karta Triki -->
+                <Border Style="{StaticResource HeroCardBorderStyle}">
                     <StackPanel Spacing="16">
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Border Width="42" Height="42" CornerRadius="21" Background="{ThemeResource AccentFillColorSecondaryBrush}">
-                                <FontIcon Glyph="&#xE702;" FontSize="18" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                            <Border Width="44" Height="44" CornerRadius="22" Background="{ThemeResource AccentFillColorSecondaryBrush}">
+                                <FontIcon Glyph="&#xE702;" FontSize="20" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
                             </Border>
                             <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                <TextBlock Text="Triki" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="Kontroler Triki" Style="{StaticResource SectionTitleStyle}" />
                                 <TextBlock Text="{Binding ConnectionTitle}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" />
                             </StackPanel>
+                            <Border Grid.Column="2" Style="{StaticResource AccentPillBorderStyle}" VerticalAlignment="Top">
+                                <TextBlock Text="{Binding ConnectionStateBadge}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
                         </Grid>
-                        <TextBlock Text="{Binding ConnectionDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <Grid ColumnSpacing="24">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="{Binding BatteryText}" FontSize="18" FontWeight="SemiBold" />
-                                <TextBlock Text="Bateria" Style="{StaticResource MetadataTextStyle}" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="2">
-                                <TextBlock Text="{Binding SignalQuality}" FontSize="18" FontWeight="SemiBold" />
-                                <TextBlock Text="Sygnał" Style="{StaticResource MetadataTextStyle}" />
-                            </StackPanel>
+                        
+                        <TextBlock Text="{Binding ConnectionDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MinHeight="36" />
+                        
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            
+                            <Border Style="{StaticResource TileBorderStyle}">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xEBB5;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="BATERIA" Style="{StaticResource EyebrowTextStyle}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding BatteryText}" Style="{StaticResource StatNumberStyle}" />
+                                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding BatteryFraction}" Height="4" CornerRadius="2"
+                                                 Foreground="{StaticResource BrandAccentBrush}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE704;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="SYGNAŁ" Style="{StaticResource EyebrowTextStyle}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding SignalQuality}" Style="{StaticResource StatNumberStyle}" />
+                                    <TextBlock Text="Bluetooth LE" Style="{StaticResource MetadataTextStyle}" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
-                        <Button Content="Zarządzaj urządzeniem" Click="Device_Click" HorizontalAlignment="Left" AutomationProperties.Name="Otwórz ekran urządzenia Triki" />
+
+                        <Button Click="Device_Click" HorizontalAlignment="Stretch" AutomationProperties.Name="Otwórz ekran urządzenia Triki">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE8B8;" FontSize="14" />
+                                <TextBlock Text="Zarządzaj urządzeniem" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
 
-                <Border x:Name="NowPlayingCard" Grid.Column="1" Style="{StaticResource CardBorderStyle}">
-                    <Grid ColumnSpacing="18">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="96" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Width="96" Height="96" CornerRadius="12" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Top">
-                            <FontIcon Glyph="&#xE8D6;" FontSize="36" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                        </Border>
-                        <StackPanel Grid.Column="1" Spacing="6">
-                            <TextBlock Text="Teraz odtwarzane" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Text="{Binding MediaTitle}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding MediaDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding PlaybackStatus}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" />
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                                <Button Width="44" Height="44" Background="Transparent" Click="Previous_Click" ToolTipService.ToolTip="Poprzedni utwór" AutomationProperties.Name="Poprzedni utwór">
-                                    <SymbolIcon Symbol="Previous" />
-                                </Button>
-                                <Button Width="56" Height="44" Style="{StaticResource AccentButtonStyle}" Click="PlayPause_Click" ToolTipService.ToolTip="{Binding PlayPauseLabel}" AutomationProperties.Name="{Binding PlayPauseLabel}">
-                                    <FontIcon Glyph="{Binding PlayPauseGlyph}" />
-                                </Button>
-                                <Button Width="44" Height="44" Background="Transparent" Click="Next_Click" ToolTipService.ToolTip="Następny utwór" AutomationProperties.Name="Następny utwór">
-                                    <SymbolIcon Symbol="Next" />
-                                </Button>
+                <!-- Karta Teraz Odtwarzane -->
+                <Border x:Name="NowPlayingCard" Grid.Column="1" Style="{StaticResource HeroCardBorderStyle}">
+                    <StackPanel Spacing="16">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="88" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="88" Height="88" CornerRadius="12" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Top">
+                                <FontIcon Glyph="&#xE8D6;" FontSize="38" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="TERAZ ODTWARZANE" Style="{StaticResource EyebrowTextStyle}" />
+                                <TextBlock Text="{Binding MediaTitle}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding MediaDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding PlaybackStatus}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" FontSize="13" />
                             </StackPanel>
-                            <TextBlock Text="{Binding VolumeText}" Style="{StaticResource MetadataTextStyle}" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </Grid>
+                        </Grid>
+
+                        <!-- Przyciski odtwarzacza -->
+                        <Border Style="{StaticResource TileBorderStyle}">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <Button Width="42" Height="42" CornerRadius="8" Background="Transparent" Click="Previous_Click" ToolTipService.ToolTip="Poprzedni utwór" AutomationProperties.Name="Poprzedni utwór">
+                                        <SymbolIcon Symbol="Previous" />
+                                    </Button>
+                                    <Button Width="56" Height="42" CornerRadius="8" Style="{StaticResource AccentButtonStyle}" Click="PlayPause_Click" ToolTipService.ToolTip="{Binding PlayPauseLabel}" AutomationProperties.Name="{Binding PlayPauseLabel}">
+                                        <FontIcon Glyph="{Binding PlayPauseGlyph}" FontSize="18" />
+                                    </Button>
+                                    <Button Width="42" Height="42" CornerRadius="8" Background="Transparent" Click="Next_Click" ToolTipService.ToolTip="Następny utwór" AutomationProperties.Name="Następny utwór">
+                                        <SymbolIcon Symbol="Next" />
+                                    </Button>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                        <FontIcon Glyph="&#xE767;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{Binding VolumeText}" FontWeight="SemiBold" FontSize="13" />
+                                    </StackPanel>
+                                    <TextBlock Text="Systemowe master audio" Style="{StaticResource MetadataTextStyle}" HorizontalAlignment="Right" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
                 </Border>
             </Grid>
 
+            <!-- Karta Podsumowania Sterowania -->
             <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="14">
                     <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Sterowanie Triki" Style="{StaticResource EyebrowTextStyle}" />
+                            <TextBlock Text="GESTY I STAN KONTROLERA" Style="{StaticResource EyebrowTextStyle}" />
                             <TextBlock Text="{Binding ControllerStatusTitle}" Style="{StaticResource SectionTitleStyle}" />
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Text="{Binding LastActionCompact}" Style="{StaticResource MetadataTextStyle}" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" Style="{StaticResource PillBorderStyle}" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding LastActionCompact}" Style="{StaticResource MetadataTextStyle}" FontWeight="SemiBold" />
+                        </Border>
                     </Grid>
+
                     <TextBlock Text="{Binding ControllerStatusDetails}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding ControllerProgress}" AutomationProperties.Name="Postęp przygotowania sterowania Triki" />
-                    <Grid ColumnSpacing="18" RowSpacing="8">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <TextBlock Text="Obrót → głośność" TextWrapping="Wrap" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="1" TextWrapping="Wrap" FontWeight="SemiBold">
-                            <Run Text="Odwróć + " />
-                            <Run Text="{Binding RotationAngleLabel}" />
-                            <Run Text=" → utwór" />
-                        </TextBlock>
-                        <TextBlock Grid.Column="2" Text="Przycisk → Play/Pause" TextWrapping="Wrap" FontWeight="SemiBold" />
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding ControllerProgress}" Foreground="{StaticResource BrandAccentBrush}" AutomationProperties.Name="Postęp przygotowania sterowania Triki" />
+
+                    <!-- Kafelki szybkiej ściągi -->
+                    <Grid ColumnSpacing="12" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Border Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE767;" FontSize="14" Foreground="{StaticResource BrandAccentBrush}" />
+                                    <TextBlock Text="Głośność" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="Obrót kapsla w poziomie wokół osi Z" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE7AD;" FontSize="14" Foreground="{StaticResource BrandAccentBrush}" />
+                                    <TextBlock FontWeight="SemiBold">
+                                        <Run Text="Odwróć + " /><Run Text="{Binding RotationAngleLabel}" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <TextBlock Text="Lewo = Następny • Prawo = Poprzedni" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE700;" FontSize="14" Foreground="{StaticResource BrandAccentBrush}" />
+                                    <TextBlock Text="Przycisk" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="1x Play/Pause • 2x Like • 3x Dislike" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </StackPanel>
             </Border>

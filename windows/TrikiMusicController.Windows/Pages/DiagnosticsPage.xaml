@@ -4,24 +4,56 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer>
-        <StackPanel MaxWidth="1000" Padding="28" Spacing="18" HorizontalAlignment="Stretch">
+        <StackPanel MaxWidth="900" Padding="32,24,32,32" Spacing="20" HorizontalAlignment="Stretch">
             <StackPanel Spacing="4">
                 <TextBlock Text="Diagnostyka" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Zaawansowane dane do sprawdzania połączenia i czujników." Style="{StaticResource PageSubtitleStyle}" />
+                <TextBlock Text="Zaawansowany podgląd danych telemetrycznych IMU i protokołu BLE." Style="{StaticResource PageSubtitleStyle}" />
             </StackPanel>
-            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Narzędzia zaawansowane" Message="Te wartości są przydatne podczas diagnozowania, ale nie są potrzebne do codziennej obsługi Triki." />
+
+            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Narzędzia diagnostyczne" Message="Te wartości służą do weryfikacji działania czujników i nie są wymagane do codziennej obsługi kontrolera." />
+
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Dane IMU" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="{Binding SensorDetails}" FontFamily="Consolas" FontSize="15" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding VolumeTechnicalDetails}" FontFamily="Consolas" FontSize="14" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <StackPanel Spacing="12">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="32" Height="32" CornerRadius="16" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE9D9;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <TextBlock Grid.Column="1" Text="Dane czujników IMU" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                    </Grid>
+                    
+                    <Border Style="{StaticResource TileBorderStyle}">
+                        <TextBlock Text="{Binding SensorDetails}" FontFamily="Consolas" FontSize="14" TextWrapping="Wrap" LineHeight="22" />
+                    </Border>
+
+                    <Border Style="{StaticResource TileBorderStyle}">
+                        <TextBlock Text="{Binding VolumeTechnicalDetails}" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Border>
                 </StackPanel>
             </Border>
+
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Protokół" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="{Binding ProtocolDetails}" TextWrapping="Wrap" />
-                    <TextBlock Text="Nordic UART Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E" FontFamily="Consolas" TextWrapping="Wrap" Opacity="0.75" />
+                <StackPanel Spacing="12">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="32" Height="32" CornerRadius="16" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE968;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <TextBlock Grid.Column="1" Text="Szczegóły protokołu BLE" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Border Style="{StaticResource TileBorderStyle}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding ProtocolDetails}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                            <TextBlock Text="Nordic UART Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
         </StackPanel>

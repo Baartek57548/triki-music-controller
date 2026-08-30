@@ -1,5 +1,5 @@
 #define AppName "Triki Music Controller"
-#define AppVersion "2.7.0"
+#define AppVersion "2.8.0"
 #define AppPublisher "Bartek"
 #define AppExeName "TrikiMusicController.Windows.exe"
 #define AppMutex "Local\TrikiMusicController.BAEDA449-C844-43F1-8888-AE0EFE5FBB13"
@@ -26,6 +26,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\artifacts\installer
 OutputBaseFilename=triki-music-controller-windows-v{#AppVersion}-setup
 SetupIconFile=..\TrikiMusicController.Windows\Assets\AppIcon.ico
+UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
 Compression=lzma2/max
 SolidCompression=yes
@@ -55,7 +56,11 @@ Source: "{#PublishDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recurses
 
 [Icons]
 Name: "{group}\Triki Music Controller"; Filename: "{app}\{#AppExeName}"
+Name: "{group}\Odinstaluj Triki Music Controller"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Triki Music Controller"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{localappdata}\TrikiMusicController\Updates"
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "TrikiMusicController"; Flags: deletevalue

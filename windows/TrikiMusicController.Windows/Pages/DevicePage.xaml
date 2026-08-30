@@ -29,35 +29,68 @@
                 Message="{Binding ConnectionDetails}" />
 
             <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
-                <Grid ColumnSpacing="20">
+                <Grid ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="3">
-                        <TextBlock Text="BATERIA" Style="{StaticResource EyebrowTextStyle}" />
-                        <TextBlock Text="{Binding BatteryText}" FontSize="20" FontWeight="SemiBold" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="3">
-                        <TextBlock Text="SYGNAŁ" Style="{StaticResource EyebrowTextStyle}" />
-                        <TextBlock Text="{Binding SignalQuality}" FontSize="20" FontWeight="SemiBold" />
-                    </StackPanel>
+
+                    <Border Style="{StaticResource TileBorderStyle}">
+                        <StackPanel Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xEBB5;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="POZIOM BATERII" Style="{StaticResource EyebrowTextStyle}" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding BatteryText}" Style="{StaticResource StatNumberStyle}" />
+                            <ProgressBar Minimum="0" Maximum="1" Value="{Binding BatteryFraction}" Height="4" CornerRadius="2"
+                                         Foreground="{StaticResource BrandAccentBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
+                        <StackPanel Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE704;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="JAKOŚĆ SYGNAŁU" Style="{StaticResource EyebrowTextStyle}" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding SignalQuality}" Style="{StaticResource StatNumberStyle}" />
+                            <TextBlock Text="Wskaźnik RSSI Bluetooth LE" Style="{StaticResource MetadataTextStyle}" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
 
             <TextBlock Grid.Row="3" Margin="0,22,0,8" Text="Wykryte urządzenia" Style="{StaticResource SectionTitleStyle}" />
 
-            <ListView
-                Grid.Row="4"
-                MinHeight="180"
-                ItemsSource="{Binding Devices}"
-                SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
-                DisplayMemberPath="DisplayName"
-                SelectionMode="Single"
-                AutomationProperties.Name="Wykryte urządzenia Bluetooth LE"
-                AutomationProperties.HelpText="Jeżeli lista jest pusta, wybudź kapsel przyciskiem i wybierz Znajdź Triki." />
+            <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Padding="8">
+                <ListView
+                    MinHeight="160"
+                    ItemsSource="{Binding Devices}"
+                    SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
+                    SelectionMode="Single"
+                    AutomationProperties.Name="Wykryte urządzenia Bluetooth LE"
+                    AutomationProperties.HelpText="Jeżeli lista jest pusta, wybudź kapsel przyciskiem i wybierz Znajdź Triki.">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnSpacing="12" Padding="8,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="36" Height="36" CornerRadius="18" Background="{ThemeResource SubtleFillColorSecondaryBrush}" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE702;" FontSize="16" Foreground="{StaticResource BrandAccentBrush}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" />
+                                    <TextBlock Text="Urządzenie Żabka Triki" Style="{StaticResource MetadataTextStyle}" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Border>
 
-            <CommandBar Grid.Row="5" Margin="0,12,0,0" DefaultLabelPosition="Right">
+            <CommandBar Grid.Row="5" Margin="0,12,0,0" DefaultLabelPosition="Right" Background="Transparent">
                 <AppBarButton Icon="Find" Label="Znajdź Triki" Click="Scan_Click" />
                 <AppBarButton Icon="Accept" Label="Połącz" Click="Connect_Click" />
                 <AppBarButton Icon="Cancel" Label="Rozłącz" Click="Disconnect_Click" />

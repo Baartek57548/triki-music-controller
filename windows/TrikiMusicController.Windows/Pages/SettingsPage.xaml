@@ -10,26 +10,34 @@
                 <TextBlock Text="Połączenie, zachowanie aplikacji i funkcje zaawansowane" Style="{StaticResource PageSubtitleStyle}" />
             </StackPanel>
 
-            <StackPanel Spacing="8">
-                <TextBlock Text="Triki" Style="{StaticResource SectionTitleStyle}" />
-                <TextBlock Text="{Binding RememberedDevice}" Style="{StaticResource MetadataTextStyle}" />
-            </StackPanel>
+            <!-- Połączenie Triki -->
+            <TextBlock Text="Połączenie Triki" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Zapamiętany kontroler" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding RememberedDevice}" Style="{StaticResource MetadataTextStyle}" />
+                    </StackPanel>
+                    
+                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
                     <ToggleSwitch Header="Automatycznie łącz po wybudzeniu"
                                   OffContent="Wyłączone"
                                   OnContent="Włączone"
                                   IsOn="{Binding AutoReconnect, Mode=TwoWay}"
                                   AutomationProperties.HelpText="Łączy zapamiętany kontroler po naciśnięciu jego przycisku." />
+
                     <ToggleSwitch Header="Łącz tylko podczas użycia"
                                   OffContent="Stała gotowość"
                                   OnContent="Na żądanie"
                                   IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}"
                                   AutomationProperties.HelpText="Zamyka aktywne połączenie po 12 sekundach bezczynności." />
+                    
                     <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Tryb połączenia" Message="{Binding ConnectionModeSummary}" />
                 </StackPanel>
             </Border>
 
+            <!-- Aplikacja -->
             <TextBlock Text="Aplikacja" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
@@ -40,25 +48,36 @@
                                   AutomationProperties.HelpText="Uruchamia Triki bez otwierania okna i pozostawia aplikację w zasobniku systemowym." />
                     <TextBlock Text="Triki zawsze rozpoczyna pracę po cichu w obszarze powiadomień. Minimalizacja i przycisk X ukrywają okno bez wyłączania sterowania. Dwukrotnie kliknij ikonę Triki, aby ponownie otworzyć okno."
                                Style="{StaticResource MetadataTextStyle}" />
-                    <ComboBox Header="Motyw"
+                    
+                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                    <ComboBox Header="Motyw aplikacji"
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                               HorizontalAlignment="Left"
-                              MinWidth="240" />
+                              MinWidth="260" />
                 </StackPanel>
             </Border>
 
+            <!-- Gest Obrotu -->
             <TextBlock Text="Gest obrotu" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
-                    <StackPanel Spacing="4">
-                        <TextBlock FontWeight="SemiBold">
-                            <Run Text="Wymagany obrót: " />
-                            <Run Text="{Binding RotationAngleLabel}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                        </TextBlock>
-                        <TextBlock Text="Ustaw, o ile stopni trzeba obrócić odwrócony kapsel, aby zmienić utwór. Mniejszy kąt = łatwiejsze wyzwolenie, większy = mniej przypadkowych zmian."
-                                   Style="{StaticResource MetadataTextStyle}" />
-                    </StackPanel>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Kąt do zmiany utworu" FontWeight="SemiBold" />
+                            <TextBlock Text="O ile stopni trzeba obrócić odwrócony kapsel, aby zmienić utwór (lewo = następny, prawo = poprzedni)."
+                                       Style="{StaticResource MetadataTextStyle}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Style="{StaticResource AccentPillBorderStyle}" VerticalAlignment="Center" Padding="14,6">
+                            <TextBlock Text="{Binding RotationAngleLabel}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                    </Grid>
+
                     <Slider
                         Minimum="90"
                         Maximum="360"
@@ -68,36 +87,56 @@
                         Value="{Binding RotationAngleDegrees, Mode=TwoWay}"
                         AutomationProperties.Name="Wymagany kąt obrotu do zmiany utworu"
                         HorizontalAlignment="Stretch" />
+
                     <Grid ColumnSpacing="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="90°" HorizontalAlignment="Left" Style="{StaticResource MetadataTextStyle}" />
+                        <TextBlock Text="90° (szybko)" HorizontalAlignment="Left" Style="{StaticResource MetadataTextStyle}" />
                         <TextBlock Grid.Column="1" Text="225°" HorizontalAlignment="Center" Style="{StaticResource MetadataTextStyle}" />
-                        <TextBlock Grid.Column="2" Text="360°" HorizontalAlignment="Right" Style="{StaticResource MetadataTextStyle}" />
+                        <TextBlock Grid.Column="2" Text="360° (precyzyjnie)" HorizontalAlignment="Right" Style="{StaticResource MetadataTextStyle}" />
                     </Grid>
                 </StackPanel>
             </Border>
 
+            <!-- Zaawansowane -->
             <TextBlock Text="Zaawansowane" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Diagnostyka" FontWeight="SemiBold" />
-                    <TextBlock Text="Dane IMU, częstotliwość próbek i szczegóły protokołu są oddzielone od codziennego sterowania." Style="{StaticResource PageSubtitleStyle}" />
-                    <Button Content="Otwórz diagnostykę" Click="Diagnostics_Click" HorizontalAlignment="Left" />
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Diagnostyka IMU i protokołu" FontWeight="SemiBold" />
+                    <TextBlock Text="Podgląd danych z czujników na żywo, częstotliwości ramek BLE i statusu dekodera." Style="{StaticResource MetadataTextStyle}" />
+                    <Button Click="Diagnostics_Click" HorizontalAlignment="Left">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="14" />
+                                <TextBlock Text="Otwórz diagnostykę" />
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
                 </StackPanel>
             </Border>
 
-            <TextBlock Text="Informacje" Style="{StaticResource SectionTitleStyle}" />
+            <!-- Informacje i Aktualizacje -->
+            <TextBlock Text="Informacje i aktualizacje" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Wersja, aktualizacje i prywatność" FontWeight="SemiBold" />
-                    <CommandBar Background="Transparent" DefaultLabelPosition="Right">
-                        <AppBarButton Icon="Help" Label="O aplikacji" Click="About_Click" />
-                        <AppBarButton Icon="Sync" Label="Sprawdź aktualizacje" Click="CheckUpdates_Click" />
-                    </CommandBar>
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Wersja aplikacji, zasady obsługi i aktualizacje" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Click="About_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE946;" FontSize="14" />
+                                <TextBlock Text="O aplikacji" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource AccentButtonStyle}" Click="CheckUpdates_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE895;" FontSize="14" />
+                                <TextBlock Text="Sprawdź aktualizacje" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

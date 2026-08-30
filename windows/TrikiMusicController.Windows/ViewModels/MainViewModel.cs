@@ -86,7 +86,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             "Naciśnij przycisk zapamiętanego Triki, aby połączyć je automatycznie.",
         _ => "Obudź Triki przyciskiem, a następnie znajdź i połącz je pierwszy raz.",
     };
+    public bool IsConnected => _lastBluetooth.ConnectionState == TrikiConnectionState.Ready;
+    public bool IsConnecting => _lastBluetooth.ConnectionState is TrikiConnectionState.Connecting or TrikiConnectionState.Scanning;
+    public string ConnectionStateBadge => _lastBluetooth.ConnectionState switch
+    {
+        TrikiConnectionState.Ready => "Połączono",
+        TrikiConnectionState.Connecting => "Łączenie",
+        TrikiConnectionState.Scanning => "Skanowanie",
+        TrikiConnectionState.WaitingForDevice or TrikiConnectionState.WaitingForWake => "Czuwanie",
+        TrikiConnectionState.Error => "Błąd",
+        _ => "Rozłączono",
+    };
     public string BatteryText => _lastBluetooth.BatteryPercent is int battery ? $"{battery}%" : "Brak danych";
+    public double BatteryFraction => (_lastBluetooth.BatteryPercent ?? 0) / 100.0;
+    public bool HasBatteryData => _lastBluetooth.BatteryPercent is not null;
     public string SignalQuality => _lastBluetooth.ConnectedDevice?.Rssi switch
     {
         >= -60 => "Bardzo dobry",
@@ -97,14 +110,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ => "Bardzo słaby",
     };
 
-    public string MediaTitle => _lastMedia.Title;
-    public string MediaDetails => $"{_lastMedia.Artist} • {_lastMedia.SourceApp}";
+    public bool HasMediaSession => _lastMedia.HasSession;
+    public string MediaTitle => string.IsNullOrWhiteSpace(_lastMedia.Title) ? "Brak odtwarzanego utworu" : _lastMedia.Title;
+    public string MediaDetails => string.IsNullOrWhiteSpace(_lastMedia.Artist)
+        ? (string.IsNullOrWhiteSpace(_lastMedia.SourceApp) ? "Uruchom Spotify, YouTube lub odtwarzacz multimedialny" : _lastMedia.SourceApp)
+        : $"{_lastMedia.Artist} • {_lastMedia.SourceApp}";
     public string PlaybackStatus => _lastMedia.HasSession
         ? (_lastMedia.IsPlaying ? "Odtwarzanie" : "Wstrzymano")
         : "Brak aktywnej sesji multimedialnej";
     public string PlayPauseGlyph => _lastMedia.IsPlaying ? "\uE769" : "\uE768";
     public string PlayPauseLabel => _lastMedia.IsPlaying ? "Wstrzymaj" : "Odtwórz";
-    public string VolumeText => $"Głośność systemowa: {_lastMedia.VolumePercent:0}%{(_lastMedia.IsMuted ? " (wyciszona)" : string.Empty)}";
+    public string VolumeText => $"Głośność: {_lastMedia.VolumePercent:0}%{(_lastMedia.IsMuted ? " (wyciszona)" : string.Empty)}";
+    public double VolumePercentValue => _lastMedia.VolumePercent;
 
     public double VolumeProgress => _lastRuntime.Volume?.StabilizationProgress ?? 0;
     public string VolumeControlTitle => _lastRuntime.Volume switch
@@ -186,7 +203,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         : _lastRuntime.Gesture.Phase switch
         {
             HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => "Trzymaj odwrócony kapsel stabilnie przez chwilę.",
-            HoldGesturePhase.Tracking => "Kontynuuj płynny obrót do 270°.",
+            HoldGesturePhase.Tracking => $"Kontynuuj płynny obrót do {_settings.Current.RotationAngleDegrees}°.",
             HoldGesturePhase.Rearming => "Uspokój ruch przed kolejnym gestem.",
             HoldGesturePhase.Triggered => "Zmiana utworu została wysłana.",
             _ => VolumeControlDetails,
