@@ -14,7 +14,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly FeedbackToneService _ratingFeedback;
     private readonly SensorFilter _sensorFilter = new();
     private readonly GyroscopeVolumeController _volumeController = new();
-    private readonly FullRotationGestureDetector _rotationGestureDetector = new();
+    private FullRotationGestureDetector _rotationGestureDetector;
     private readonly TrikiButtonInterpreter _buttonInterpreter = new();
     private readonly ConnectionActivityLease _connectionActivityLease = new();
     private bool _connectionWasReady;
@@ -32,8 +32,31 @@ public sealed class TrikiRuntimeEngine : IDisposable
         _systemVolume = systemVolume;
         _settings = settings;
         _ratingFeedback = ratingFeedback;
+        _rotationGestureDetector = CreateGestureDetector(_settings.Current.RotationAngleDegrees);
         _bluetooth.SampleReceived += BluetoothOnSampleReceived;
         _bluetooth.StateChanged += BluetoothOnStateChanged;
+    }
+
+    /// <summary>Tworzy detektor obrotu z przeliczonym progiem filtrowanym dla podanego kąta fizycznego.</summary>
+    private static FullRotationGestureDetector CreateGestureDetector(int physicalAngleDegrees)
+    {
+        // Filtr low-pass pochłania ~7% ruchu; przeliczamy próg proporcjonalnie
+        const float filterFactor = FullRotationGestureDetector.FilteredRotationTriggerDegrees
+            / FullRotationGestureDetector.PhysicalRotationTargetDegrees;
+        var required = Math.Clamp(physicalAngleDegrees * filterFactor, 80f, 360f);
+        var maximum = Math.Max(required + 150f, required * 1.4f);
+        return new FullRotationGestureDetector(new FullRotationGestureConfiguration(
+            RequiredRotationDegrees: required,
+            MaximumRotationDegrees: maximum));
+    }
+
+    /// <summary>Aktualizuje kąt obrotu wymagany do zmiany utworu bez przerywania połączenia.</summary>
+    public void UpdateRotationAngle(int physicalAngleDegrees)
+    {
+        lock (_sync)
+        {
+            _rotationGestureDetector = CreateGestureDetector(physicalAngleDegrees);
+        }
     }
 
     public RuntimeSnapshot State { get; private set; } = RuntimeSnapshot.Initial;

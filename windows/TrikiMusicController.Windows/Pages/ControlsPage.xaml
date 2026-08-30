@@ -42,7 +42,11 @@
 
             <StackPanel Spacing="4">
                 <TextBlock Text="Sterowanie" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Głośność, obrót 270° i mapowanie fizycznego przycisku" Style="{StaticResource PageSubtitleStyle}" />
+                <TextBlock Style="{StaticResource PageSubtitleStyle}">
+                    <Run Text="Głośność, obrót " />
+                    <Run Text="{Binding RotationAngleLabel}" />
+                    <Run Text=" i mapowanie fizycznego przycisku" />
+                </TextBlock>
             </StackPanel>
 
             <Grid x:Name="StatusCards" Grid.Row="1" Margin="0,20,0,0" ColumnSpacing="16">
@@ -77,7 +81,10 @@
                     <StackPanel Spacing="12">
                         <StackPanel Spacing="3">
                             <TextBlock Text="ODWRÓCONY KAPSEL" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Text="Nawigacja obrotem 270°" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Style="{StaticResource SectionTitleStyle}">
+                                <Run Text="Nawigacja obrotem " />
+                                <Run Text="{Binding RotationAngleLabel}" />
+                            </TextBlock>
                         </StackPanel>
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
@@ -97,12 +104,16 @@
                                 </StackPanel>
                             </Border>
                         </Grid>
-                        <TextBlock Text="Odwróć kapsel, odczekaj 0,5 s i obróć go o 270° wokół osi Z. Przycisk nie jest potrzebny." Style="{StaticResource MetadataTextStyle}" />
+                        <TextBlock Style="{StaticResource MetadataTextStyle}">
+                            <Run Text="Odwróć kapsel, odczekaj 0,5 s i obróć go o " />
+                            <Run Text="{Binding RotationAngleLabel}" />
+                            <Run Text=" wokół osi Z. Przycisk nie jest potrzebny." />
+                        </TextBlock>
                         <ProgressBar Minimum="0"
                                      Maximum="1"
                                      Value="{Binding GestureProgress}"
                                      Foreground="{StaticResource BrandAccentBrush}"
-                                     AutomationProperties.Name="Postęp gestu obrotu 270 stopni" />
+                                     AutomationProperties.Name="Postęp gestu obrotu" />
                         <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>

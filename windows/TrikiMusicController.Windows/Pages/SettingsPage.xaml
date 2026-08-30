@@ -48,6 +48,39 @@
                 </StackPanel>
             </Border>
 
+            <TextBlock Text="Gest obrotu" Style="{StaticResource SectionTitleStyle}" />
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="4">
+                        <TextBlock FontWeight="SemiBold">
+                            <Run Text="Wymagany obrót: " />
+                            <Run Text="{Binding RotationAngleLabel}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </TextBlock>
+                        <TextBlock Text="Ustaw, o ile stopni trzeba obrócić odwrócony kapsel, aby zmienić utwór. Mniejszy kąt = łatwiejsze wyzwolenie, większy = mniej przypadkowych zmian."
+                                   Style="{StaticResource MetadataTextStyle}" />
+                    </StackPanel>
+                    <Slider
+                        Minimum="90"
+                        Maximum="360"
+                        StepFrequency="5"
+                        TickFrequency="45"
+                        TickPlacement="Outside"
+                        Value="{Binding RotationAngleDegrees, Mode=TwoWay}"
+                        AutomationProperties.Name="Wymagany kąt obrotu do zmiany utworu"
+                        HorizontalAlignment="Stretch" />
+                    <Grid ColumnSpacing="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="90°" HorizontalAlignment="Left" Style="{StaticResource MetadataTextStyle}" />
+                        <TextBlock Grid.Column="1" Text="225°" HorizontalAlignment="Center" Style="{StaticResource MetadataTextStyle}" />
+                        <TextBlock Grid.Column="2" Text="360°" HorizontalAlignment="Right" Style="{StaticResource MetadataTextStyle}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <TextBlock Text="Zaawansowane" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="10">

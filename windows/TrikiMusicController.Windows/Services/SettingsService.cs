@@ -120,6 +120,8 @@ public sealed class SettingsService
         }
 
         settings.Calibration = NormalizeCalibration(settings.Calibration);
+        if (settings.RotationAngleDegrees is < 90 or > 360)
+            settings.RotationAngleDegrees = 200;
         return settings;
     }
 

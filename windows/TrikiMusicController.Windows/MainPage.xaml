@@ -123,7 +123,11 @@
                     <Grid ColumnSpacing="18" RowSpacing="8">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <TextBlock Text="Obrót → głośność" TextWrapping="Wrap" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="1" Text="Odwróć + 270° → utwór" TextWrapping="Wrap" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" TextWrapping="Wrap" FontWeight="SemiBold">
+                            <Run Text="Odwróć + " />
+                            <Run Text="{Binding RotationAngleLabel}" />
+                            <Run Text=" → utwór" />
+                        </TextBlock>
                         <TextBlock Grid.Column="2" Text="Przycisk → Play/Pause" TextWrapping="Wrap" FontWeight="SemiBold" />
                     </Grid>
                 </StackPanel>

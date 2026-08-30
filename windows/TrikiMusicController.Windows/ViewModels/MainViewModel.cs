@@ -141,18 +141,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         HoldGesturePhase.Holding => _lastRuntime.Gesture.FaceDown
             ? $"Odwrócenie potwierdzone • stabilizacja {_lastRuntime.Gesture.StabilizationProgress * 100:0}%"
             : "Odwróć kapsel górą w dół i uspokój go przed ruchem",
-        HoldGesturePhase.Ready => "Gotowe — obróć o 270°: lewo = następny, prawo = poprzedni",
+        HoldGesturePhase.Ready => $"Gotowe — obróć o {_settings.Current.RotationAngleDegrees}°: lewo = następny, prawo = poprzedni",
         HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction switch
         {
-            RotationGestureDirection.Left => $"Następny utwór • ruch w lewo: {GestureProgress * FullRotationGestureDetector.PhysicalRotationTargetDegrees:0}° / 270°",
-            RotationGestureDirection.Right => $"Poprzedni utwór • ruch w prawo: {GestureProgress * FullRotationGestureDetector.PhysicalRotationTargetDegrees:0}° / 270°",
+            RotationGestureDirection.Left => $"Następny utwór • ruch w lewo: {GestureProgress * FullRotationGestureDetector.PhysicalRotationTargetDegrees:0}° / {_settings.Current.RotationAngleDegrees}°",
+            RotationGestureDirection.Right => $"Poprzedni utwór • ruch w prawo: {GestureProgress * FullRotationGestureDetector.PhysicalRotationTargetDegrees:0}° / {_settings.Current.RotationAngleDegrees}°",
             _ => "Potwierdzam kierunek obrotu…",
         },
         HoldGesturePhase.Completing => _lastRuntime.Gesture.Direction switch
         {
-            RotationGestureDirection.Left => "Następny utwór — dokończ ruch w lewo do 270°",
-            RotationGestureDirection.Right => "Poprzedni utwór — dokończ ruch w prawo do 270°",
-            _ => "Dokończ obrót do 270°",
+            RotationGestureDirection.Left => $"Następny utwór — dokończ ruch w lewo do {_settings.Current.RotationAngleDegrees}°",
+            RotationGestureDirection.Right => $"Poprzedni utwór — dokończ ruch w prawo do {_settings.Current.RotationAngleDegrees}°",
+            _ => $"Dokończ obrót do {_settings.Current.RotationAngleDegrees}°",
         },
         HoldGesturePhase.Rearming => "Uspokój ruch na moment przed kolejną próbą",
         HoldGesturePhase.Triggered => _lastRuntime.Gesture.Direction switch
@@ -161,7 +161,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             RotationGestureDirection.Right => "Poprzedni utwór — rozpoznano ruch w prawo",
             _ => "Zmiana utworu wysłana",
         },
-        _ => "Odwróć kapsel, ustabilizuj go 0,5 s i obróć o 270°: lewo = następny, prawo = poprzedni",
+        _ => $"Odwróć kapsel, ustabilizuj go 0,5 s i obróć o {_settings.Current.RotationAngleDegrees}°: lewo = następny, prawo = poprzedni",
     };
     public double ControllerProgress => _lastRuntime.Gesture.Phase switch
     {
@@ -298,6 +298,25 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => OptionFor(_settings.Current.TripleClickAction);
         set { if (_settings.Current.TripleClickAction == value.Action) return; _settings.Current.TripleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
     }
+
+    public int RotationAngleDegrees
+    {
+        get => _settings.Current.RotationAngleDegrees;
+        set
+        {
+            var clamped = Math.Clamp(value, 90, 360);
+            if (_settings.Current.RotationAngleDegrees == clamped) return;
+            _settings.Current.RotationAngleDegrees = clamped;
+            _runtime.UpdateRotationAngle(clamped);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(RotationAngleLabel));
+            OnPropertyChanged(nameof(GestureStatus));
+            OnPropertyChanged(nameof(ControllerStatusDetails));
+            _ = SaveSettingsAsync();
+        }
+    }
+
+    public string RotationAngleLabel => $"{_settings.Current.RotationAngleDegrees}°";
 
     public async Task InitializeAsync()
     {

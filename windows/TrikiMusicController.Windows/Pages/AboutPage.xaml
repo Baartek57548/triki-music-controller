@@ -33,7 +33,7 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
                     <TextBlock Text="Zappki — Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Wersja 2.6.5 • Windows x64" />
+                    <TextBlock Text="Wersja 2.7.0 • Windows x64" />
                     <TextBlock Text="Natywna aplikacja WinUI 3 sterująca globalną sesją multimedialną i głośnością domyślnego urządzenia audio." TextWrapping="Wrap" />
                     <TextBlock Text="Dane czujników pozostają lokalnie na komputerze. Sieć jest używana wyłącznie do sprawdzania publicznych wydań GitHub; aplikacja sprawdza nową wersję po uruchomieniu." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <StackPanel Orientation="Horizontal" Spacing="10">

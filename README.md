@@ -25,7 +25,7 @@ Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i
 - opcjonalna kalibracja biasu akcelerometru/żyroskopu, neutralnej pozycji i szumu;
 - bezpieczna autodetekcja przycisku: jeden klik steruje Play/Pause, dwa wysyłają Like, trzy Dislike; każde mapowanie można zmienić w profilu;
 - konfigurowalne mapowania przycisku zapisywane w Preferences DataStore;
-- obrót odwróconym kapslem o 270° bez wciskania przycisku: po 0,5 s stabilizacji ruch dłoni w lewo przechodzi do następnego utworu, a w prawo do poprzedniego;
+- obrót odwróconym kapslem o konfigurowalny kąt (domyślnie 200°, zakres 90–360°) bez wciskania przycisku: po 0,5 s stabilizacji ruch dłoni w lewo przechodzi do następnego utworu, a w prawo do poprzedniego; kąt można zmienić w ustawieniach aplikacji;
 - sterowanie Play, Pause, Play/Pause, Next, Previous, Like, Dislike, Stop, Volume +/−, Mute i Unmute;
 - dashboard z orientacją Triki, baterią, RSSI, częstotliwością ramek i informacją o odtwarzanym utworze;
 - uproszczone ekrany robocze i wspólny ekran **Informacje**, otwierany ikoną w prawym górnym rogu aplikacji Android i Windows;
