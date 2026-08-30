@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bluetooth
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -29,6 +32,8 @@ import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -92,11 +97,14 @@ fun HomeScreen(
 private fun TrikiStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
     val ready = state.ble.connectionState == TrikiConnectionState.READY
     Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (ready) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Surface(
                     shape = CircleShape,
                     color = if (ready) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
@@ -104,7 +112,7 @@ private fun TrikiStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
                     Icon(
                         if (ready) Icons.Default.Bluetooth else Icons.Default.BluetoothDisabled,
                         contentDescription = null,
-                        modifier = Modifier.padding(10.dp),
+                        modifier = Modifier.padding(12.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
@@ -112,6 +120,7 @@ private fun TrikiStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
                     Text(
                         state.ble.selectedDevice?.name ?: state.settings.knownDeviceName ?: "Triki",
                         style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         connectionSummary(state),
@@ -123,7 +132,12 @@ private fun TrikiStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
             }
 
             if (ready) {
-                Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     CompactMetric(
                         icon = Icons.Default.BatteryFull,
                         label = "Bateria",
@@ -134,6 +148,13 @@ private fun TrikiStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
                         label = "Sygnał",
                         value = signalQuality(state.ble.rssi),
                     )
+                    OutlinedButton(
+                        onClick = onOpenDevice,
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                    ) {
+                        Text("Zarządzaj")
+                    }
                 }
             } else {
                 Text(
@@ -145,7 +166,11 @@ private fun TrikiStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                 )
-                Button(onClick = onOpenDevice, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onOpenDevice,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
                     Text(connectionActionLabel(state.ble.connectionState))
                 }
             }
@@ -156,10 +181,10 @@ private fun TrikiStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
 @Composable
 private fun CompactMetric(icon: ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
         Column {
-            Text(value, style = MaterialTheme.typography.labelLarge)
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -171,25 +196,53 @@ private fun NowPlayingCard(
     onOpenPermissions: () -> Unit,
 ) {
     val hasMetadata = state.media.hasPermission && state.media.hasActiveSession
-    Card(shape = RoundedCornerShape(20.dp)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Teraz odtwarzane", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "TERAZ ODTWARZANE",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (hasMetadata && state.media.appName != null) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                    ) {
+                        Text(
+                            state.media.appName,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (hasMetadata && state.media.artworkUri != null) {
                     AsyncImage(
                         model = state.media.artworkUri,
                         contentDescription = "Okładka albumu",
-                        modifier = Modifier.size(78.dp).clip(RoundedCornerShape(14.dp)),
+                        modifier = Modifier.size(82.dp).clip(RoundedCornerShape(16.dp)),
                     )
                 } else {
                     Box(
-                        Modifier.size(78.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(14.dp)),
+                        Modifier.size(82.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(34.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(38.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         when {
                             hasMetadata -> state.media.title ?: "Nieznany utwór"
@@ -197,6 +250,7 @@ private fun NowPlayingCard(
                             else -> "Nic teraz nie gra"
                         },
                         style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -204,7 +258,7 @@ private fun NowPlayingCard(
                         when {
                             hasMetadata -> state.media.artist ?: state.media.album ?: "Nieznany wykonawca"
                             !state.media.hasPermission -> "Sterowanie działa; dostęp do tytułu i okładki jest opcjonalny."
-                            else -> "Uruchom utwór w wybranej aplikacji."
+                            else -> "Uruchom odtwarzanie w Spotify, YouTube Music lub innej aplikacji."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -213,25 +267,57 @@ private fun NowPlayingCard(
                     )
                     if (hasMetadata) {
                         Text(
-                            if (state.media.isPlaying) "Odtwarzanie" else "Wstrzymano",
-                            style = MaterialTheme.typography.labelLarge,
+                            if (state.media.isPlaying) "Odtwarzanie na żywo" else "Wstrzymano",
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
             }
 
-            MediaControls(state.media.isPlaying, onMediaAction)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    volumeLabel(state),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (!state.media.hasPermission) {
-                    OutlinedButton(onClick = onOpenPermissions) { Text("Pokaż informacje") }
+            MediaControls(
+                isPlaying = state.media.isPlaying,
+                onMediaAction = onMediaAction,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // Quick Volume Row
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                IconButton(onClick = { onMediaAction(MediaAction.VOLUME_DOWN) }) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = "Ciszej", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Column(Modifier.weight(1f)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("Głośność systemowa", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${state.media.volumePercent}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                    LinearProgressIndicator(
+                        progress = {
+                            if (state.media.maxVolume > 0) (state.media.volume.toFloat() / state.media.maxVolume.toFloat()).coerceIn(0f, 1f)
+                            else 0f
+                        },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    )
+                }
+                IconButton(onClick = { onMediaAction(MediaAction.VOLUME_UP) }) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Głośniej", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            if (!state.media.hasPermission) {
+                OutlinedButton(onClick = onOpenPermissions, modifier = Modifier.fillMaxWidth()) {
+                    Text("Nadaj uprawnienia do okładek i tytułów")
                 }
             }
         }
@@ -239,25 +325,50 @@ private fun NowPlayingCard(
 }
 
 @Composable
-private fun MediaControls(isPlaying: Boolean, onMediaAction: (MediaAction) -> Unit) {
+private fun MediaControls(
+    isPlaying: Boolean,
+    onMediaAction: (MediaAction) -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = { onMediaAction(MediaAction.PREVIOUS) }, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Default.SkipPrevious, contentDescription = "Poprzedni utwór")
+        IconButton(
+            onClick = { onMediaAction(MediaAction.LIKE) },
+            modifier = Modifier.size(46.dp),
+        ) {
+            Icon(Icons.Default.ThumbUp, contentDescription = "Polub utwór", tint = MaterialTheme.colorScheme.primary)
         }
-        FilledIconButton(onClick = { onMediaAction(MediaAction.PLAY_PAUSE) }, modifier = Modifier.size(58.dp)) {
+        IconButton(
+            onClick = { onMediaAction(MediaAction.PREVIOUS) },
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(Icons.Default.SkipPrevious, contentDescription = "Poprzedni utwór", modifier = Modifier.size(28.dp))
+        }
+        FilledIconButton(
+            onClick = { onMediaAction(MediaAction.PLAY_PAUSE) },
+            modifier = Modifier.size(60.dp),
+        ) {
             AnimatedContent(isPlaying, label = "stan odtwarzania") { playing ->
                 Icon(
                     if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (playing) "Wstrzymaj" else "Odtwórz",
+                    modifier = Modifier.size(32.dp),
                 )
             }
         }
-        IconButton(onClick = { onMediaAction(MediaAction.NEXT) }, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Default.SkipNext, contentDescription = "Następny utwór")
+        IconButton(
+            onClick = { onMediaAction(MediaAction.NEXT) },
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(Icons.Default.SkipNext, contentDescription = "Następny utwór", modifier = Modifier.size(28.dp))
+        }
+        IconButton(
+            onClick = { onMediaAction(MediaAction.DISLIKE) },
+            modifier = Modifier.size(46.dp),
+        ) {
+            Icon(Icons.Default.ThumbDown, contentDescription = "Odrzuć utwór", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -265,8 +376,9 @@ private fun MediaControls(isPlaying: Boolean, onMediaAction: (MediaAction) -> Un
 @Composable
 private fun ControllerStatusCard(state: MainUiState) {
     val presentation = controllerPresentation(state)
+    val angle = state.settings.rotationAngleDegrees
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (presentation.ready) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f)
@@ -275,7 +387,7 @@ private fun ControllerStatusCard(state: MainUiState) {
             },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(
                     when {
@@ -291,15 +403,16 @@ private fun ControllerStatusCard(state: MainUiState) {
                 )
                 Column(Modifier.weight(1f)) {
                     Text("Sterowanie Triki", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(presentation.title, style = MaterialTheme.typography.titleLarge)
+                    Text(presentation.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 }
                 state.runtime.lastAction?.takeIf { it != MediaAction.NONE }?.let { action ->
-                    Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
+                    Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
                         Text(
                             action.displayName,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -308,10 +421,10 @@ private fun ControllerStatusCard(state: MainUiState) {
             presentation.progress?.let { progress ->
                 LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
             }
-            HorizontalDivider()
-            ControlHintRow(Icons.AutoMirrored.Filled.VolumeUp, "Obrót", "Głośność systemowa")
-            ControlHintRow(Icons.Default.SwapHoriz, "Odwróć + obrót 270°", "Lewo: następny • prawo: poprzedni")
-            ControlHintRow(Icons.Default.TouchApp, "Przycisk", "1× Play/Pause • 2× Like • 3× Dislike")
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            ControlHintRow(Icons.AutoMirrored.Filled.VolumeUp, "Pochylenie i obrót", "Płynna regulacja głośności")
+            ControlHintRow(Icons.Default.SwapHoriz, "Odwrócenie + obrót $angle°", "Lewo: następny • prawo: poprzedni")
+            ControlHintRow(Icons.Default.TouchApp, "Fizyczny przycisk", "1× Play/Pause • 2× Like • 3× Dislike")
         }
     }
 }
@@ -362,7 +475,7 @@ private fun controllerPresentation(state: MainUiState): ControllerPresentation {
         }
         return ControllerPresentation(
             title = action,
-            instruction = "Kontynuuj płynny obrót do 270°.",
+            instruction = "Kontynuuj płynny obrót do ${state.settings.rotationAngleDegrees}°.",
             progress = state.runtime.rotationGestureProgress,
         )
     }
@@ -390,7 +503,7 @@ private fun controllerPresentation(state: MainUiState): ControllerPresentation {
         )
         VolumeGateState.SUDDEN_MOTION -> ControllerPresentation("Ustabilizuj Triki", "Gwałtowny ruch przerwał przygotowanie sterowania.")
         VolumeGateState.OUTSIDE_TILT_RANGE -> ControllerPresentation("Ustaw Triki prawie poziomo", "Utrzymuj kapsel w zakresie 0–25°.")
-        VolumeGateState.UPSIDE_DOWN -> ControllerPresentation("Tryb zmiany utworu", "Ustabilizuj odwrócony kapsel, a potem obróć go o 270°.")
+        VolumeGateState.UPSIDE_DOWN -> ControllerPresentation("Tryb zmiany utworu", "Ustabilizuj odwrócony kapsel, a potem obróć go o ${state.settings.rotationAngleDegrees}°.")
         VolumeGateState.SENSOR_INVALID -> ControllerPresentation("Sprawdź Triki", "Nie otrzymuję prawidłowych danych ruchu.", error = true)
         VolumeGateState.NO_DATA -> ControllerPresentation("Sterowanie nieaktywne", "Połącz Triki, aby uruchomić gesty i przycisk.")
     }

@@ -1,12 +1,15 @@
 package pl.trikimusic.controller.ui.screen
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -37,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -122,22 +126,26 @@ fun ControlsScreen(
                         Text(if (showVolumeDetails) "Ukryj szczegóły" else "Pokaż szczegóły")
                     }
                     AnimatedVisibility(showVolumeDetails) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            HorizontalDivider()
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             GateStatusRow(
-                                "Zakres 0–25°",
+                                "Zakres przechyłu (0–25°)",
                                 state.runtime.volumeWithinTiltRange,
-                                sample?.let { "Aktualny przechył %.1f°".format(state.runtime.volumeTiltDegrees) } ?: "Brak danych",
+                                sample?.let { "Aktualny przechył: %.1f°".format(state.runtime.volumeTiltDegrees) } ?: "Brak danych",
                             )
-                            HorizontalDivider()
+                            LinearProgressIndicator(
+                                progress = { ((state.runtime.volumeTiltDegrees) / 25f).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             GateStatusRow(
-                                "Spokojny ruch",
+                                "Stabilność ruchu (0,80–1,20 g)",
                                 state.runtime.volumeAccelerationStable,
-                                sample?.let { "Przyspieszenie %.2f g · zakres 0,80–1,20 g".format(it.accelerationMagnitude) } ?: "Brak danych",
+                                sample?.let { "Wypadkowe przyspieszenie: %.2f g".format(it.accelerationMagnitude) } ?: "Brak danych",
                             )
-                            HorizontalDivider()
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             SensorValueRow(
-                                "Żyroskop Z",
+                                "Prędkość obrotu osi Z",
                                 sample?.let { "%+.1f °/s".format(state.runtime.volumeGyroscopeZDps) } ?: "—",
                             )
                         }
@@ -146,33 +154,36 @@ fun ControlsScreen(
             }
         }
         item {
-            Card(shape = RoundedCornerShape(24.dp)) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            ) {
                 Column(
-                    Modifier.fillMaxWidth().padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     val angle = state.settings.rotationAngleDegrees
-                    Text("Nawigacja obrotem $angle°", style = MaterialTheme.typography.titleLarge)
+                    Text("Nawigacja obrotem $angle°", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     GestureActionRow(Icons.Default.SkipNext, "Ruch dłoni w lewo", "Następny utwór")
                     GestureActionRow(Icons.Default.SkipPrevious, "Ruch dłoni w prawo", "Poprzedni utwór")
                     Text(
-                        "Kapsel jest odwrócony, dlatego liczy się kierunek ruchu Twojej dłoni. Ustabilizuj go przez 0,5 s, a następnie obróć o $angle° wokół osi Z — bez wciskania przycisku.",
+                        "Kapsel jest odwrócony, dlatego liczy się kierunek ruchu Twojej dłoni. Ustabilizuj go przez 0,5 s, a następnie obróć o $angle° wokół osi Z.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Dwa kliknięcia → Like · trzy kliknięcia → Dislike · osobny krótki sygnał potwierdza każdą ocenę",
+                        "2× klik → Like · 3× klik → Dislike · osobny krótki sygnał dźwiękowy potwierdza każdą ocenę.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    HorizontalDivider()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     if (
                         (state.runtime.rotationGesturePhase == HoldGesturePhase.HOLDING && state.runtime.rotationGestureFaceDown) ||
                         state.runtime.rotationGesturePhase in setOf(HoldGesturePhase.TRACKING, HoldGesturePhase.COMPLETING)
                     ) {
                         LinearProgressIndicator(
                             progress = { rotationProgress },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                         )
                     }
                     Text(
@@ -208,40 +219,44 @@ fun ControlsScreen(
                             }
                         },
                         style = MaterialTheme.typography.labelLarge,
-                    )
-                    Text(
-                        when {
-                            !state.media.hasActiveSession -> "Uruchom odtwarzanie w aplikacji obsługującej Android MediaSession."
-                            state.media.canLike && state.media.canDislike -> "Odtwarzacz obsługuje Like i Dislike wysyłane przez dwa lub trzy kliknięcia."
-                            state.media.canLike -> "Odtwarzacz obsługuje polubienie, ale nie udostępnia odrzucenia."
-                            state.media.canDislike -> "Odtwarzacz obsługuje odrzucenie, ale nie udostępnia polubienia."
-                            else -> "Aktywna aplikacja nie udostępnia oceniania utworów przez MediaSession."
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
         }
-        item { SectionTitle("Przycisk") }
+        item { SectionTitle("Mapowanie przycisku fizycznego") }
         item {
-            Card(shape = RoundedCornerShape(24.dp)) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            ) {
                 Column {
                     ButtonClickType.entries.forEachIndexed { index, click ->
                         val action = state.settings.activeProfile.actionFor(click)
                         TextButton(
                             onClick = { selectedClick = click },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                         ) {
-                            Icon(Icons.Default.TouchApp, contentDescription = null)
-                            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-                                Text(click.displayName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                                Text(action.displayName, style = MaterialTheme.typography.bodyMedium)
+                            Box(
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                    .padding(8.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.TouchApp,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
                             }
-                            Text("Zmień", fontWeight = FontWeight.SemiBold)
+                            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                                Text(click.displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                                Text(action.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Text("Zmień", fontWeight = FontWeight.Bold)
                         }
                         if (index != ButtonClickType.entries.lastIndex) {
-                            HorizontalDivider(Modifier.padding(horizontal = 18.dp))
+                            HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         }
                     }
                 }

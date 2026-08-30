@@ -24,8 +24,8 @@ android {
         applicationId = "pl.trikimusic.controller"
         minSdk = 26
         targetSdk = 36
-        versionCode = 30
-        versionName = "2.9.2"
+        versionCode = 31
+        versionName = "2.9.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

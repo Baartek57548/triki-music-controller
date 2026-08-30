@@ -16,4 +16,7 @@ data class MediaSessionState(
     val maxVolume: Int = 0,
     val isMuted: Boolean = false,
     val errorMessage: String? = null,
-)
+) {
+    val volumePercent: Int
+        get() = if (maxVolume > 0) ((volume.toFloat() / maxVolume.toFloat()) * 100f).toInt().coerceIn(0, 100) else 0
+}

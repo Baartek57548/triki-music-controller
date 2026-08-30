@@ -112,8 +112,21 @@ fun SettingsScreen(
                         steps = 26,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        listOf(180, 200, 270, 360).forEach { preset ->
+                            val selected = state.settings.rotationAngleDegrees == preset
+                            androidx.compose.material3.FilterChip(
+                                selected = selected,
+                                onClick = { viewModel.setRotationAngleDegrees(preset) },
+                                label = { Text(if (preset == 200) "200° (Domyślny)" else "$preset°") },
+                            )
+                        }
+                    }
                     Text(
-                        "Domyślnie: 200°. Obrót odwróconym kapslem w lewo przełącza utwór na następny, w prawo na poprzedni.",
+                        "Obrót odwróconym kapslem w lewo przełącza utwór na następny, w prawo na poprzedni.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
