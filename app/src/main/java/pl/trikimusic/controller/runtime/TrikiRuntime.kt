@@ -90,6 +90,7 @@ class TrikiRuntime(
                 val calibrationChanged = value.calibration != settings.calibration
                 val connectionModeChanged = value.connectOnlyWhenNeeded != settings.connectOnlyWhenNeeded
                 settings = value
+                rotationGestureDetector.updateRotationAngle(value.rotationAngleDegrees)
                 bleManager.setConnectOnlyWhenNeeded(value.connectOnlyWhenNeeded)
                 bleManager.setRawCaptureEnabled(value.developerMode)
                 if (calibrationChanged) resetProcessing()
@@ -216,7 +217,9 @@ class TrikiRuntime(
         if (buttonEvent != null) {
             mutableButtonEvents.tryEmit(buttonEvent)
             val execution = actionMapper.execute(buttonEvent, settings.activeProfile)
-            if (execution.action.isRatingAction) ratingFeedback.play(execution.action)
+            if (execution.action.isRatingAction && settings.enableSoundFeedback) {
+                ratingFeedback.play(execution.action)
+            }
             logger.log(
                 LogCategory.CONTROL,
                 "BUTTON_${buttonEvent.type.name}: ${execution.action.name}",

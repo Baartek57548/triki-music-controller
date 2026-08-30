@@ -60,6 +60,8 @@ data class AppSettings(
     val developerMode: Boolean = false,
     val backgroundEnabled: Boolean = true,
     val connectOnlyWhenNeeded: Boolean = false,
+    val rotationAngleDegrees: Int = 200,
+    val enableSoundFeedback: Boolean = true,
     val theme: ThemePreference = ThemePreference.SYSTEM,
 ) {
     val activeProfile: ControlProfile

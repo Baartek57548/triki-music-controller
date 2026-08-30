@@ -89,6 +89,14 @@ class DataStoreSettingsRepository(
         copy(connectOnlyWhenNeeded = enabled)
     }
 
+    override suspend fun setRotationAngleDegrees(degrees: Int) = update {
+        copy(rotationAngleDegrees = degrees.coerceIn(90, 360))
+    }
+
+    override suspend fun setEnableSoundFeedback(enabled: Boolean) = update {
+        copy(enableSoundFeedback = enabled)
+    }
+
     override suspend fun setTheme(theme: ThemePreference) = update { copy(theme = theme) }
 
     private suspend fun update(transform: AppSettings.() -> AppSettings) {

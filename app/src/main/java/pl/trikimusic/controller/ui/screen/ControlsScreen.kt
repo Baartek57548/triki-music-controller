@@ -151,11 +151,12 @@ fun ControlsScreen(
                     Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("Nawigacja obrotem 270°", style = MaterialTheme.typography.titleLarge)
+                    val angle = state.settings.rotationAngleDegrees
+                    Text("Nawigacja obrotem $angle°", style = MaterialTheme.typography.titleLarge)
                     GestureActionRow(Icons.Default.SkipNext, "Ruch dłoni w lewo", "Następny utwór")
                     GestureActionRow(Icons.Default.SkipPrevious, "Ruch dłoni w prawo", "Poprzedni utwór")
                     Text(
-                        "Kapsel jest odwrócony, dlatego liczy się kierunek ruchu Twojej dłoni. Ustabilizuj go przez 0,5 s, a następnie obróć o 270° wokół osi Z — bez wciskania przycisku.",
+                        "Kapsel jest odwrócony, dlatego liczy się kierunek ruchu Twojej dłoni. Ustabilizuj go przez 0,5 s, a następnie obróć o $angle° wokół osi Z — bez wciskania przycisku.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -184,20 +185,20 @@ fun ControlsScreen(
                             } else {
                                 "Odwróć kapsel górą w dół i uspokój go przed ruchem."
                             }
-                            HoldGesturePhase.READY -> "Gotowe — obróć o 270°: lewo = następny, prawo = poprzedni."
+                            HoldGesturePhase.READY -> "Gotowe — obróć o $angle°: lewo = następny, prawo = poprzedni."
                             HoldGesturePhase.TRACKING -> when (state.runtime.rotationGestureDirection) {
-                                RotationGestureDirection.LEFT -> "Następny utwór · ruch w lewo: %.0f° / 270°".format(
-                                    rotationProgress * ROTATION_TARGET_DEGREES,
+                                RotationGestureDirection.LEFT -> "Następny utwór · ruch w lewo: %.0f° / $angle°".format(
+                                    rotationProgress * angle,
                                 )
-                                RotationGestureDirection.RIGHT -> "Poprzedni utwór · ruch w prawo: %.0f° / 270°".format(
-                                    rotationProgress * ROTATION_TARGET_DEGREES,
+                                RotationGestureDirection.RIGHT -> "Poprzedni utwór · ruch w prawo: %.0f° / $angle°".format(
+                                    rotationProgress * angle,
                                 )
                                 null -> "Potwierdzam kierunek obrotu…"
                             }
                             HoldGesturePhase.COMPLETING -> when (state.runtime.rotationGestureDirection) {
-                                RotationGestureDirection.LEFT -> "Następny utwór — dokończ ruch w lewo do 270°."
-                                RotationGestureDirection.RIGHT -> "Poprzedni utwór — dokończ ruch w prawo do 270°."
-                                null -> "Dokończ obrót do 270°."
+                                RotationGestureDirection.LEFT -> "Następny utwór — dokończ ruch w lewo do $angle°."
+                                RotationGestureDirection.RIGHT -> "Poprzedni utwór — dokończ ruch w prawo do $angle°."
+                                null -> "Dokończ obrót do $angle°."
                             }
                             HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
                             HoldGesturePhase.TRIGGERED -> when (state.runtime.rotationGestureDirection) {

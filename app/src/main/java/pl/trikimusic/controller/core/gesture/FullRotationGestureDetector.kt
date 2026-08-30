@@ -14,14 +14,12 @@ import pl.trikimusic.controller.domain.model.Vector3
  * inverted pose and acceleration magnitude gate keep track navigation separate from volume use.
  */
 class FullRotationGestureDetector(
-    private val configuration: Configuration = Configuration(),
+    private var configuration: Configuration = Configuration(),
 ) {
     data class Configuration(
         val stabilizationMillis: Long = 500L,
-        // The two low-pass stages lose roughly 20–25° at the edges of a deliberate turn. A 245°
-        // integrated threshold therefore makes the physical gesture finish around the requested 270°.
         val requiredRotationDegrees: Float = FILTERED_ROTATION_TRIGGER_DEGREES,
-        val maximumRotationDegrees: Float = 420f,
+        val maximumRotationDegrees: Float = 360f,
         val maximumRotationMillis: Long = 5_000L,
         val maximumFaceDownTiltDegrees: Float = 25f,
         val maximumAccelerationDeviationG: Float = 0.20f,
@@ -34,7 +32,7 @@ class FullRotationGestureDetector(
     ) {
         init {
             require(stabilizationMillis in 200L..3_000L)
-            require(requiredRotationDegrees.isFinite() && requiredRotationDegrees in 180f..360f)
+            require(requiredRotationDegrees.isFinite() && requiredRotationDegrees in 70f..360f)
             require(maximumRotationDegrees.isFinite() && maximumRotationDegrees > requiredRotationDegrees)
             require(maximumRotationMillis in 1_000L..10_000L)
             require(maximumFaceDownTiltDegrees.isFinite() && maximumFaceDownTiltDegrees in 5f..45f)
@@ -46,6 +44,15 @@ class FullRotationGestureDetector(
             require(armingMaximumAngularRateDps.isFinite() && armingMaximumAngularRateDps in 10f..120f)
             require(rearmQuietMillis in 80L..500L)
         }
+    }
+
+    fun updateRotationAngle(degrees: Int) {
+        val clamped = degrees.coerceIn(90, 360)
+        val trigger = (clamped * 0.90f).coerceIn(75f, 340f)
+        configuration = configuration.copy(
+            requiredRotationDegrees = trigger,
+            maximumRotationDegrees = clamped + 120f,
+        )
     }
 
     private var previousTimestampNanos: Long? = null
@@ -252,8 +259,8 @@ class FullRotationGestureDetector(
             value.magnitude in MIN_USABLE_ACCELERATION_G..MAX_USABLE_ACCELERATION_G
 
     companion object {
-        const val PHYSICAL_ROTATION_TARGET_DEGREES = 270f
-        const val FILTERED_ROTATION_TRIGGER_DEGREES = 245f
+        const val PHYSICAL_ROTATION_TARGET_DEGREES = 200f
+        const val FILTERED_ROTATION_TRIGGER_DEGREES = 180f
 
         private const val NANOS_PER_MILLISECOND = 1_000_000L
         private const val NANOS_PER_SECOND = 1_000_000_000f

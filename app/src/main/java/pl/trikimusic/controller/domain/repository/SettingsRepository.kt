@@ -18,5 +18,7 @@ interface SettingsRepository {
     suspend fun setDeveloperMode(enabled: Boolean)
     suspend fun setBackgroundEnabled(enabled: Boolean)
     suspend fun setConnectOnlyWhenNeeded(enabled: Boolean)
+    suspend fun setRotationAngleDegrees(degrees: Int)
+    suspend fun setEnableSoundFeedback(enabled: Boolean)
     suspend fun setTheme(theme: ThemePreference)
 }

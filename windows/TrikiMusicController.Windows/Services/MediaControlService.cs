@@ -55,7 +55,8 @@ public sealed class MediaControlService : IDisposable
 
             if (action is MediaAction.Like or MediaAction.Dislike)
             {
-                return (false, "Windows nie udostępnia systemowej akcji polubienia ani dislike. Gest został rozpoznany, ale aktywny odtwarzacz nie może otrzymać tej oceny przez Media Control API.");
+                var ratingResult = await WindowsRatingDispatcher.DispatchRatingAsync(action, _session?.SourceAppUserModelId);
+                return ratingResult;
             }
 
             if (action == MediaAction.None) return (true, action.DisplayName());

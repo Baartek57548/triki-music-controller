@@ -84,19 +84,64 @@ fun SettingsScreen(
                 }
             }
         }
+        item {
+            SectionTitle(
+                title = "Gest obrotu (Zmiana utworu)",
+                subtitle = "Ustawienie wymaganego kąta obrotu odwróconym kontrolerem.",
+            )
+        }
+        item {
+            Card(shape = RoundedCornerShape(24.dp)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Kąt wymaganego obrotu", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "${state.settings.rotationAngleDegrees}°",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    androidx.compose.material3.Slider(
+                        value = state.settings.rotationAngleDegrees.toFloat(),
+                        onValueChange = { viewModel.setRotationAngleDegrees(kotlin.math.round(it).toInt()) },
+                        valueRange = 90f..360f,
+                        steps = 26,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "Domyślnie: 200°. Obrót odwróconym kapslem w lewo przełącza utwór na następny, w prawo na poprzedni.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         item { SectionTitle("Aplikacja") }
         item {
             Card(shape = RoundedCornerShape(20.dp)) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("Motyw", style = MaterialTheme.typography.titleMedium)
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        ThemePreference.entries.forEachIndexed { index, theme ->
-                            SegmentedButton(
-                                selected = state.settings.theme == theme,
-                                onClick = { viewModel.setTheme(theme) },
-                                shape = SegmentedButtonDefaults.itemShape(index, ThemePreference.entries.size),
-                                label = { Text(theme.displayName) },
-                            )
+                Column {
+                    SettingSwitchRow(
+                        title = "Dźwięki ocen (Like / Dislike)",
+                        description = "Odtwarzaj krótki sygnał dźwiękowy po naciśnięciu 2x lub 3x fizycznego przycisku.",
+                        checked = state.settings.enableSoundFeedback,
+                        onCheckedChange = viewModel::setEnableSoundFeedback,
+                    )
+                    HorizontalDivider(Modifier.padding(horizontal = 18.dp))
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("Motyw", style = MaterialTheme.typography.titleMedium)
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            ThemePreference.entries.forEachIndexed { index, theme ->
+                                SegmentedButton(
+                                    selected = state.settings.theme == theme,
+                                    onClick = { viewModel.setTheme(theme) },
+                                    shape = SegmentedButtonDefaults.itemShape(index, ThemePreference.entries.size),
+                                    label = { Text(theme.displayName) },
+                                )
+                            }
                         }
                     }
                 }

@@ -238,6 +238,14 @@ class MainViewModel(
         container.settingsRepository.setConnectOnlyWhenNeeded(enabled)
     }
 
+    fun setRotationAngleDegrees(degrees: Int) = launchHandled {
+        container.settingsRepository.setRotationAngleDegrees(degrees)
+    }
+
+    fun setEnableSoundFeedback(enabled: Boolean) = launchHandled {
+        container.settingsRepository.setEnableSoundFeedback(enabled)
+    }
+
     fun setTheme(theme: ThemePreference) = launchHandled { container.settingsRepository.setTheme(theme) }
 
     fun setLed(enabled: Boolean) {
