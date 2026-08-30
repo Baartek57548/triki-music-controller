@@ -86,6 +86,8 @@ public sealed class AppSettings
     public MediaAction SingleClickAction { get; set; } = MediaAction.PlayPause;
     public MediaAction DoubleClickAction { get; set; } = MediaAction.Like;
     public MediaAction TripleClickAction { get; set; } = MediaAction.Dislike;
+    public bool EnableSoundFeedback { get; set; } = true;
+    public bool EnableToastNotifications { get; set; } = true;
     public CalibrationProfile Calibration { get; set; } = new();
     /// <summary>Fizyczny kąt obrotu (w stopniach) wymagany do zmiany utworu. Zakres: 90–360.</summary>
     public int RotationAngleDegrees { get; set; } = 200;
@@ -109,7 +111,7 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "2.8.1";
+    public const string Version = "2.9.0";
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }

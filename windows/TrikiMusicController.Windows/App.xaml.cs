@@ -59,10 +59,16 @@ public partial class App : Microsoft.UI.Xaml.Application
                 _dispatcherQueue,
                 Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"),
                 ShowMainWindow,
-                Shutdown);
+                Shutdown,
+                action => _ = Services.Media.ExecuteAsync(action),
+                () => _ = Services.ViewModel.ConnectOrDisconnectAsync());
+
+            Services.Bluetooth.StateChanged += (_, _) => _dispatcherQueue.TryEnqueue(UpdateTrayStatus);
+            Services.Media.StateChanged += (_, _) => _dispatcherQueue.TryEnqueue(UpdateTrayStatus);
 
             HideMainWindow();
             await Services.ViewModel.InitializeAsync();
+            UpdateTrayStatus();
         }
         catch (Exception error)
         {
@@ -124,6 +130,43 @@ public partial class App : Microsoft.UI.Xaml.Application
         if (_shutdownStarted || !args.DidPresenterChange) return;
         if (sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized })
             HideMainWindow();
+    }
+
+    private bool _notifiedConnected;
+
+    private void UpdateTrayStatus()
+    {
+        if (_trayIcon is null || _shutdownStarted || Services is null) return;
+        try
+        {
+            var vm = Services.ViewModel;
+            var isConnected = vm.IsConnected;
+            var statusHeader = isConnected
+                ? $"Triki: Połączono ({vm.BatteryText})"
+                : $"Triki: {vm.ConnectionTitle}";
+            var tooltip = isConnected
+                ? $"Triki: {vm.BatteryText} • {vm.MediaTitle}"
+                : $"Triki Music Controller • {vm.ConnectionTitle}";
+
+            _trayIcon.UpdateStatus(statusHeader, tooltip, isConnected, Services.Media.State.IsPlaying);
+
+            if (Services.Settings.Current.EnableToastNotifications)
+            {
+                if (isConnected && !_notifiedConnected)
+                {
+                    _notifiedConnected = true;
+                    _trayIcon.ShowToastNotification("Triki Music Controller", $"Połączono z Triki (Bateria: {vm.BatteryText})");
+                }
+                else if (!isConnected)
+                {
+                    _notifiedConnected = false;
+                }
+            }
+        }
+        catch (Exception error)
+        {
+            System.Diagnostics.Trace.WriteLine($"Błąd podczas aktualizacji ikony zasobnika: {error}");
+        }
     }
 
     private void Window_Closed(object sender, WindowEventArgs args)

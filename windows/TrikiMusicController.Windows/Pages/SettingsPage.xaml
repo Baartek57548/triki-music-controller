@@ -38,7 +38,7 @@
             </Border>
 
             <!-- Aplikacja -->
-            <TextBlock Text="Aplikacja" Style="{StaticResource SectionTitleStyle}" />
+            <TextBlock Text="Aplikacja i powiadomienia" Style="{StaticResource SectionTitleStyle}" />
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="16">
                     <ToggleSwitch Header="Uruchamiaj w tle razem z Windows"
@@ -49,6 +49,20 @@
                     <TextBlock Text="Triki zawsze rozpoczyna pracę po cichu w obszarze powiadomień. Minimalizacja i przycisk X ukrywają okno bez wyłączania sterowania. Dwukrotnie kliknij ikonę Triki, aby ponownie otworzyć okno."
                                Style="{StaticResource MetadataTextStyle}" />
                     
+                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                    <ToggleSwitch Header="Dźwięki potwierdzenia ocen (Like / Dislike)"
+                                  OffContent="Wyłączone"
+                                  OnContent="Włączone"
+                                  IsOn="{Binding EnableSoundFeedback, Mode=TwoWay}"
+                                  AutomationProperties.HelpText="Odtwarza krótki sygnał audio w głośnikach po naciśnięciu 2x lub 3x fizycznego przycisku." />
+
+                    <ToggleSwitch Header="Powiadomienia systemowe (Toast)"
+                                  OffContent="Wyłączone"
+                                  OnContent="Włączone"
+                                  IsOn="{Binding EnableToastNotifications, Mode=TwoWay}"
+                                  AutomationProperties.HelpText="Wyświetla dymek Windows po połączeniu z kontrolerem." />
+
                     <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
                     <ComboBox Header="Motyw aplikacji"

@@ -18,7 +18,16 @@ public sealed partial class DevicePage : Page
     private async void Connect_Click(object sender, RoutedEventArgs e) => await RunAsync(ViewModel.ConnectSelectedAsync);
     private async void Disconnect_Click(object sender, RoutedEventArgs e) => await RunAsync(ViewModel.DisconnectAsync);
     private async void Forget_Click(object sender, RoutedEventArgs e) => await RunAsync(ViewModel.ForgetAsync);
-    private async void Led_Click(object sender, RoutedEventArgs e) => await RunAsync(() => ViewModel.SetLedAsync(((AppBarToggleButton)sender).IsChecked == true));
+    private async void Led_Click(object sender, RoutedEventArgs e)
+    {
+        var isChecked = sender switch
+        {
+            AppBarToggleButton ab => ab.IsChecked == true,
+            Microsoft.UI.Xaml.Controls.Primitives.ToggleButton tb => tb.IsChecked == true,
+            _ => false
+        };
+        await RunAsync(() => ViewModel.SetLedAsync(isChecked));
+    }
 
     private async Task RunAsync(Func<Task> action)
     {

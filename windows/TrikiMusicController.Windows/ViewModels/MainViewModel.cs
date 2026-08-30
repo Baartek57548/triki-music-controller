@@ -228,6 +228,33 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ? $"Ostatnio: {action.DisplayName()}"
         : "Oczekiwanie na sterowanie";
     public string LastActionStatus => _lastRuntime.LastActionStatus;
+    public bool IsScanning => _lastBluetooth.ConnectionState == TrikiConnectionState.Scanning;
+    public bool HasDevices => Devices.Count > 0;
+    public bool IsDeviceListEmpty => Devices.Count == 0 && !IsScanning;
+    public bool CanConnect => SelectedDevice is not null || _settings.Current.KnownDeviceAddress is not null;
+    public bool CanDisconnect => _lastBluetooth.ConnectionState is TrikiConnectionState.Ready or TrikiConnectionState.Connecting;
+
+    // Pomiary telemetryczne na żywo
+    public string AccXText => _lastRuntime.LatestSample is { } s ? $"{s.AccelerometerG.X:+0.000;-0.000;0.000} g" : "0.000 g";
+    public string AccYText => _lastRuntime.LatestSample is { } s ? $"{s.AccelerometerG.Y:+0.000;-0.000;0.000} g" : "0.000 g";
+    public string AccZText => _lastRuntime.LatestSample is { } s ? $"{s.AccelerometerG.Z:+0.000;-0.000;0.000} g" : "0.000 g";
+    public double AccXNormalized => Math.Clamp((_lastRuntime.LatestSample?.AccelerometerG.X ?? 0) / 2.0 * 50 + 50, 0, 100);
+    public double AccYNormalized => Math.Clamp((_lastRuntime.LatestSample?.AccelerometerG.Y ?? 0) / 2.0 * 50 + 50, 0, 100);
+    public double AccZNormalized => Math.Clamp((_lastRuntime.LatestSample?.AccelerometerG.Z ?? 0) / 2.0 * 50 + 50, 0, 100);
+
+    public string GyroXText => _lastRuntime.LatestSample is { } s ? $"{s.GyroscopeDps.X:+0.0;-0.0;0.0} °/s" : "0.0 °/s";
+    public string GyroYText => _lastRuntime.LatestSample is { } s ? $"{s.GyroscopeDps.Y:+0.0;-0.0;0.0} °/s" : "0.0 °/s";
+    public string GyroZText => _lastRuntime.LatestSample is { } s ? $"{s.GyroscopeDps.Z:+0.0;-0.0;0.0} °/s" : "0.0 °/s";
+    public double GyroXNormalized => Math.Clamp((_lastRuntime.LatestSample?.GyroscopeDps.X ?? 0) / 400.0 * 50 + 50, 0, 100);
+    public double GyroYNormalized => Math.Clamp((_lastRuntime.LatestSample?.GyroscopeDps.Y ?? 0) / 400.0 * 50 + 50, 0, 100);
+    public double GyroZNormalized => Math.Clamp((_lastRuntime.LatestSample?.GyroscopeDps.Z ?? 0) / 400.0 * 50 + 50, 0, 100);
+
+    public string AccMagnitudeText => _lastRuntime.LatestSample is { } s ? $"{s.AccelerationMagnitude:0.00} g" : "—";
+    public string OrientationBadgeText => _lastRuntime.LatestSample is null ? "Brak danych" : (_lastRuntime.Gesture.FaceDown ? "Odwrócony (Zmiana utworu)" : "Górą do góry (Głośność)");
+    public string SampleRateDisplay => _lastBluetooth.SampleRateHz is { } hz ? $"{hz:0.0} Hz" : "—";
+    public string DecodedFramesText => $"{_lastBluetooth.DecodedFrames:N0}";
+    public string DroppedBytesText => $"{_lastBluetooth.DroppedProtocolBytes:N0}";
+
     public string SensorDetails => _lastRuntime.LatestSample is { } sample
         ? $"ACC  X {sample.AccelerometerG.X:+0.000;-0.000;0.000}  Y {sample.AccelerometerG.Y:+0.000;-0.000;0.000}  Z {sample.AccelerometerG.Z:+0.000;-0.000;0.000} g\n" +
           $"GYRO X {sample.GyroscopeDps.X:+0.0;-0.0;0.0}  Y {sample.GyroscopeDps.Y:+0.0;-0.0;0.0}  Z {sample.GyroscopeDps.Z:+0.0;-0.0;0.0} °/s"
@@ -332,6 +359,30 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set { if (_settings.Current.TripleClickAction == value.Action) return; _settings.Current.TripleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
     }
 
+    public bool EnableSoundFeedback
+    {
+        get => _settings.Current.EnableSoundFeedback;
+        set
+        {
+            if (_settings.Current.EnableSoundFeedback == value) return;
+            _settings.Current.EnableSoundFeedback = value;
+            OnPropertyChanged();
+            _ = SaveSettingsAsync();
+        }
+    }
+
+    public bool EnableToastNotifications
+    {
+        get => _settings.Current.EnableToastNotifications;
+        set
+        {
+            if (_settings.Current.EnableToastNotifications == value) return;
+            _settings.Current.EnableToastNotifications = value;
+            OnPropertyChanged();
+            _ = SaveSettingsAsync();
+        }
+    }
+
     public int RotationAngleDegrees
     {
         get => _settings.Current.RotationAngleDegrees;
@@ -382,6 +433,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public Task DisconnectAsync() => _bluetooth.DisconnectAsync(forgetDevice: false);
+
+    public async Task ConnectOrDisconnectAsync()
+    {
+        if (IsConnected)
+            await DisconnectAsync();
+        else if (SelectedDevice is not null)
+            await ConnectSelectedAsync();
+        else
+            await ScanAsync();
+    }
 
     public async Task ForgetAsync()
     {

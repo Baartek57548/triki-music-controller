@@ -1,40 +1,183 @@
-<?xml version="1.0" encoding="utf-8" ?>
 <Page
     x:Class="TrikiMusicController_Windows.Pages.DiagnosticsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer>
-        <StackPanel MaxWidth="900" Padding="32,24,32,32" Spacing="20" HorizontalAlignment="Stretch">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel MaxWidth="960" Padding="32,24,32,32" Spacing="20" HorizontalAlignment="Stretch">
+            <!-- Nagłówek -->
             <StackPanel Spacing="4">
                 <TextBlock Text="Diagnostyka" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Zaawansowany podgląd danych telemetrycznych IMU i protokołu BLE." Style="{StaticResource PageSubtitleStyle}" />
+                <TextBlock Text="Wizualny podgląd danych telemetrycznych IMU w czasie rzeczywistym oraz protokołu BLE." Style="{StaticResource PageSubtitleStyle}" />
             </StackPanel>
 
-            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Narzędzia diagnostyczne" Message="Te wartości służą do weryfikacji działania czujników i nie są wymagane do codziennej obsługi kontrolera." />
-
-            <Border Style="{StaticResource CardBorderStyle}">
-                <StackPanel Spacing="12">
-                    <Grid ColumnSpacing="10">
+            <!-- Karta Stanu Orientacji i Pozycji Kapsla -->
+            <Border Style="{StaticResource HeroCardBorderStyle}">
+                <StackPanel Spacing="16">
+                    <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="32" Height="32" CornerRadius="16" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
-                            <FontIcon Glyph="&#xE9D9;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        <Border Width="40" Height="40" CornerRadius="20" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE9D9;" FontSize="18" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                         </Border>
-                        <TextBlock Grid.Column="1" Text="Dane czujników IMU" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="ORIENTACJA I POZYCJA" Style="{StaticResource EyebrowTextStyle}" />
+                            <TextBlock Text="Ułożenie kapsla w przestrzeni" Style="{StaticResource SectionTitleStyle}" />
+                        </StackPanel>
+                        <Border Grid.Column="2" Style="{StaticResource AccentPillBorderStyle}" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding OrientationBadgeText}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
                     </Grid>
-                    
-                    <Border Style="{StaticResource TileBorderStyle}">
-                        <TextBlock Text="{Binding SensorDetails}" FontFamily="Consolas" FontSize="14" TextWrapping="Wrap" LineHeight="22" />
-                    </Border>
 
-                    <Border Style="{StaticResource TileBorderStyle}">
-                        <TextBlock Text="{Binding VolumeTechnicalDetails}" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </Border>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="KĄT PRZECHYŁU" Style="{StaticResource EyebrowTextStyle}" FontSize="11" />
+                                <TextBlock Text="{Binding VolumeTiltAngleText}" Style="{StaticResource StatNumberStyle}" FontSize="20" />
+                                <TextBlock Text="Względem poziomu" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="PRZYSPIESZENIE |ACC|" Style="{StaticResource EyebrowTextStyle}" FontSize="11" />
+                                <TextBlock Text="{Binding AccMagnitudeText}" Style="{StaticResource StatNumberStyle}" FontSize="20" />
+                                <TextBlock Text="Norma wektora (1.00g)" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="CZĘSTOTLIWOŚĆ BLE" Style="{StaticResource EyebrowTextStyle}" FontSize="11" />
+                                <TextBlock Text="{Binding SampleRateDisplay}" Style="{StaticResource StatNumberStyle}" FontSize="20" />
+                                <TextBlock Text="Próbkowanie IMU" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </StackPanel>
             </Border>
 
+            <!-- Karta Pomiary Żyroskopu i Akcelerometru -->
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Akcelerometr -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="14">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="AKCELEROMETR" Style="{StaticResource EyebrowTextStyle}" />
+                            <TextBlock Text="Przyspieszenie liniowe (g)" FontWeight="SemiBold" />
+                        </StackPanel>
+
+                        <!-- Oś X -->
+                        <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="X" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding AccXNormalized}" Height="6" CornerRadius="3" Foreground="{StaticResource BrandAccentBrush}" />
+                                <TextBlock Grid.Column="2" Text="{Binding AccXText}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Oś Y -->
+                        <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Y" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding AccYNormalized}" Height="6" CornerRadius="3" Foreground="{StaticResource BrandAccentBrush}" />
+                                <TextBlock Grid.Column="2" Text="{Binding AccYText}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Oś Z -->
+                        <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Z" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding AccZNormalized}" Height="6" CornerRadius="3" Foreground="{StaticResource BrandAccentBrush}" />
+                                <TextBlock Grid.Column="2" Text="{Binding AccZText}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Żyroskop -->
+                <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="14">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="ŻYROSKOP" Style="{StaticResource EyebrowTextStyle}" />
+                            <TextBlock Text="Prędkość kątowa (°/s)" FontWeight="SemiBold" />
+                        </StackPanel>
+
+                        <!-- Oś X -->
+                        <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="X" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding GyroXNormalized}" Height="6" CornerRadius="3" Foreground="{StaticResource BrandAccentBrush}" />
+                                <TextBlock Grid.Column="2" Text="{Binding GyroXText}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Oś Y -->
+                        <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Y" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding GyroYNormalized}" Height="6" CornerRadius="3" Foreground="{StaticResource BrandAccentBrush}" />
+                                <TextBlock Grid.Column="2" Text="{Binding GyroYText}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Oś Z -->
+                        <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Z" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding GyroZNormalized}" Height="6" CornerRadius="3" Foreground="{StaticResource BrandAccentBrush}" />
+                                <TextBlock Grid.Column="2" Text="{Binding GyroZText}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Karta Protokołu BLE i Statystyk -->
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="12">
                     <Grid ColumnSpacing="10">
@@ -42,16 +185,42 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="32" Height="32" CornerRadius="16" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
-                            <FontIcon Glyph="&#xE968;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE968;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                         </Border>
-                        <TextBlock Grid.Column="1" Text="Szczegóły protokołu BLE" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="PROTOKÓŁ BLE" Style="{StaticResource EyebrowTextStyle}" />
+                            <TextBlock Text="Statystyki transmisji i dekodera" Style="{StaticResource SectionTitleStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="ZDEKODOWANE RAMKI" Style="{StaticResource EyebrowTextStyle}" FontSize="11" />
+                                <TextBlock Text="{Binding DecodedFramesText}" Style="{StaticResource StatNumberStyle}" FontSize="20" />
+                                <TextBlock Text="Pakiety Nordic UART" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="POMINIĘTE BAJTY" Style="{StaticResource EyebrowTextStyle}" FontSize="11" />
+                                <TextBlock Text="{Binding DroppedBytesText}" Style="{StaticResource StatNumberStyle}" FontSize="20" />
+                                <TextBlock Text="Błędy synchronizacji" Style="{StaticResource MetadataTextStyle}" />
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
                     <Border Style="{StaticResource TileBorderStyle}">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="{Binding ProtocolDetails}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                            <TextBlock Text="Nordic UART Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Serwis Nordic UART Service (NUS): 6E400001-B5A3-F393-E0A9-E50E24DCCA9E" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding ProtocolDetails}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

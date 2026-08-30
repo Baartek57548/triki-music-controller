@@ -203,7 +203,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
             result = (false, error.Message);
             System.Diagnostics.Debug.WriteLine($"Wykonanie akcji {action} nie powiodło się: {error}");
         }
-        if (action is MediaAction.Like or MediaAction.Dislike)
+        if (_settings.Current.EnableSoundFeedback && action is MediaAction.Like or MediaAction.Dislike)
             _ratingFeedback.PlayRatingAction(action);
         lock (_sync)
         {
