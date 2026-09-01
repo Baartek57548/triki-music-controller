@@ -36,7 +36,9 @@ class AppContainer(application: Application) {
     val mediaController = AndroidMediaControllerGateway(application, logger)
     val actionMapper = ActionMapper(mediaController)
     val ratingFeedback = RatingFeedbackPlayer(logger)
-    val runtime = TrikiRuntime(scope, bleManager, settingsRepository, actionMapper, ratingFeedback, logger)
+    val spotifyConnect = pl.trikimusic.controller.data.spotify.SpotifyConnectService(logger)
+    val brightnessManager = pl.trikimusic.controller.core.brightness.SystemBrightnessManager(application, logger)
+    val runtime = TrikiRuntime(scope, bleManager, settingsRepository, actionMapper, ratingFeedback, brightnessManager, logger)
     val fakeTrikiDataSource = FakeTrikiDataSource()
 
     init {

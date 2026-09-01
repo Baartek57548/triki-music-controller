@@ -1,0 +1,98 @@
+﻿name: Triki Release CI/CD
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows Application
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run Windows Unit Tests
+        run: dotnet test windows/TrikiMusicController.Windows.Tests/TrikiMusicController.Windows.Tests.csproj -c Release
+
+      - name: Publish Windows App
+        run: dotnet publish windows/TrikiMusicController.Windows/TrikiMusicController.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/artifacts/publish
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Compile Inno Setup Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows/installer/TrikiMusicController.iss
+
+      - name: Upload Windows Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: windows/artifacts/installer/*.exe
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make Gradlew Executable
+        run: chmod +x gradlew
+
+      - name: Run Android Unit Tests
+        run: ./gradlew testReleaseUnitTest
+
+      - name: Build Android Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: app/build/outputs/apk/release/*.apk
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release-assets/
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

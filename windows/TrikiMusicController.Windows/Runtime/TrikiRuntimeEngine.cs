@@ -10,10 +10,12 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly BluetoothService _bluetooth;
     private readonly MediaControlService _media;
     private readonly SystemVolumeService _systemVolume;
+    private readonly SystemBrightnessService _systemBrightness;
     private readonly SettingsService _settings;
     private readonly FeedbackToneService _ratingFeedback;
     private readonly SensorFilter _sensorFilter = new();
     private readonly GyroscopeVolumeController _volumeController = new();
+    private readonly EdgePoseBrightnessController _brightnessController = new();
     private FullRotationGestureDetector _rotationGestureDetector;
     private readonly TrikiButtonInterpreter _buttonInterpreter = new();
     private readonly ConnectionActivityLease _connectionActivityLease = new();
@@ -24,14 +26,17 @@ public sealed class TrikiRuntimeEngine : IDisposable
         BluetoothService bluetooth,
         MediaControlService media,
         SystemVolumeService systemVolume,
+        SystemBrightnessService systemBrightness,
         SettingsService settings,
         FeedbackToneService ratingFeedback)
     {
         _bluetooth = bluetooth;
         _media = media;
         _systemVolume = systemVolume;
+        _systemBrightness = systemBrightness;
         _settings = settings;
         _ratingFeedback = ratingFeedback;
+        _brightnessController.CurrentBrightnessPercent = _systemBrightness.GetBrightness();
         _rotationGestureDetector = CreateGestureDetector(_settings.Current.RotationAngleDegrees);
         _bluetooth.SampleReceived += BluetoothOnSampleReceived;
         _bluetooth.StateChanged += BluetoothOnStateChanged;
@@ -96,8 +101,10 @@ public sealed class TrikiRuntimeEngine : IDisposable
             var filtered = _sensorFilter.Process(sample, _settings.Current.Calibration);
             var buttonEvent = _buttonInterpreter.Process(sample);
             var gesture = _rotationGestureDetector.Process(filtered);
+            var brightness = _brightnessController.Process(filtered);
             var explicitConnectionActivity = buttonEvent is not null ||
                 _buttonInterpreter.IsPressed ||
+                brightness.Active ||
                 gesture.Phase is HoldGesturePhase.Holding or
                     HoldGesturePhase.Ready or
                     HoldGesturePhase.Tracking or
@@ -106,13 +113,32 @@ public sealed class TrikiRuntimeEngine : IDisposable
             shouldParkConnection = _settings.Current.ConnectOnlyWhenNeeded &&
                 _connectionActivityLease.Observe(filtered, explicitConnectionActivity);
 
-            if (buttonEvent is null && gesture.Triggered)
+            if (brightness.Active)
             {
                 _volumeController.Reset();
+                _rotationGestureDetector.Reset();
+                if (brightness.DeltaPercent != 0f)
+                {
+                    _systemBrightness.StepBrightness(brightness.DeltaPercent);
+                }
+                State = State with
+                {
+                    LatestSample = filtered,
+                    Brightness = brightness,
+                    Volume = null,
+                    Gesture = gesture,
+                    ButtonProtocol = _buttonInterpreter.ProtocolMode,
+                };
+            }
+            else if (buttonEvent is null && gesture.Triggered)
+            {
+                _volumeController.Reset();
+                _brightnessController.Reset();
                 actionToExecute = gesture.Direction?.ToInvertedCapsuleNavigationAction() ?? MediaAction.None;
                 State = State with
                 {
                     LatestSample = filtered,
+                    Brightness = null,
                     Gesture = gesture,
                     ButtonProtocol = _buttonInterpreter.ProtocolMode,
                     LastActionStatus = $"Rozpoznano obrót: {actionToExecute.Value.DisplayName()}",
@@ -121,10 +147,12 @@ public sealed class TrikiRuntimeEngine : IDisposable
             else if (buttonEvent is not null)
             {
                 _volumeController.Reset();
+                _brightnessController.Reset();
                 actionToExecute = _settings.Current.ActionFor(buttonEvent.Type);
                 State = State with
                 {
                     LatestSample = filtered,
+                    Brightness = null,
                     Gesture = gesture,
                     ButtonProtocol = _buttonInterpreter.ProtocolMode,
                     LastActionStatus = $"Przycisk: {buttonEvent.Type}",
@@ -133,9 +161,11 @@ public sealed class TrikiRuntimeEngine : IDisposable
             else if (_buttonInterpreter.ShouldSuppressMotionControl)
             {
                 _volumeController.Reset();
+                _brightnessController.Reset();
                 State = State with
                 {
                     LatestSample = filtered,
+                    Brightness = null,
                     Gesture = gesture,
                     ButtonProtocol = _buttonInterpreter.ProtocolMode,
                     Volume = null,
@@ -143,11 +173,13 @@ public sealed class TrikiRuntimeEngine : IDisposable
             }
             else
             {
+                _brightnessController.Reset();
                 var volume = _volumeController.Process(filtered);
                 actionToExecute = volume.Action;
                 State = State with
                 {
                     LatestSample = filtered,
+                    Brightness = null,
                     Volume = volume,
                     Gesture = gesture,
                     ButtonProtocol = _buttonInterpreter.ProtocolMode,

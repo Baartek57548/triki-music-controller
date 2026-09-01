@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using TrikiMusicController_Windows.Core;
 
 namespace TrikiMusicController_Windows.Models;
 
@@ -67,6 +68,7 @@ public sealed record MediaSnapshot(
 public sealed record RuntimeSnapshot(
     FilteredSensorData? LatestSample,
     VolumeControlResult? Volume,
+    BrightnessControlResult? Brightness,
     FullRotationGestureResult Gesture,
     TrikiButtonProtocolMode ButtonProtocol,
     MediaAction? LastAction,
@@ -74,6 +76,7 @@ public sealed record RuntimeSnapshot(
     DateTimeOffset? LastActionAt)
 {
     public static RuntimeSnapshot Initial { get; } = new(
+        null,
         null,
         null,
         new FullRotationGestureResult(false, null, HoldGesturePhase.Idle, 0, false, 0, 0),

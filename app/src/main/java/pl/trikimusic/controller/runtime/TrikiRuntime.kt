@@ -32,6 +32,10 @@ import pl.trikimusic.controller.domain.repository.RatingFeedback
 import pl.trikimusic.controller.domain.repository.SettingsRepository
 import pl.trikimusic.controller.domain.usecase.ActionMapper
 
+import pl.trikimusic.controller.core.brightness.BrightnessControlResult
+import pl.trikimusic.controller.core.brightness.EdgePoseBrightnessController
+import pl.trikimusic.controller.core.brightness.SystemBrightnessManager
+
 data class RuntimeState(
     val latestSample: FilteredSensorData? = null,
     val history: List<FilteredSensorData> = emptyList(),
@@ -47,6 +51,7 @@ data class RuntimeState(
     val volumeStabilizationProgress: Float = 0f,
     val volumeTiltDegrees: Float = 180f,
     val volumeGyroscopeZDps: Float = 0f,
+    val brightness: BrightnessControlResult? = null,
     val rotationGesturePhase: HoldGesturePhase = HoldGesturePhase.IDLE,
     val rotationGestureDirection: RotationGestureDirection? = null,
     val rotationGestureProgress: Float = 0f,
@@ -60,11 +65,13 @@ class TrikiRuntime(
     settingsRepository: SettingsRepository,
     private val actionMapper: ActionMapper,
     private val ratingFeedback: RatingFeedback,
+    private val brightnessManager: SystemBrightnessManager? = null,
     private val logger: AppLogger,
 ) {
     private val sensorFilter = SensorFilter()
     private val volumeController = GyroscopeVolumeController()
     private val rotationGestureDetector = FullRotationGestureDetector()
+    private val brightnessController = EdgePoseBrightnessController()
     private val buttonInterpreter = TrikiButtonInterpreter()
     private val connectionActivityLease = ConnectionActivityLease()
     private val mutableState = MutableStateFlow(RuntimeState())
@@ -150,9 +157,11 @@ class TrikiRuntime(
         val filtered = sensorFilter.process(sample, settings.calibration)
         val buttonEvent = buttonInterpreter.process(sample)
         val rotationGestureResult = rotationGestureDetector.process(filtered)
+        val brightnessResult = brightnessController.process(filtered)
         val explicitConnectionActivity =
             buttonEvent != null ||
                 buttonInterpreter.isPressed ||
+                brightnessResult.active ||
                 rotationGestureResult.phase in setOf(
                     HoldGesturePhase.HOLDING,
                     HoldGesturePhase.READY,
@@ -185,14 +194,24 @@ class TrikiRuntime(
                 latestSample = filtered,
                 history = (current.history + filtered).takeLast(MAX_HISTORY_SAMPLES),
                 buttonProtocolMode = buttonMode,
+                brightness = brightnessResult,
                 rotationGesturePhase = rotationGestureResult.phase,
                 rotationGestureDirection = rotationGestureResult.direction,
                 rotationGestureProgress = rotationGestureResult.stabilizationProgress,
                 rotationGestureFaceDown = rotationGestureResult.faceDown,
             )
         }
+        if (brightnessResult.active) {
+            volumeController.reset()
+            rotationGestureDetector.reset()
+            if (brightnessResult.deltaPercent != 0f) {
+                brightnessManager?.stepBrightness(brightnessResult.deltaPercent)
+            }
+            return
+        }
         if (buttonEvent == null && rotationGestureResult.triggered) {
             volumeController.reset()
+            brightnessController.reset()
             val mediaAction = rotationGestureResult.direction
                 ?.toInvertedCapsuleNavigationAction()
                 ?: MediaAction.NONE

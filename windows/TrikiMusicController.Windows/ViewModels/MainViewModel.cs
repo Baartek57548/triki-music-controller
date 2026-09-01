@@ -33,18 +33,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _settingsStatus = string.Empty;
     private int _uiRefreshPending = 1;
     private DateTimeOffset? _lastPlaybackActiveAt;
+    private readonly CompactHudService? _hud;
 
     public MainViewModel(
         DispatcherQueue dispatcherQueue,
         SettingsService settings,
         BluetoothService bluetooth,
         MediaControlService media,
-        TrikiRuntimeEngine runtime)
+        TrikiRuntimeEngine runtime,
+        CompactHudService? hud = null)
     {
         _settings = settings;
         _bluetooth = bluetooth;
         _media = media;
         _runtime = runtime;
+        _hud = hud;
         _uiTimer = dispatcherQueue.CreateTimer();
         _uiTimer.Interval = TimeSpan.FromMilliseconds(100);
         _uiTimer.IsRepeating = true;
@@ -535,7 +538,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         MarkUiDirty();
     }
-    private void RuntimeOnStateChanged(object? sender, RuntimeSnapshot state) => MarkUiDirty();
+    private void RuntimeOnStateChanged(object? sender, RuntimeSnapshot state)
+    {
+        if (state.Brightness is { Active: true, DeltaPercent: not 0f } brightness)
+        {
+            _hud?.ShowBrightness((int)brightness.BrightnessPercent);
+        }
+        else if (state.Volume is { Active: true, Action: not MediaAction.None })
+        {
+            _hud?.ShowVolume((int)MathF.Round(_lastMedia.VolumePercent), _lastMedia.Title, _lastMedia.Artist);
+        }
+        MarkUiDirty();
+    }
     private void MarkUiDirty() => Interlocked.Exchange(ref _uiRefreshPending, 1);
 
     private void UiTimerOnTick(DispatcherQueueTimer sender, object args)
