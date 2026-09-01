@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Application
     x:Class="TrikiMusicController_Windows.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -9,23 +9,63 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
-            <Color x:Key="SystemAccentColorDark3">#FF064E3B</Color>
-            <Color x:Key="SystemAccentColorDark2">#FF047857</Color>
-            <Color x:Key="SystemAccentColorDark1">#FF059669</Color>
-            <Color x:Key="SystemAccentColor">#FF16A34A</Color>
-            <Color x:Key="SystemAccentColorLight1">#FF22C55E</Color>
-            <Color x:Key="SystemAccentColorLight2">#FF4ADE80</Color>
-            <Color x:Key="SystemAccentColorLight3">#FF86EFAC</Color>
-            <SolidColorBrush x:Key="BrandAccentBrush" Color="#FF22C55E" />
-            <SolidColorBrush x:Key="BrandAccentSubtleBrush" Color="#1F22C55E" />
-            <SolidColorBrush x:Key="SuccessBrush" Color="#FF22C55E" />
-            <SolidColorBrush x:Key="WarningBrush" Color="#FFF59E0B" />
 
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- Ciemny motyw Android Material 3 -->
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#FFA7F3D0" />
+                    <SolidColorBrush x:Key="BrandAccentSubtleBrush" Color="#26A7F3D0" />
+                    <SolidColorBrush x:Key="BrandAccentContainerBrush" Color="#FF155C45" />
+                    <SolidColorBrush x:Key="BrandOnAccentContainerBrush" Color="#FFC4F9DF" />
+                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#FF111816" />
+                    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#335F706A" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#FF1B2421" />
+                    <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#FF155C45" />
+                    <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FFE5EDE9" />
+                    <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#FFB8C7C1" />
+                    <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#FFA7F3D0" />
+                    <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FFA7F3D0" />
+                    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#FF155C45" />
+                    <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#2E155C45" />
+                    <SolidColorBrush x:Key="SuccessBrush" Color="#FFA7F3D0" />
+                    <SolidColorBrush x:Key="WarningBrush" Color="#FFFFC285" />
+                </ResourceDictionary>
+
+                <!-- Jasny motyw Android Material 3 -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#FF006C4C" />
+                    <SolidColorBrush x:Key="BrandAccentSubtleBrush" Color="#1F006C4C" />
+                    <SolidColorBrush x:Key="BrandAccentContainerBrush" Color="#FFA9F3D2" />
+                    <SolidColorBrush x:Key="BrandOnAccentContainerBrush" Color="#FF002116" />
+                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#FFFCFFFC" />
+                    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#33707973" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#FFE0E9E4" />
+                    <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#FFA9F3D2" />
+                    <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FF171D1A" />
+                    <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#FF404943" />
+                    <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#FF006C4C" />
+                    <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FF006C4C" />
+                    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#FFA9F3D2" />
+                    <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#2EA9F3D2" />
+                    <SolidColorBrush x:Key="SuccessBrush" Color="#FF006C4C" />
+                    <SolidColorBrush x:Key="WarningBrush" Color="#FF8A4F00" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <Color x:Key="SystemAccentColorDark3">#FF083829</Color>
+            <Color x:Key="SystemAccentColorDark2">#FF155C45</Color>
+            <Color x:Key="SystemAccentColorDark1">#FF006C4C</Color>
+            <Color x:Key="SystemAccentColor">#FF10B981</Color>
+            <Color x:Key="SystemAccentColorLight1">#FFA7F3D0</Color>
+            <Color x:Key="SystemAccentColorLight2">#FFC4F9DF</Color>
+            <Color x:Key="SystemAccentColorLight3">#FFE5EDE9</Color>
+
+            <!-- Stylistyka kart Material 3 (Zaokrąglone narożniki 18-22px) -->
             <Style x:Key="CardBorderStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="CornerRadius" Value="18" />
                 <Setter Property="Padding" Value="20" />
             </Style>
 
@@ -33,7 +73,7 @@
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="CornerRadius" Value="22" />
                 <Setter Property="Padding" Value="22" />
             </Style>
 
@@ -41,25 +81,26 @@
                 <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="CornerRadius" Value="14" />
                 <Setter Property="Padding" Value="14" />
             </Style>
 
             <Style x:Key="PillBorderStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
-                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Padding" Value="10,4" />
             </Style>
 
             <Style x:Key="AccentPillBorderStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource AccentFillColorTertiaryBrush}" />
-                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Padding" Value="10,4" />
             </Style>
 
             <Style x:Key="PageTitleStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="26" />
-                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
             <Style x:Key="PageSubtitleStyle" TargetType="TextBlock">
@@ -69,13 +110,14 @@
             </Style>
             <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="17" />
-                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
             <Style x:Key="EyebrowTextStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{StaticResource BrandAccentBrush}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 <Setter Property="CharacterSpacing" Value="50" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
@@ -86,7 +128,8 @@
             </Style>
             <Style x:Key="StatNumberStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="20" />
-                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>
