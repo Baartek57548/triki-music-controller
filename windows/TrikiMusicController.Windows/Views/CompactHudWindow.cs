@@ -1,11 +1,13 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using TrikiMusicController_Windows.Models;
 using Windows.Graphics;
+using Windows.Storage.Streams;
 using WinRT.Interop;
 
 namespace TrikiMusicController_Windows.Views;
@@ -20,11 +22,13 @@ public sealed class CompactHudWindow : Window
 
     private readonly DispatcherTimer _hideTimer;
     private readonly FontIcon _fontIcon;
+    private readonly Image _albumArtImage;
     private readonly TextBlock _titleText;
     private readonly TextBlock _subtitleText;
     private readonly TextBlock _valueText;
     private readonly ProgressBar _progressBar;
     private readonly IntPtr _hwnd;
+    private byte[]? _currentThumbnailBytes;
 
     public CompactHudWindow()
     {
@@ -52,6 +56,14 @@ public sealed class CompactHudWindow : Window
             HideHud();
         };
 
+        _albumArtImage = new Image
+        {
+            Stretch = Stretch.UniformToFill,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+        };
+
         _fontIcon = new FontIcon
         {
             Glyph = "\uE767",
@@ -59,16 +71,23 @@ public sealed class CompactHudWindow : Window
             Foreground = Application.Current.Resources["AccentTextFillColorPrimaryBrush"] as Brush,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Visible,
+        };
+
+        var iconGrid = new Grid
+        {
+            CornerRadius = new CornerRadius(12),
+            Children = { _fontIcon, _albumArtImage },
         };
 
         var iconBorder = new Border
         {
-            Width = 40,
-            Height = 40,
+            Width = 44,
+            Height = 44,
             CornerRadius = new CornerRadius(12),
             VerticalAlignment = VerticalAlignment.Center,
             Background = Application.Current.Resources["AccentFillColorTertiaryBrush"] as Brush,
-            Child = _fontIcon,
+            Child = iconGrid,
         };
 
         _titleText = new TextBlock
@@ -194,9 +213,63 @@ public sealed class CompactHudWindow : Window
         }
     }
 
-    public void ShowVolume(int volumePercent, string trackTitle, string artist)
+    private void ApplyThumbnail(byte[]? thumbnailBytes)
     {
-        // Dynamiczna ikona głośnika Fluent w zależności od poziomu
+        if (thumbnailBytes is { Length: > 0 })
+        {
+            if (ByteArraysEqual(_currentThumbnailBytes, thumbnailBytes) && _albumArtImage.Source is not null)
+            {
+                _albumArtImage.Visibility = Visibility.Visible;
+                _fontIcon.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            _currentThumbnailBytes = thumbnailBytes;
+            _ = UpdateThumbnailBitmapAsync(thumbnailBytes);
+        }
+        else
+        {
+            _currentThumbnailBytes = null;
+            _albumArtImage.Source = null;
+            _albumArtImage.Visibility = Visibility.Collapsed;
+            _fontIcon.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async Task UpdateThumbnailBitmapAsync(byte[] bytes)
+    {
+        try
+        {
+            using var stream = new InMemoryRandomAccessStream();
+            using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+            }
+            stream.Seek(0);
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(stream);
+            _albumArtImage.Source = bitmap;
+            _albumArtImage.Visibility = Visibility.Visible;
+            _fontIcon.Visibility = Visibility.Collapsed;
+        }
+        catch
+        {
+            _albumArtImage.Source = null;
+            _albumArtImage.Visibility = Visibility.Collapsed;
+            _fontIcon.Visibility = Visibility.Visible;
+        }
+    }
+
+    private static bool ByteArraysEqual(byte[]? a, byte[]? b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a is null || b is null) return false;
+        return a.AsSpan().SequenceEqual(b.AsSpan());
+    }
+
+    public void ShowVolume(int volumePercent, string trackTitle, string artist, byte[]? thumbnailBytes = null)
+    {
         _fontIcon.Glyph = volumePercent switch
         {
             0 => "\uE74F",       // Wyciszenie (Mute)
@@ -211,6 +284,8 @@ public sealed class CompactHudWindow : Window
         _valueText.FontSize = 14;
         _progressBar.Value = volumePercent;
         _progressBar.Visibility = Visibility.Visible;
+
+        ApplyThumbnail(thumbnailBytes);
 
         PositionWindowOnRight();
         if (_hwnd != IntPtr.Zero)
@@ -229,6 +304,8 @@ public sealed class CompactHudWindow : Window
     public void ShowBrightness(int brightnessPercent)
     {
         _fontIcon.Glyph = "\uE706"; // Ikona słońca / jasności (Fluent Brightness)
+        _albumArtImage.Visibility = Visibility.Collapsed;
+        _fontIcon.Visibility = Visibility.Visible;
         _titleText.Text = "Jasność ekranu";
         _subtitleText.Text = "Pozycja 90°";
         _valueText.Text = $"{brightnessPercent}%";
@@ -250,7 +327,7 @@ public sealed class CompactHudWindow : Window
         _hideTimer.Start();
     }
 
-    public void ShowTrack(string trackTitle, string artist, MediaAction action)
+    public void ShowTrack(string trackTitle, string artist, MediaAction action, byte[]? thumbnailBytes = null)
     {
         _fontIcon.Glyph = action switch
         {
@@ -264,6 +341,8 @@ public sealed class CompactHudWindow : Window
         _valueText.Text = action == MediaAction.Previous ? "POPRZEDNI" : "NASTĘPNY";
         _valueText.FontSize = 11;
         _progressBar.Visibility = Visibility.Collapsed;
+
+        ApplyThumbnail(thumbnailBytes);
 
         PositionWindowOnRight();
         if (_hwnd != IntPtr.Zero)

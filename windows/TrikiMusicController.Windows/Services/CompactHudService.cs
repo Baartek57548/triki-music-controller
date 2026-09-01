@@ -19,14 +19,14 @@ public sealed class CompactHudService
         return _window ??= new CompactHudWindow();
     }
 
-    public void ShowVolume(int volumePercent, string trackTitle, string artist)
+    public void ShowVolume(int volumePercent, string trackTitle, string artist, byte[]? thumbnailBytes = null)
     {
         _dispatcherQueue.TryEnqueue(() =>
         {
             try
             {
                 var win = GetOrCreateWindow();
-                win.ShowVolume(volumePercent, trackTitle, artist);
+                win.ShowVolume(volumePercent, trackTitle, artist, thumbnailBytes);
             }
             catch
             {
@@ -51,14 +51,14 @@ public sealed class CompactHudService
         });
     }
 
-    public void ShowTrack(string trackTitle, string artist, MediaAction action)
+    public void ShowTrack(string trackTitle, string artist, MediaAction action, byte[]? thumbnailBytes = null)
     {
         _dispatcherQueue.TryEnqueue(() =>
         {
             try
             {
                 var win = GetOrCreateWindow();
-                win.ShowTrack(trackTitle, artist, action);
+                win.ShowTrack(trackTitle, artist, action, thumbnailBytes);
             }
             catch
             {

@@ -512,7 +512,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         await _media.ExecuteAsync(action);
         if (action is MediaAction.Next or MediaAction.Previous)
         {
-            _hud?.ShowTrack(_lastMedia.Title, _lastMedia.Artist, action);
+            _hud?.ShowTrack(_media.State.Title, _media.State.Artist, action, _media.State.ThumbnailBytes);
         }
     }
 
@@ -549,11 +549,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         if (Math.Abs(prevVolume - state.VolumePercent) > 0.01f && _bluetooth.State.ConnectionState == TrikiConnectionState.Ready)
         {
-            _hud?.ShowVolume((int)MathF.Round(state.VolumePercent), state.Title, state.Artist);
+            _hud?.ShowVolume((int)MathF.Round(state.VolumePercent), state.Title, state.Artist, state.ThumbnailBytes);
         }
         if (!string.IsNullOrWhiteSpace(state.Title) && state.Title != "—" && state.Title != _lastKnownTitle && !string.IsNullOrEmpty(_lastKnownTitle) && _bluetooth.State.ConnectionState == TrikiConnectionState.Ready)
         {
-            _hud?.ShowTrack(state.Title, state.Artist, MediaAction.Next);
+            _hud?.ShowTrack(state.Title, state.Artist, MediaAction.Next, state.ThumbnailBytes);
         }
         _lastKnownTitle = state.Title;
         MarkUiDirty();
@@ -566,7 +566,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         else if (state.LastAction is MediaAction.Next or MediaAction.Previous)
         {
-            _hud?.ShowTrack(_media.State.Title, _media.State.Artist, state.LastAction.Value);
+            _hud?.ShowTrack(_media.State.Title, _media.State.Artist, state.LastAction.Value, _media.State.ThumbnailBytes);
         }
         MarkUiDirty();
     }
