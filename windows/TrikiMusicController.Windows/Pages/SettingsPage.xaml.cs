@@ -13,7 +13,13 @@ public sealed partial class SettingsPage : Page
 
     private void Diagnostics_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(DiagnosticsPage));
 
-    private void About_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(AboutPage));
+    private void About_Click(object sender, RoutedEventArgs e)
+    {
+        if (((App)Microsoft.UI.Xaml.Application.Current).MainWindow is { } window)
+            window.NavigateToTag("about");
+        else
+            Frame.Navigate(typeof(AboutPage));
+    }
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {

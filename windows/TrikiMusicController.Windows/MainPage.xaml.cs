@@ -23,7 +23,18 @@ public sealed partial class MainPage : Page
         catch (Exception error) { await ShowErrorAsync(error.Message); }
     }
 
-    private void Device_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(DevicePage));
+    private void Device_Click(object sender, RoutedEventArgs e)
+    {
+        var mainWindow = (Application.Current as App)?.MainWindow;
+        if (mainWindow is not null)
+        {
+            mainWindow.NavigateToTag("device");
+        }
+        else
+        {
+            Frame.Navigate(typeof(DevicePage));
+        }
+    }
 
     private async void Previous_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(MediaAction.Previous);
     private async void PlayPause_Click(object sender, RoutedEventArgs e) => await ExecuteAsync(MediaAction.PlayPause);

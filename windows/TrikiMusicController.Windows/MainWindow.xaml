@@ -43,10 +43,10 @@
                 <NavigationViewItem x:Name="HomeItem" Content="Start" Tag="home">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Sterowanie" Tag="controls">
+                <NavigationViewItem x:Name="ControlsItem" Content="Sterowanie" Tag="controls">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Play" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Urządzenie" Tag="device">
+                <NavigationViewItem x:Name="DeviceItem" Content="Urządzenie" Tag="device">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE702;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>

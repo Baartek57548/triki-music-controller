@@ -49,11 +49,33 @@ public sealed partial class MainWindow : Window
         if (RootFrame.CurrentSourcePageType != pageType) RootFrame.Navigate(pageType);
     }
 
+    public void NavigateToTag(string tag)
+    {
+        switch (tag)
+        {
+            case "device":
+                Navigation.SelectedItem = DeviceItem;
+                break;
+            case "controls":
+                Navigation.SelectedItem = ControlsItem;
+                break;
+            case "settings":
+                Navigation.SelectedItem = Navigation.SettingsItem;
+                break;
+            case "about":
+                Navigation.SelectedItem = null;
+                if (RootFrame.CurrentSourcePageType != typeof(AboutPage))
+                    RootFrame.Navigate(typeof(AboutPage));
+                break;
+            default:
+                Navigation.SelectedItem = HomeItem;
+                break;
+        }
+    }
+
     private void Info_Click(object sender, RoutedEventArgs e)
     {
-        Navigation.SelectedItem = null;
-        if (RootFrame.CurrentSourcePageType != typeof(AboutPage))
-            RootFrame.Navigate(typeof(AboutPage));
+        NavigateToTag("about");
     }
 
     public async Task CheckForUpdatesAsync(bool showUpToDateMessage)
