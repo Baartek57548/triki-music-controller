@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,11 +32,13 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
 import pl.trikimusic.controller.core.gesture.RotationGestureDirection
 import pl.trikimusic.controller.domain.model.ButtonClickType
@@ -61,6 +66,7 @@ import pl.trikimusic.controller.ui.components.TrikiCard
 import pl.trikimusic.controller.ui.components.VolumeGateState
 import pl.trikimusic.controller.ui.components.volumeControlPresentation
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ControlsScreen(
     state: MainUiState,
@@ -296,6 +302,48 @@ fun ControlsScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                     )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("Czułość obrotu", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "$angle°",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+
+                        Slider(
+                            value = state.settings.rotationAngleDegrees.toFloat(),
+                            onValueChange = { viewModel.setRotationAngleDegrees(it.roundToInt()) },
+                            valueRange = 90f..360f,
+                            steps = 26,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf(180, 200, 270, 360).forEach { preset ->
+                                val selected = state.settings.rotationAngleDegrees == preset
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { viewModel.setRotationAngleDegrees(preset) },
+                                    label = { Text(if (preset == 200) "200° (Domyślny)" else "$preset°") },
+                                    shape = RoundedCornerShape(12.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
