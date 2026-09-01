@@ -9,6 +9,15 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "2.9.8",
+            "Usprawnienia skalowania i odnośnik do repozytorium",
+            [
+                "Poprawiono skalowanie sekcji wyboru kąta obrotu w ustawieniach aplikacji Android na wąskich ekranach smartfonów (np. Xiaomi 13).",
+                "Zastosowano elastyczny układ FlowRow zapobiegający ucinaniu plakietek kątów obrotu.",
+                "Dodano bezpośredni przycisk z linkiem do oficjalnego repozytorium GitHub w zakładce O aplikacji.",
+                "Wprowadzono kontekstowe okno dialogowe z informacjami o działaniu parametru kąta obrotu."
+            ]),
+        new ReleaseHighlight(
             "2.9.7",
             "Przejrzysty interfejs i kontekstowe okna pomocy",
             [

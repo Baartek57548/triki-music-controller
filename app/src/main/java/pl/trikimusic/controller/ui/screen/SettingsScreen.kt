@@ -3,6 +3,8 @@ package pl.trikimusic.controller.ui.screen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +32,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -38,11 +44,12 @@ import kotlin.math.roundToInt
 import pl.trikimusic.controller.domain.model.ThemePreference
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
+import pl.trikimusic.controller.ui.components.InfoDialog
 import pl.trikimusic.controller.ui.components.NavigationRow
 import pl.trikimusic.controller.ui.components.SectionTitle
 import pl.trikimusic.controller.ui.components.TrikiCard
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     state: MainUiState,
@@ -53,6 +60,8 @@ fun SettingsScreen(
     onInspector: () -> Unit,
     onInfo: () -> Unit,
 ) {
+    var showAngleInfo by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -94,6 +103,7 @@ fun SettingsScreen(
             SectionTitle(
                 title = "Kąt obrotu (Zmiana utworu)",
                 icon = Icons.Default.SwapHoriz,
+                onInfoClick = { showAngleInfo = true },
             )
         }
 
@@ -125,9 +135,10 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         listOf(180, 200, 270, 360).forEach { preset ->
                             val selected = state.settings.rotationAngleDegrees == preset
@@ -233,6 +244,25 @@ fun SettingsScreen(
                 subtitle = "Wersja, licencja i informacje o projekcie.",
                 onClick = onInfo,
             )
+        }
+    }
+
+    if (showAngleInfo) {
+        InfoDialog(
+            title = "Kąt wymaganego obrotu",
+            onDismiss = { showAngleInfo = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Parametr ten określa, o ile stopni należy obrócić odwróconym kontrolerem, aby aplikacja uznała gest za wykonany i przełączyła utwór.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Domyślna wartość wynosi 200°, co zapewnia idealny balans między wygodą ruchu dłoni a odpornością na przypadkowe poruszenia.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ package pl.trikimusic.controller.ui.screen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Button
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -42,6 +45,9 @@ fun InfoScreen(
     onCheckForUpdates: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val uriHandler = LocalUriHandler.current
+    val gitHubUrl = "https://github.com/Baartek57548/triki-music-controller"
+
     Scaffold(topBar = { DetailTopBar("O aplikacji", onBack) }) { padding ->
         Column(
             modifier = Modifier
@@ -87,7 +93,8 @@ fun InfoScreen(
                         shape = RoundedCornerShape(14.dp),
                     ) {
                         Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text(if (updateState.stage == UpdateStage.CHECKING) " Sprawdzanie…" else " Sprawdź aktualizacje", fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.size(8.dp))
+                        Text(if (updateState.stage == UpdateStage.CHECKING) "Sprawdzanie…" else "Sprawdź aktualizacje", fontWeight = FontWeight.SemiBold)
                     }
 
                     if (updateState.stage == UpdateStage.DOWNLOADING) {
@@ -112,13 +119,23 @@ fun InfoScreen(
                 ) {
                     InfoSection(
                         "O projekcie",
-                        "Triki Music Controller to bezprzewodowy kontroler multimedialny bazujący na sensorach IMU (żyroskop, akcelerometr) oraz Bluetooth LE.",
+                        "Triki Music Controller to otwartoźródłowy kontroler multimedialny bazujący na sensorach IMU (żyroskop, akcelerometr) oraz łączności Bluetooth LE.",
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     InfoSection(
                         "Prywatność i bezpieczeństwo",
                         "Dane telemetryczne, kalibracja i profile przetwarzane są wyłącznie lokalnie na Twoim telefonie bez wysyłania do chmury.",
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    OutlinedButton(
+                        onClick = { uriHandler.openUri(gitHubUrl) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Kod źródłowy na GitHubie", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
