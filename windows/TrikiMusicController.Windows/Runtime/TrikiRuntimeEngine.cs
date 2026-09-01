@@ -101,7 +101,12 @@ public sealed class TrikiRuntimeEngine : IDisposable
             var filtered = _sensorFilter.Process(sample, _settings.Current.Calibration);
             var buttonEvent = _buttonInterpreter.Process(sample);
             var gesture = _rotationGestureDetector.Process(filtered);
-            var brightness = _brightnessController.Process(filtered);
+            var isButtonPressed = _buttonInterpreter.IsPressed || sample.Status == 1;
+            var brightness = _brightnessController.Process(filtered, isButtonPressed);
+            if (brightness.Active && isButtonPressed)
+            {
+                _buttonInterpreter.ConsumeCurrentHold();
+            }
             var explicitConnectionActivity = buttonEvent is not null ||
                 _buttonInterpreter.IsPressed ||
                 brightness.Active ||

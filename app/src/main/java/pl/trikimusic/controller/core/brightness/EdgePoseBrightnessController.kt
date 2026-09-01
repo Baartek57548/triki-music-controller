@@ -43,7 +43,7 @@ class EdgePoseBrightnessController(
         accumulatedDegrees = 0f
     }
 
-    fun process(sample: FilteredSensorData): BrightnessControlResult {
+    fun process(sample: FilteredSensorData, isButtonPressed: Boolean = true): BrightnessControlResult {
         val accZ = abs(sample.accelerometerG.z)
         val planeAcc = sqrt(
             sample.accelerometerG.x * sample.accelerometerG.x +
@@ -67,7 +67,7 @@ class EdgePoseBrightnessController(
                 brightnessPercent = currentBrightnessPercent,
                 deltaPercent = 0f,
                 stabilizationProgress = 0f,
-                statusText = "Postaw kapsel na krawędzi (90°), aby regulować jasność.",
+                statusText = "Postaw kapsel na krawędzi (90°) i przytrzymaj przycisk, aby regulować jasność.",
             )
         }
 
@@ -99,6 +99,19 @@ class EdgePoseBrightnessController(
             )
         }
 
+        if (!isButtonPressed) {
+            accumulatedDegrees = 0f
+            lastTimestampNanos = timestamp
+            return BrightnessControlResult(
+                active = true,
+                ready = false,
+                brightnessPercent = currentBrightnessPercent,
+                deltaPercent = 0f,
+                stabilizationProgress = 1f,
+                statusText = "Przytrzymaj przycisk, aby regulować jasność w pozycji 90°.",
+            )
+        }
+
         var deltaPercent = 0f
         val prevTimestamp = lastTimestampNanos
         if (prevTimestamp != null && timestamp > prevTimestamp) {
@@ -126,7 +139,7 @@ class EdgePoseBrightnessController(
             brightnessPercent = currentBrightnessPercent,
             deltaPercent = deltaPercent,
             stabilizationProgress = 1f,
-            statusText = "Jasność: ${currentBrightnessPercent.toInt()}% (Obracaj kapsel na krawędzi)",
+            statusText = "Jasność: ${currentBrightnessPercent.toInt()}% (Obracaj trzymając przycisk)",
         )
     }
 }

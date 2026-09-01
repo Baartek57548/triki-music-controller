@@ -1,4 +1,4 @@
-﻿using TrikiMusicController_Windows.Core;
+using TrikiMusicController_Windows.Core;
 using TrikiMusicController_Windows.Models;
 
 namespace TrikiMusicController.Windows.Tests;
@@ -75,5 +75,37 @@ public sealed class EdgePoseBrightnessControllerTests
         Assert.True(res.Active);
         Assert.True(res.Ready);
         Assert.True(res.BrightnessPercent >= 55f);
+    }
+
+    [Fact]
+    public void ButtonMustBeHeldToAdjustBrightness()
+    {
+        var controller = new EdgePoseBrightnessController(50f);
+        var t0 = 1_000_000_000L;
+
+        // Stabilize
+        controller.Process(SensorTestData.Filtered(t0, new Vector3f(0f, 1f, 0f), new Vector3f(0f, 0f, 0f)));
+        controller.Process(SensorTestData.Filtered(t0 + 400_000_000L, new Vector3f(0f, 1f, 0f), new Vector3f(0f, 0f, 0f)));
+
+        // Rotate at +180 deg/s without pressing button -> brightness should NOT change
+        var resWithoutButton = controller.Process(SensorTestData.Filtered(
+            t0 + 500_000_000L,
+            new Vector3f(0f, 1f, 0f),
+            new Vector3f(0f, 0f, 180f)), isButtonPressed: false);
+
+        Assert.True(resWithoutButton.Active);
+        Assert.False(resWithoutButton.Ready);
+        Assert.Equal(50f, resWithoutButton.BrightnessPercent);
+        Assert.Equal(0f, resWithoutButton.DeltaPercent);
+
+        // Rotate with button pressed -> brightness changes
+        var resWithButton = controller.Process(SensorTestData.Filtered(
+            t0 + 600_000_000L,
+            new Vector3f(0f, 1f, 0f),
+            new Vector3f(0f, 0f, 180f)), isButtonPressed: true);
+
+        Assert.True(resWithButton.Active);
+        Assert.True(resWithButton.Ready);
+        Assert.True(resWithButton.BrightnessPercent > 50f);
     }
 }

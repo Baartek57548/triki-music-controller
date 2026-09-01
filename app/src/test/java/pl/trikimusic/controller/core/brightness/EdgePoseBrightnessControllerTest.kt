@@ -1,4 +1,4 @@
-﻿package pl.trikimusic.controller.core.brightness
+package pl.trikimusic.controller.core.brightness
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,5 +71,31 @@ class EdgePoseBrightnessControllerTest {
         assertTrue(res.active)
         assertTrue(res.ready)
         assertTrue(res.brightnessPercent >= 55f)
+    }
+
+    @Test
+    fun buttonMustBeHeldToAdjustBrightness() {
+        val controller = EdgePoseBrightnessController(50f)
+        val t0 = 1_000_000_000L
+
+        controller.process(sample(t0, Vector3(0f, 1f, 0f)))
+        controller.process(sample(t0 + 400_000_000L, Vector3(0f, 1f, 0f)))
+
+        val resWithoutButton = controller.process(
+            sample(t0 + 500_000_000L, Vector3(0f, 1f, 0f), 180f),
+            isButtonPressed = false,
+        )
+        assertTrue(resWithoutButton.active)
+        assertFalse(resWithoutButton.ready)
+        assertEquals(50f, resWithoutButton.brightnessPercent, 0.01f)
+        assertEquals(0f, resWithoutButton.deltaPercent, 0.01f)
+
+        val resWithButton = controller.process(
+            sample(t0 + 600_000_000L, Vector3(0f, 1f, 0f), 180f),
+            isButtonPressed = true,
+        )
+        assertTrue(resWithButton.active)
+        assertTrue(resWithButton.ready)
+        assertTrue(resWithButton.brightnessPercent > 50f)
     }
 }

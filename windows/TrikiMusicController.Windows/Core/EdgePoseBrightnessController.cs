@@ -46,7 +46,7 @@ public sealed class EdgePoseBrightnessController
         _accumulatedDegrees = 0f;
     }
 
-    public BrightnessControlResult Process(FilteredSensorData sample)
+    public BrightnessControlResult Process(FilteredSensorData sample, bool isButtonPressed = true)
     {
         var accZ = Math.Abs(sample.AccelerometerG.Z);
         var planeAcc = MathF.Sqrt(
@@ -71,7 +71,7 @@ public sealed class EdgePoseBrightnessController
                 BrightnessPercent: _currentBrightnessPercent,
                 DeltaPercent: 0f,
                 StabilizationProgress: 0f,
-                StatusText: "Postaw kapsel na krawędzi (90°), aby regulować jasność.");
+                StatusText: "Postaw kapsel na krawędzi (90°) i przytrzymaj przycisk, aby regulować jasność.");
         }
 
         if (_stabilizationStartNanos is null)
@@ -100,6 +100,19 @@ public sealed class EdgePoseBrightnessController
                 DeltaPercent: 0f,
                 StabilizationProgress: stabilizationProgress,
                 StatusText: $"Stabilizacja: {(int)(stabilizationProgress * 100)}%");
+        }
+
+        if (!isButtonPressed)
+        {
+            _accumulatedDegrees = 0f;
+            _lastTimestampNanos = timestamp;
+            return new BrightnessControlResult(
+                Active: true,
+                Ready: false,
+                BrightnessPercent: _currentBrightnessPercent,
+                DeltaPercent: 0f,
+                StabilizationProgress: 1f,
+                StatusText: "Przytrzymaj przycisk, aby regulować jasność w pozycji 90°.");
         }
 
         var deltaPercent = 0f;
@@ -131,6 +144,6 @@ public sealed class EdgePoseBrightnessController
             BrightnessPercent: _currentBrightnessPercent,
             DeltaPercent: deltaPercent,
             StabilizationProgress: 1f,
-            StatusText: $"Jasność: {(int)_currentBrightnessPercent}% (Obracaj kapsel na krawędzi)");
+            StatusText: $"Jasność: {(int)_currentBrightnessPercent}% (Obracaj trzymając przycisk)");
     }
 }

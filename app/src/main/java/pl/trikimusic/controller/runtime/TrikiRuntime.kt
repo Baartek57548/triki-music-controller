@@ -157,7 +157,11 @@ class TrikiRuntime(
         val filtered = sensorFilter.process(sample, settings.calibration)
         val buttonEvent = buttonInterpreter.process(sample)
         val rotationGestureResult = rotationGestureDetector.process(filtered)
-        val brightnessResult = brightnessController.process(filtered)
+        val isButtonPressed = buttonInterpreter.isPressed || sample.status == 1
+        val brightnessResult = brightnessController.process(filtered, isButtonPressed)
+        if (brightnessResult.active && isButtonPressed) {
+            buttonInterpreter.consumeCurrentHold()
+        }
         val explicitConnectionActivity =
             buttonEvent != null ||
                 buttonInterpreter.isPressed ||
