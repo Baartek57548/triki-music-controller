@@ -27,11 +27,13 @@
                                   IsOn="{Binding AutoReconnect, Mode=TwoWay}"
                                   AutomationProperties.HelpText="Łączy zapamiętany kontroler po naciśnięciu jego przycisku." />
 
-                    <ToggleSwitch Header="Łącz tylko podczas użycia"
+                    <ToggleSwitch Header="Oszczędzanie energii (Tryb Eco)"
                                   OffContent="Stała gotowość"
-                                  OnContent="Na żądanie"
+                                  OnContent="Włączone (Eco)"
                                   IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}"
-                                  AutomationProperties.HelpText="Zamyka aktywne połączenie po 12 sekundach bezczynności." />
+                                  AutomationProperties.HelpText="Zamyka aktywne połączenie po 12 sekundach bezczynności kontrolera." />
+                    <TextBlock Text="W trybie Eco Triki usypia połączenie Bluetooth po 12 sekundach bezczynności i wznawia je natychmiast po wykryciu ruchu lub naciśnięciu przycisku."
+                               Style="{StaticResource MetadataTextStyle}" />
 
                     <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
@@ -79,6 +81,7 @@
                     <ComboBox Header="Motyw aplikacji"
                               ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
+                              DisplayMemberPath="DisplayName"
                               HorizontalAlignment="Left"
                               MinWidth="260" />
                 </StackPanel>

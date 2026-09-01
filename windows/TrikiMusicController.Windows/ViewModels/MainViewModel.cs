@@ -528,6 +528,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void MediaOnStateChanged(object? sender, MediaSnapshot state)
     {
         var wasPlaying = _lastMedia.IsPlaying;
+        var prevVolume = _lastMedia.VolumePercent;
         if (state.IsPlaying)
         {
             _lastPlaybackActiveAt = DateTimeOffset.UtcNow;
@@ -536,15 +537,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 _bluetooth.NotifyMediaPlaybackStarted();
             }
         }
+        if (Math.Abs(prevVolume - state.VolumePercent) > 0.01f && _lastBluetooth.ConnectionState == TrikiConnectionState.Ready)
+        {
+            _hud?.ShowVolume((int)MathF.Round(state.VolumePercent), state.Title, state.Artist);
+        }
         MarkUiDirty();
     }
     private void RuntimeOnStateChanged(object? sender, RuntimeSnapshot state)
     {
         if (state.Brightness is { Active: true, DeltaPercent: not 0f } brightness)
         {
-            _hud?.ShowBrightness((int)brightness.BrightnessPercent);
+            _hud?.ShowBrightness((int)MathF.Round(brightness.BrightnessPercent));
         }
-        else if (state.Volume is { Active: true, Action: not MediaAction.None })
+        else if (state.Volume?.Action is MediaAction.VolumeUp or MediaAction.VolumeDown)
         {
             _hud?.ShowVolume((int)MathF.Round(_lastMedia.VolumePercent), _lastMedia.Title, _lastMedia.Artist);
         }

@@ -273,6 +273,7 @@
                                 </StackPanel>
                                 <ComboBox ItemsSource="{Binding AvailableActions}"
                                           SelectedItem="{Binding SingleClickAction, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName"
                                           HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </Border>
@@ -290,6 +291,7 @@
                                 </StackPanel>
                                 <ComboBox ItemsSource="{Binding AvailableActions}"
                                           SelectedItem="{Binding DoubleClickAction, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName"
                                           HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </Border>
@@ -307,6 +309,7 @@
                                 </StackPanel>
                                 <ComboBox ItemsSource="{Binding AvailableActions}"
                                           SelectedItem="{Binding TripleClickAction, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName"
                                           HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </Border>

@@ -1,31 +1,34 @@
-﻿using Microsoft.UI;
+﻿using System.Runtime.InteropServices;
+using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
+using WinRT.Interop;
 
 namespace TrikiMusicController_Windows.Views;
 
 public sealed class CompactHudWindow : Window
 {
-    private readonly DispatcherTimer _hideTimer = new();
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private const int SwHide = 0;
+    private const int SwShowNoActivate = 4;
+
+    private readonly DispatcherTimer _hideTimer;
     private readonly TextBlock _iconText;
     private readonly TextBlock _titleText;
     private readonly TextBlock _subtitleText;
     private readonly TextBlock _valueText;
     private readonly ProgressBar _progressBar;
+    private readonly IntPtr _hwnd;
 
     public CompactHudWindow()
     {
         Title = "Triki HUD";
-
-        _hideTimer.Interval = TimeSpan.FromMilliseconds(1500);
-        _hideTimer.Tick += (s, e) =>
-        {
-            _hideTimer.Stop();
-            AppWindow.Hide();
-        };
+        _hwnd = WindowNative.GetWindowHandle(this);
 
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -36,7 +39,17 @@ public sealed class CompactHudWindow : Window
             presenter.SetBorderAndTitleBar(false, false);
         }
 
-        AppWindow.Resize(new SizeInt32(320, 88));
+        AppWindow.Resize(new SizeInt32(320, 84));
+
+        _hideTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(2000), // Dokładnie 2 sekundy
+        };
+        _hideTimer.Tick += (s, e) =>
+        {
+            _hideTimer.Stop();
+            HideHud();
+        };
 
         _iconText = new TextBlock
         {
@@ -131,7 +144,7 @@ public sealed class CompactHudWindow : Window
         {
             CornerRadius = new CornerRadius(16),
             Padding = new Thickness(14, 10, 14, 10),
-            Margin = new Thickness(6),
+            Margin = new Thickness(4),
             Background = Application.Current.Resources["SystemControlBackgroundChromeMediumBrush"] as Brush,
             BorderBrush = Application.Current.Resources["CardStrokeColorDefaultBrush"] as Brush,
             BorderThickness = new Thickness(1),
@@ -139,10 +152,10 @@ public sealed class CompactHudWindow : Window
         };
 
         Content = card;
-        PositionWindow();
+        HideHud();
     }
 
-    private void PositionWindow()
+    private void PositionWindowOnRight()
     {
         try
         {
@@ -150,7 +163,8 @@ public sealed class CompactHudWindow : Window
             if (displayArea is not null)
             {
                 var workArea = displayArea.WorkArea;
-                var x = workArea.X + (workArea.Width - 320) / 2;
+                // Prawa strona ekranu (32 px marginesu od prawej krawędzi, 80 px od dołu)
+                var x = workArea.X + workArea.Width - 320 - 32;
                 var y = workArea.Y + workArea.Height - 110;
                 AppWindow.Move(new PointInt32(x, y));
             }
@@ -158,6 +172,22 @@ public sealed class CompactHudWindow : Window
         catch
         {
             // Fallback default position
+        }
+    }
+
+    private void HideHud()
+    {
+        try
+        {
+            if (_hwnd != IntPtr.Zero)
+            {
+                ShowWindow(_hwnd, SwHide);
+            }
+            AppWindow.Hide();
+        }
+        catch
+        {
+            // Safety
         }
     }
 
@@ -169,8 +199,16 @@ public sealed class CompactHudWindow : Window
         _valueText.Text = $"{volumePercent}%";
         _progressBar.Value = volumePercent;
 
-        PositionWindow();
-        AppWindow.Show();
+        PositionWindowOnRight();
+        if (_hwnd != IntPtr.Zero)
+        {
+            ShowWindow(_hwnd, SwShowNoActivate);
+        }
+        else
+        {
+            AppWindow.Show();
+        }
+
         _hideTimer.Stop();
         _hideTimer.Start();
     }
@@ -183,8 +221,16 @@ public sealed class CompactHudWindow : Window
         _valueText.Text = $"{brightnessPercent}%";
         _progressBar.Value = brightnessPercent;
 
-        PositionWindow();
-        AppWindow.Show();
+        PositionWindowOnRight();
+        if (_hwnd != IntPtr.Zero)
+        {
+            ShowWindow(_hwnd, SwShowNoActivate);
+        }
+        else
+        {
+            AppWindow.Show();
+        }
+
         _hideTimer.Stop();
         _hideTimer.Start();
     }
