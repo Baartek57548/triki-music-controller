@@ -18,7 +18,7 @@ public sealed class CompactHudWindow : Window
     private const int SwShowNoActivate = 4;
 
     private readonly DispatcherTimer _hideTimer;
-    private readonly TextBlock _iconText;
+    private readonly FontIcon _fontIcon;
     private readonly TextBlock _titleText;
     private readonly TextBlock _subtitleText;
     private readonly TextBlock _valueText;
@@ -39,11 +39,11 @@ public sealed class CompactHudWindow : Window
             presenter.SetBorderAndTitleBar(false, false);
         }
 
-        AppWindow.Resize(new SizeInt32(320, 84));
+        AppWindow.Resize(new SizeInt32(330, 86));
 
         _hideTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(2000), // Dokładnie 2 sekundy
+            Interval = TimeSpan.FromMilliseconds(2000), // Dokładnie 2 sekundy bezczynności
         };
         _hideTimer.Tick += (s, e) =>
         {
@@ -51,23 +51,23 @@ public sealed class CompactHudWindow : Window
             HideHud();
         };
 
-        _iconText = new TextBlock
+        _fontIcon = new FontIcon
         {
-            Text = "VOL",
-            FontSize = 11,
-            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Glyph = "\uE767",
+            FontSize = 18,
+            Foreground = Application.Current.Resources["AccentTextFillColorPrimaryBrush"] as Brush,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
         };
 
         var iconBorder = new Border
         {
-            Width = 36,
-            Height = 36,
-            CornerRadius = new CornerRadius(10),
+            Width = 40,
+            Height = 40,
+            CornerRadius = new CornerRadius(12),
             VerticalAlignment = VerticalAlignment.Center,
-            Background = Application.Current.Resources["LayerFillColorDefaultBrush"] as Brush,
-            Child = _iconText,
+            Background = Application.Current.Resources["AccentFillColorTertiaryBrush"] as Brush,
+            Child = _fontIcon,
         };
 
         _titleText = new TextBlock
@@ -89,6 +89,7 @@ public sealed class CompactHudWindow : Window
         var textStack = new StackPanel
         {
             VerticalAlignment = VerticalAlignment.Center,
+            Spacing = 1,
             Children = { _titleText, _subtitleText },
         };
 
@@ -97,6 +98,7 @@ public sealed class CompactHudWindow : Window
             Text = "50%",
             FontSize = 14,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Foreground = Application.Current.Resources["AccentTextFillColorPrimaryBrush"] as Brush,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(4, 0, 2, 0),
         };
@@ -106,15 +108,15 @@ public sealed class CompactHudWindow : Window
             Minimum = 0,
             Maximum = 100,
             Value = 50,
-            Height = 5,
-            CornerRadius = new CornerRadius(2.5),
+            Height = 4,
+            CornerRadius = new CornerRadius(2),
             Margin = new Thickness(0, 4, 0, 0),
         };
 
         var contentGrid = new Grid
         {
             ColumnSpacing = 12,
-            RowSpacing = 6,
+            RowSpacing = 4,
         };
         contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -164,7 +166,7 @@ public sealed class CompactHudWindow : Window
             {
                 var workArea = displayArea.WorkArea;
                 // Prawa strona ekranu (32 px marginesu od prawej krawędzi, 80 px od dołu)
-                var x = workArea.X + workArea.Width - 320 - 32;
+                var x = workArea.X + workArea.Width - 330 - 32;
                 var y = workArea.Y + workArea.Height - 110;
                 AppWindow.Move(new PointInt32(x, y));
             }
@@ -193,7 +195,15 @@ public sealed class CompactHudWindow : Window
 
     public void ShowVolume(int volumePercent, string trackTitle, string artist)
     {
-        _iconText.Text = "VOL";
+        // Dynamiczna ikona głośnika Fluent w zależności od poziomu
+        _fontIcon.Glyph = volumePercent switch
+        {
+            0 => "\uE74F",       // Wyciszenie (Mute)
+            < 33 => "\uE993",    // Cicho (Volume 1)
+            < 67 => "\uE994",    // Średnio (Volume 2)
+            _ => "\uE995",       // Głośno (Volume 3)
+        };
+
         _titleText.Text = string.IsNullOrWhiteSpace(trackTitle) || trackTitle == "—" ? "Głośność" : trackTitle;
         _subtitleText.Text = string.IsNullOrWhiteSpace(artist) || artist == "—" ? "System audio" : artist;
         _valueText.Text = $"{volumePercent}%";
@@ -215,7 +225,7 @@ public sealed class CompactHudWindow : Window
 
     public void ShowBrightness(int brightnessPercent)
     {
-        _iconText.Text = "JAS";
+        _fontIcon.Glyph = "\uE706"; // Ikona słońca / jasności (Fluent Brightness)
         _titleText.Text = "Jasność ekranu";
         _subtitleText.Text = "Pozycja 90°";
         _valueText.Text = $"{brightnessPercent}%";
