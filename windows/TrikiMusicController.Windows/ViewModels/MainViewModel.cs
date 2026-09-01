@@ -11,6 +11,10 @@ using TrikiMusicController_Windows.Services;
 
 namespace TrikiMusicController_Windows.ViewModels;
 
+public sealed record ThemeOption(string Value, string DisplayName);
+public sealed record MediaActionOption(MediaAction Action, string DisplayName);
+public sealed record MultiDeviceArbitrationOption(MultiDeviceArbitrationMode Mode, string DisplayName);
+
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly SettingsService _settings;
@@ -28,6 +32,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private BitmapImage? _mediaThumbnailSource;
     private string _settingsStatus = string.Empty;
     private int _uiRefreshPending = 1;
+    private DateTimeOffset? _lastPlaybackActiveAt;
 
     public MainViewModel(
         DispatcherQueue dispatcherQueue,
@@ -44,6 +49,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _uiTimer.Interval = TimeSpan.FromMilliseconds(100);
         _uiTimer.IsRepeating = true;
         _uiTimer.Tick += UiTimerOnTick;
+        _bluetooth.SetMediaStateProviders(
+            () => _lastMedia.IsPlaying,
+            () => _lastPlaybackActiveAt,
+            () => true);
         _bluetooth.StateChanged += BluetoothOnStateChanged;
         _media.StateChanged += MediaOnStateChanged;
         _runtime.StateChanged += RuntimeOnStateChanged;
@@ -54,6 +63,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public IReadOnlyList<MediaActionOption> AvailableActions { get; } = Enum.GetValues<MediaAction>()
         .Select(action => new MediaActionOption(action, action.DisplayName()))
         .ToArray();
+    public IReadOnlyList<MultiDeviceArbitrationOption> AvailableArbitrationModes { get; } =
+    [
+        new(MultiDeviceArbitrationMode.MediaPriority, "Priorytet aktywnej muzyki (Zalecany)"),
+        new(MultiDeviceArbitrationMode.AlwaysConnect, "Zawsze łącz (Agresywny)"),
+        new(MultiDeviceArbitrationMode.OnlyWhenPlaying, "Tylko podczas odtwarzania"),
+    ];
     public IReadOnlyList<ThemeOption> AvailableThemes { get; } =
     [
         new("System", "Zgodny z Windows"),
@@ -321,9 +336,29 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 _settings.Current.KnownDeviceAddress,
                 _settings.Current.KnownDeviceName,
                 _settings.Current.AutoReconnect,
-                value);
+                value,
+                _settings.Current.MultiDeviceArbitration);
             OnPropertyChanged();
             OnPropertyChanged(nameof(ConnectionModeSummary));
+            _ = SaveSettingsAsync();
+        }
+    }
+
+    public MultiDeviceArbitrationOption SelectedArbitrationMode
+    {
+        get => AvailableArbitrationModes.FirstOrDefault(option => option.Mode == _settings.Current.MultiDeviceArbitration)
+            ?? AvailableArbitrationModes[0];
+        set
+        {
+            if (value is null || _settings.Current.MultiDeviceArbitration == value.Mode) return;
+            _settings.Current.MultiDeviceArbitration = value.Mode;
+            _bluetooth.ConfigureRememberedDevice(
+                _settings.Current.KnownDeviceAddress,
+                _settings.Current.KnownDeviceName,
+                _settings.Current.AutoReconnect,
+                _settings.Current.ConnectOnlyWhenNeeded,
+                value.Mode);
+            OnPropertyChanged();
             _ = SaveSettingsAsync();
         }
     }
@@ -487,7 +522,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         AvailableActions.First(option => option.Action == action);
 
     private void BluetoothOnStateChanged(object? sender, BluetoothSnapshot state) => MarkUiDirty();
-    private void MediaOnStateChanged(object? sender, MediaSnapshot state) => MarkUiDirty();
+    private void MediaOnStateChanged(object? sender, MediaSnapshot state)
+    {
+        var wasPlaying = _lastMedia.IsPlaying;
+        if (state.IsPlaying)
+        {
+            _lastPlaybackActiveAt = DateTimeOffset.UtcNow;
+            if (!wasPlaying)
+            {
+                _bluetooth.NotifyMediaPlaybackStarted();
+            }
+        }
+        MarkUiDirty();
+    }
     private void RuntimeOnStateChanged(object? sender, RuntimeSnapshot state) => MarkUiDirty();
     private void MarkUiDirty() => Interlocked.Exchange(ref _uiRefreshPending, 1);
 

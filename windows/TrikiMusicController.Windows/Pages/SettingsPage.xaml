@@ -32,6 +32,17 @@
                                   OnContent="Na żądanie"
                                   IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}"
                                   AutomationProperties.HelpText="Zamyka aktywne połączenie po 12 sekundach bezczynności." />
+
+                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                    <ComboBox Header="Priorytet wielu urządzeń (Współdzielenie Triki)"
+                              ItemsSource="{Binding AvailableArbitrationModes}"
+                              SelectedItem="{Binding SelectedArbitrationMode, Mode=TwoWay}"
+                              DisplayMemberPath="DisplayName"
+                              HorizontalAlignment="Left"
+                              MinWidth="320" />
+                    <TextBlock Text="Gdy muzyka gra na tym komputerze, Triki łączy się natychmiast. Gdy muzyka nie gra, komputer ustępuje pierwszeństwa drugiemu urządzeniu."
+                               Style="{StaticResource MetadataTextStyle}" />
                     
                     <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Tryb połączenia" Message="{Binding ConnectionModeSummary}" />
                 </StackPanel>

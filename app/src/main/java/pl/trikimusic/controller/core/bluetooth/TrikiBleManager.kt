@@ -84,6 +84,32 @@ class TrikiBleManager(
     @Volatile private var waitingForWake = false
     @Volatile private var wakeWatcherArmed = false
     @Volatile private var rawCaptureEnabled = false
+    @Volatile private var arbitrationMode = pl.trikimusic.controller.domain.model.MultiDeviceArbitrationMode.MEDIA_PRIORITY
+    private var isMediaPlayingProvider: (() -> Boolean)? = null
+    private var lastPlaybackTimeMillisProvider: (() -> Long?)? = null
+    private var isScreenInteractiveProvider: (() -> Boolean)? = null
+    private var arbitrationDelayJob: Job? = null
+
+    fun setMediaStateProviders(
+        isMediaPlaying: () -> Boolean,
+        lastPlaybackTimeMillis: () -> Long?,
+        isScreenInteractive: () -> Boolean,
+    ) {
+        isMediaPlayingProvider = isMediaPlaying
+        lastPlaybackTimeMillisProvider = lastPlaybackTimeMillis
+        isScreenInteractiveProvider = isScreenInteractive
+    }
+
+    fun configureArbitration(mode: pl.trikimusic.controller.domain.model.MultiDeviceArbitrationMode) {
+        arbitrationMode = mode
+    }
+
+    fun notifyMediaPlaybackStarted() {
+        if (waitingForWake && autoReconnectAuthorized && !manualDisconnect) {
+            reconnectJob?.cancel()
+            reconnectJob = null
+        }
+    }
 
     fun startScan(knownAddress: String? = null, reconnecting: Boolean = false): Result<Unit> = runCatching {
         val permission = permissionManager.state()
@@ -345,17 +371,55 @@ class TrikiBleManager(
         if (!isNameMatch && !isAddressMatch) return
         val device = TrikiDevice(name, result.device.address, result.rssi, isKnown = isAddressMatch)
         if (isAddressMatch && waitingForWake) {
+            val isMediaPlaying = isMediaPlayingProvider?.invoke() ?: false
+            val isUserActive = isScreenInteractiveProvider?.invoke() ?: false
+            val lastPlayback = lastPlaybackTimeMillisProvider?.invoke()
+
+            if (!MultiDeviceArbitrationPolicy.shouldAttemptConnection(arbitrationMode, isMediaPlaying, isUserActive)) {
+                return
+            }
+
             if (!wakeAdvertisementGate.observeAdvertisement(SystemClock.elapsedRealtime())) return
-            waitingForWake = false
-            wakeWatcherArmed = false
-            wakeArmJob?.cancel()
-            wakeArmJob = null
-            mutableState.update { it.copy(wakeWatcherArmed = false) }
-            runCatching { connect(result.device, device, useAutoConnect = false) }
-                .onFailure { error ->
-                    fail(error.message ?: "Połączenie po wybudzeniu nie powiodło się.", error)
-                    scheduleReconnect()
+
+            val delayMillis = MultiDeviceArbitrationPolicy.calculateConnectionDelay(
+                arbitrationMode,
+                isMediaPlaying,
+                lastPlayback,
+                isUserActive,
+                System.currentTimeMillis()
+            )
+
+            if (delayMillis <= 0L) {
+                waitingForWake = false
+                wakeWatcherArmed = false
+                wakeArmJob?.cancel()
+                wakeArmJob = null
+                arbitrationDelayJob?.cancel()
+                arbitrationDelayJob = null
+                mutableState.update { it.copy(wakeWatcherArmed = false) }
+                runCatching { connect(result.device, device, useAutoConnect = false) }
+                    .onFailure { error ->
+                        fail(error.message ?: "Połączenie po wybudzeniu nie powiodło się.", error)
+                        scheduleReconnect()
+                    }
+            } else if (arbitrationDelayJob == null) {
+                arbitrationDelayJob = scope.launch {
+                    delay(delayMillis)
+                    arbitrationDelayJob = null
+                    if (waitingForWake && !manualDisconnect && autoReconnectAuthorized) {
+                        waitingForWake = false
+                        wakeWatcherArmed = false
+                        wakeArmJob?.cancel()
+                        wakeArmJob = null
+                        mutableState.update { it.copy(wakeWatcherArmed = false) }
+                        runCatching { connect(result.device, device, useAutoConnect = false) }
+                            .onFailure { error ->
+                                fail(error.message ?: "Połączenie po wybudzeniu nie powiodło się.", error)
+                                scheduleReconnect()
+                            }
+                    }
                 }
+            }
             return
         }
         mutableState.update { current ->

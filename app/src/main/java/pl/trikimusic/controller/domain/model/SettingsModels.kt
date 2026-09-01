@@ -50,6 +50,13 @@ enum class ThemePreference(val displayName: String) {
 }
 
 @Serializable
+enum class MultiDeviceArbitrationMode(val displayName: String) {
+    MEDIA_PRIORITY("Priorytet aktywnej muzyki (Zalecany)"),
+    ALWAYS_CONNECT("Zawsze łącz (Agresywny)"),
+    ONLY_WHEN_PLAYING("Tylko podczas odtwarzania"),
+}
+
+@Serializable
 data class AppSettings(
     val onboardingComplete: Boolean = false,
     val knownDeviceAddress: String? = null,
@@ -60,6 +67,7 @@ data class AppSettings(
     val developerMode: Boolean = false,
     val backgroundEnabled: Boolean = true,
     val connectOnlyWhenNeeded: Boolean = false,
+    val multiDeviceArbitration: MultiDeviceArbitrationMode = MultiDeviceArbitrationMode.MEDIA_PRIORITY,
     val rotationAngleDegrees: Int = 200,
     val enableSoundFeedback: Boolean = true,
     val theme: ThemePreference = ThemePreference.SYSTEM,

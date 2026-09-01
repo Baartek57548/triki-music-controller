@@ -95,6 +95,31 @@ fun SettingsScreen(
                         checked = state.settings.connectOnlyWhenNeeded,
                         onCheckedChange = viewModel::setConnectOnlyWhenNeeded,
                     )
+                    HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("Priorytet wielu urządzeń", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Gdy muzyka gra na telefonie, Triki łączy się natychmiast. Gdy nie gra, telefon ustępuje pierwszeństwa drugiemu urządzeniu.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            pl.trikimusic.controller.domain.model.MultiDeviceArbitrationMode.entries.forEach { mode ->
+                                FilterChip(
+                                    selected = state.settings.multiDeviceArbitration == mode,
+                                    onClick = { viewModel.setMultiDeviceArbitration(mode) },
+                                    label = { Text(mode.displayName) },
+                                    shape = RoundedCornerShape(12.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

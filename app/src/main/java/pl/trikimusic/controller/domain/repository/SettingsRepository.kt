@@ -20,5 +20,6 @@ interface SettingsRepository {
     suspend fun setConnectOnlyWhenNeeded(enabled: Boolean)
     suspend fun setRotationAngleDegrees(degrees: Int)
     suspend fun setEnableSoundFeedback(enabled: Boolean)
+    suspend fun setMultiDeviceArbitration(mode: pl.trikimusic.controller.domain.model.MultiDeviceArbitrationMode)
     suspend fun setTheme(theme: ThemePreference)
 }

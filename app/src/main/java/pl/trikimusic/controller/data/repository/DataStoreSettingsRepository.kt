@@ -97,6 +97,10 @@ class DataStoreSettingsRepository(
         copy(enableSoundFeedback = enabled)
     }
 
+    override suspend fun setMultiDeviceArbitration(mode: pl.trikimusic.controller.domain.model.MultiDeviceArbitrationMode) = update {
+        copy(multiDeviceArbitration = mode)
+    }
+
     override suspend fun setTheme(theme: ThemePreference) = update { copy(theme = theme) }
 
     private suspend fun update(transform: AppSettings.() -> AppSettings) {

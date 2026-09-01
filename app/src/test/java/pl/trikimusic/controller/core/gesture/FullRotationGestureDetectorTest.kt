@@ -82,7 +82,7 @@ class FullRotationGestureDetectorTest {
     }
 
     @Test
-    fun filteredPhysicalTurnTriggersAt270DegreesButNotAt240Degrees() {
+    fun filteredPhysicalTurnTriggersAt200DegreesButNotAt160Degrees() {
         val detector = FullRotationGestureDetector()
         val filter = SensorFilter()
         val directions = mutableListOf<RotationGestureDirection>()
@@ -92,7 +92,7 @@ class FullRotationGestureDetectorTest {
             val raw = sample(timestampNanos, Vector3(0f, 0f, 1f), 0f).source
             detector.process(filter.process(raw, CalibrationProfile()))
         }
-        repeat(100) {
+        repeat(65) {
             timestampNanos += SAMPLE_PERIOD_NANOS
             val raw = sample(timestampNanos, Vector3(0f, 0f, 1f), 120f).source
             detector.process(filter.process(raw, CalibrationProfile())).takeIf { it.triggered }
@@ -101,7 +101,7 @@ class FullRotationGestureDetectorTest {
 
         assertTrue(directions.isEmpty())
 
-        repeat(13) {
+        repeat(48) {
             timestampNanos += SAMPLE_PERIOD_NANOS
             val raw = sample(timestampNanos, Vector3(0f, 0f, 1f), 120f).source
             detector.process(filter.process(raw, CalibrationProfile())).takeIf { it.triggered }

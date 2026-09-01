@@ -13,6 +13,13 @@ public enum TrikiConnectionState
     Error,
 }
 
+public enum MultiDeviceArbitrationMode
+{
+    MediaPriority = 0,
+    AlwaysConnect = 1,
+    OnlyWhenPlaying = 2,
+}
+
 public sealed record TrikiDeviceInfo(ulong BluetoothAddress, string Name, short Rssi)
 {
     public string AddressDisplay => string.Join(":", Enumerable.Range(0, 6)
@@ -82,6 +89,7 @@ public sealed class AppSettings
     public string? KnownDeviceName { get; set; }
     public bool AutoReconnect { get; set; } = true;
     public bool ConnectOnlyWhenNeeded { get; set; }
+    public MultiDeviceArbitrationMode MultiDeviceArbitration { get; set; } = MultiDeviceArbitrationMode.MediaPriority;
     public bool StartWithWindows { get; set; }
     public string Theme { get; set; } = "System";
     public MediaAction SingleClickAction { get; set; } = MediaAction.PlayPause;

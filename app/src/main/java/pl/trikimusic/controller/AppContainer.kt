@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import pl.trikimusic.controller.core.bluetooth.TrikiBleManager
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.core.permissions.PermissionManager
@@ -37,4 +38,30 @@ class AppContainer(application: Application) {
     val ratingFeedback = RatingFeedbackPlayer(logger)
     val runtime = TrikiRuntime(scope, bleManager, settingsRepository, actionMapper, ratingFeedback, logger)
     val fakeTrikiDataSource = FakeTrikiDataSource()
+
+    init {
+        val powerManager = application.getSystemService(android.os.PowerManager::class.java)
+        var lastPlaybackTimeMillis: Long? = null
+
+        scope.launch {
+            mediaController.state.collect { mediaState ->
+                if (mediaState.isPlaying) {
+                    lastPlaybackTimeMillis = System.currentTimeMillis()
+                    bleManager.notifyMediaPlaybackStarted()
+                }
+            }
+        }
+
+        scope.launch {
+            settings.collect { currentSettings ->
+                bleManager.configureArbitration(currentSettings.multiDeviceArbitration)
+            }
+        }
+
+        bleManager.setMediaStateProviders(
+            isMediaPlaying = { mediaController.state.value.isPlaying },
+            lastPlaybackTimeMillis = { lastPlaybackTimeMillis },
+            isScreenInteractive = { powerManager?.isInteractive ?: true },
+        )
+    }
 }

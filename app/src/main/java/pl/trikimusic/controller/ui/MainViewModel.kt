@@ -246,6 +246,10 @@ class MainViewModel(
         container.settingsRepository.setEnableSoundFeedback(enabled)
     }
 
+    fun setMultiDeviceArbitration(mode: pl.trikimusic.controller.domain.model.MultiDeviceArbitrationMode) = launchHandled {
+        container.settingsRepository.setMultiDeviceArbitration(mode)
+    }
+
     fun setTheme(theme: ThemePreference) = launchHandled { container.settingsRepository.setTheme(theme) }
 
     fun setLed(enabled: Boolean) {

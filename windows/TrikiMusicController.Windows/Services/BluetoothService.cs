@@ -29,6 +29,10 @@ public sealed class BluetoothService : IDisposable
     private string? _knownName;
     private bool _autoReconnect = true;
     private volatile bool _connectOnlyWhenNeeded;
+    private volatile MultiDeviceArbitrationMode _arbitrationMode = MultiDeviceArbitrationMode.MediaPriority;
+    private Func<bool>? _isMediaPlayingProvider;
+    private Func<DateTimeOffset?>? _lastPlaybackTimeProvider;
+    private Func<bool>? _isUserActiveProvider;
     private volatile bool _waitingForWake;
     private volatile bool _wakeWatcherArmed;
     private bool _manualDisconnect;
@@ -43,19 +47,32 @@ public sealed class BluetoothService : IDisposable
     public event EventHandler<TrikiSensorData>? SampleReceived;
     public BluetoothSnapshot State { get; private set; } = BluetoothSnapshot.Initial;
 
+    public void SetMediaStateProviders(
+        Func<bool> isMediaPlaying,
+        Func<DateTimeOffset?> lastPlaybackTime,
+        Func<bool> isUserActive)
+    {
+        _isMediaPlayingProvider = isMediaPlaying;
+        _lastPlaybackTimeProvider = lastPlaybackTime;
+        _isUserActiveProvider = isUserActive;
+    }
+
     public void ConfigureRememberedDevice(
         ulong? address,
         string? name,
         bool autoReconnect,
-        bool connectOnlyWhenNeeded)
+        bool connectOnlyWhenNeeded,
+        MultiDeviceArbitrationMode arbitrationMode = MultiDeviceArbitrationMode.MediaPriority)
     {
         var configurationChanged = _knownAddress != address ||
             _autoReconnect != autoReconnect ||
-            _connectOnlyWhenNeeded != connectOnlyWhenNeeded;
+            _connectOnlyWhenNeeded != connectOnlyWhenNeeded ||
+            _arbitrationMode != arbitrationMode;
         _knownAddress = address;
         _knownName = string.IsNullOrWhiteSpace(name) ? "Triki" : name;
         _autoReconnect = autoReconnect;
         _connectOnlyWhenNeeded = connectOnlyWhenNeeded;
+        _arbitrationMode = arbitrationMode;
         _manualDisconnect = false;
         if (!configurationChanged) return;
         if (!autoReconnect || address is null)
@@ -304,6 +321,13 @@ public sealed class BluetoothService : IDisposable
         if (!knownMatch || !_autoReconnect || _manualDisconnect ||
             State.ConnectionState is TrikiConnectionState.Connecting or TrikiConnectionState.Ready) return;
 
+        var isMediaPlaying = _isMediaPlayingProvider?.Invoke() ?? false;
+        var isUserActive = _isUserActiveProvider?.Invoke() ?? false;
+        var lastPlayback = _lastPlaybackTimeProvider?.Invoke();
+
+        if (!MultiDeviceArbitrationPolicy.ShouldAttemptConnection(_arbitrationMode, isMediaPlaying, isUserActive))
+            return;
+
         if (now - _lastAutoConnectAttemptNanos < AutoConnectCooldownNanos) return;
 
         if (_connectOnlyWhenNeeded && _waitingForWake)
@@ -313,7 +337,37 @@ public sealed class BluetoothService : IDisposable
         }
 
         _lastAutoConnectAttemptNanos = now;
-        _ = ConnectAsync(device, userInitiated: false);
+
+        var delay = MultiDeviceArbitrationPolicy.CalculateConnectionDelay(
+            _arbitrationMode, isMediaPlaying, lastPlayback, isUserActive, DateTimeOffset.UtcNow);
+
+        if (delay <= TimeSpan.Zero)
+        {
+            _ = ConnectAsync(device, userInitiated: false);
+        }
+        else
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(delay).ConfigureAwait(false);
+                if (_disposed || _manualDisconnect || !_autoReconnect) return;
+                if (State.ConnectionState is TrikiConnectionState.Connecting or TrikiConnectionState.Ready) return;
+                await ConnectAsync(device, userInitiated: false).ConfigureAwait(false);
+            });
+        }
+    }
+
+    public void NotifyMediaPlaybackStarted()
+    {
+        if (_disposed || _knownAddress is null || !_autoReconnect || State.ConnectionState is TrikiConnectionState.Ready or TrikiConnectionState.Connecting)
+            return;
+
+        _lastAutoConnectAttemptNanos = 0;
+        if (State.ConnectionState == TrikiConnectionState.WaitingForWake)
+        {
+            CancelWakeWatcher();
+            UpdateState(state => state with { ConnectionState = TrikiConnectionState.WaitingForDevice });
+        }
     }
 
     private void WatcherOnStopped(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementWatcherStoppedEventArgs args)
