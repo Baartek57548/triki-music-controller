@@ -172,7 +172,7 @@
                                     </Grid.ColumnDefinitions>
                                     <SymbolIcon Symbol="Next" VerticalAlignment="Center" Foreground="{StaticResource BrandAccentBrush}" />
                                     <StackPanel Grid.Column="1" Spacing="2">
-                                        <TextBlock Text="Obrót w lewo ↺" FontWeight="SemiBold" />
+                                        <TextBlock Text="Obrót w lewo" FontWeight="SemiBold" />
                                         <TextBlock Text="Następny utwór" Style="{StaticResource MetadataTextStyle}" />
                                     </StackPanel>
                                 </Grid>
@@ -186,7 +186,7 @@
                                     </Grid.ColumnDefinitions>
                                     <SymbolIcon Symbol="Previous" VerticalAlignment="Center" Foreground="{StaticResource BrandAccentBrush}" />
                                     <StackPanel Grid.Column="1" Spacing="2">
-                                        <TextBlock Text="Obrót w prawo ↻" FontWeight="SemiBold" />
+                                        <TextBlock Text="Obrót w prawo" FontWeight="SemiBold" />
                                         <TextBlock Text="Poprzedni utwór" Style="{StaticResource MetadataTextStyle}" />
                                     </StackPanel>
                                 </Grid>
@@ -223,7 +223,7 @@
                         </Border>
 
                         <TextBlock Style="{StaticResource MetadataTextStyle}">
-                            <Run Text="💡 Kąt obrotu można dostosować w zakresie 90°–360° w zakładce Ustawienia." />
+                            <Run Text="Kąt obrotu można dostosować w zakresie 90°–360° w zakładce Ustawienia." />
                         </TextBlock>
                     </StackPanel>
                 </Border>

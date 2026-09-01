@@ -9,6 +9,14 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "2.9.9",
+            "Uporządkowanie zakładki Sterowanie w Windows",
+            [
+                "Usunięto emotikony i zbędne symbole z zakładki Sterowanie w aplikacji Windows.",
+                "Uporządkowano opisy i etykiety nawigacji gestami w interfejsie WinUI 3.",
+                "Zapewniono spójność wizualną pomiędzy kafelkami kierunków i panelami telemetrii."
+            ]),
+        new ReleaseHighlight(
             "2.9.8",
             "Usprawnienia skalowania i odnośnik do repozytorium",
             [

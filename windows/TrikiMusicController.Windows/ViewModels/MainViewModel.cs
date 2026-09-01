@@ -155,7 +155,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             { WithinTiltRange: false } => "Utrzymuj kapsel górną stroną do góry w zakresie przechyłu 0–25°.",
             { AccelerationStable: false } => "Gwałtowny ruch przerwał przygotowanie. Trzymaj kapsel spokojnie.",
             { TiltStable: false } => "Utrzymaj pozycję przez 2 sekundy i unikaj szarpnięć.",
-            _ => "Obracaj kapsel w poziomie wokół osi Z: ↻ w prawo = głośniej, ↺ w lewo = ciszej.",
+            _ => "Obracaj kapsel w poziomie wokół osi Z: w prawo = głośniej, w lewo = ciszej.",
         }
         : "Połącz Triki, aby uruchomić gesty i regulację głośności.";
     public string VolumeTechnicalDetails => _lastRuntime.Volume is { } volume
