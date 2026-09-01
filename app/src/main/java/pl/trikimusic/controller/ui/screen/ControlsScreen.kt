@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -27,7 +29,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -54,6 +55,7 @@ import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.ui.MainUiState
 import pl.trikimusic.controller.ui.MainViewModel
+import pl.trikimusic.controller.ui.components.InfoDialog
 import pl.trikimusic.controller.ui.components.SectionTitle
 import pl.trikimusic.controller.ui.components.TrikiCard
 import pl.trikimusic.controller.ui.components.VolumeGateState
@@ -67,9 +69,14 @@ fun ControlsScreen(
 ) {
     var selectedClick by remember { mutableStateOf<ButtonClickType?>(null) }
     var showVolumeDetails by remember { mutableStateOf(false) }
+    var showVolumeInfo by remember { mutableStateOf(false) }
+    var showRotationInfo by remember { mutableStateOf(false) }
+    var showButtonInfo by remember { mutableStateOf(false) }
+
     val sample = state.runtime.latestSample
     val volumePresentation = state.volumeControlPresentation()
     val rotationProgress = state.runtime.rotationGestureProgress.coerceIn(0f, 1f)
+    val angle = state.settings.rotationAngleDegrees
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -84,8 +91,8 @@ fun ControlsScreen(
         item {
             SectionTitle(
                 title = "Głośność i żyroskop",
-                subtitle = "Płynna regulacja dźwięku po ustabilizowaniu kąta kapsla.",
                 icon = Icons.AutoMirrored.Filled.VolumeUp,
+                onInfoClick = { showVolumeInfo = true },
             )
         }
 
@@ -147,12 +154,6 @@ fun ControlsScreen(
                         }
                     }
 
-                    Text(
-                        volumePresentation.instruction,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
                     TextButton(
                         onClick = { showVolumeDetails = !showVolumeDetails },
                         modifier = Modifier.align(Alignment.End),
@@ -162,6 +163,7 @@ fun ControlsScreen(
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
+                        Spacer(Modifier.size(4.dp))
                         Text(if (showVolumeDetails) "Ukryj telemetrię" else "Pokaż telemetrię")
                     }
 
@@ -197,34 +199,61 @@ fun ControlsScreen(
         item {
             SectionTitle(
                 title = "Gesty obrotu (Zmiana utworu)",
-                subtitle = "Odwróć kontroler i obróć o zadany kąt wokół osi Z.",
                 icon = Icons.Default.SwapHoriz,
+                onInfoClick = { showRotationInfo = true },
             )
         }
 
         item {
-            val angle = state.settings.rotationAngleDegrees
             TrikiCard {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(
-                        "Nawigacja obrotem $angle°",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            ) {
+                                Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.padding(6.dp).size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                            Text("Lewo: Następny", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
 
-                    GestureActionRow(Icons.Default.SkipNext, "Ruch dłoni w lewo", "Następny utwór")
-                    GestureActionRow(Icons.Default.SkipPrevious, "Ruch dłoni w prawo", "Poprzedni utwór")
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        ) {
+                            Text(
+                                "$angle°",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
 
-                    Text(
-                        "Kapsel jest odwrócony górą do dołu, dlatego liczy się kierunek ruchu Twojej dłoni. Po odwróceniu odczekaj 0,5 s na stabilizację, a następnie wykonaj obrót.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            ) {
+                                Icon(Icons.Default.SkipPrevious, contentDescription = null, modifier = Modifier.padding(6.dp).size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                            Text("Prawo: Poprzedni", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
 
                     if (
                         (state.runtime.rotationGesturePhase == HoldGesturePhase.HOLDING && state.runtime.rotationGestureFaceDown) ||
@@ -247,31 +276,23 @@ fun ControlsScreen(
 
                     Text(
                         when (state.runtime.rotationGesturePhase) {
-                            HoldGesturePhase.IDLE -> "Gotowe — odwróć kapsel i odczekaj 0,5 s."
+                            HoldGesturePhase.IDLE -> "Gotowe — odwróć kapsel dnem do góry."
                             HoldGesturePhase.HOLDING -> if (state.runtime.rotationGestureFaceDown) {
-                                "Odwrócenie potwierdzone — stabilizacja %.0f%%".format(rotationProgress * 100f)
+                                "Stabilizacja pozycji: %.0f%%".format(rotationProgress * 100f)
                             } else {
-                                "Odwróć kapsel górą w dół i uspokój go przed ruchem."
+                                "Odwróć kapsel górą w dół."
                             }
-                            HoldGesturePhase.READY -> "Gotowe — obróć o $angle°: lewo = następny, prawo = poprzedni."
+                            HoldGesturePhase.READY -> "Gotowy — obróć dłoń o $angle°."
                             HoldGesturePhase.TRACKING -> when (state.runtime.rotationGestureDirection) {
-                                RotationGestureDirection.LEFT -> "Następny utwór — ruch w lewo: %.0f° / $angle°".format(rotationProgress * angle)
-                                RotationGestureDirection.RIGHT -> "Poprzedni utwór — ruch w prawo: %.0f° / $angle°".format(rotationProgress * angle)
-                                null -> "Potwierdzam kierunek obrotu…"
+                                RotationGestureDirection.LEFT -> "Ruch w lewo: %.0f° / $angle°".format(rotationProgress * angle)
+                                RotationGestureDirection.RIGHT -> "Ruch w prawo: %.0f° / $angle°".format(rotationProgress * angle)
+                                null -> "Rozpoznawanie kierunku…"
                             }
-                            HoldGesturePhase.COMPLETING -> when (state.runtime.rotationGestureDirection) {
-                                RotationGestureDirection.LEFT -> "Następny utwór — dokończ ruch w lewo do $angle°."
-                                RotationGestureDirection.RIGHT -> "Poprzedni utwór — dokończ ruch w prawo do $angle°."
-                                null -> "Dokończ obrót do $angle°."
-                            }
-                            HoldGesturePhase.REARMING -> "Uspokój ruch na moment przed kolejną próbą."
-                            HoldGesturePhase.TRIGGERED -> when (state.runtime.rotationGestureDirection) {
-                                RotationGestureDirection.LEFT -> "Następny utwór — rozpoznano ruch w lewo."
-                                RotationGestureDirection.RIGHT -> "Poprzedni utwór — rozpoznano ruch w prawo."
-                                null -> "Zmiana utworu wysłana."
-                            }
+                            HoldGesturePhase.COMPLETING -> "Dokończ ruch do $angle°."
+                            HoldGesturePhase.REARMING -> "Chwila przerwy przed kolejnym ruchem."
+                            HoldGesturePhase.TRIGGERED -> "Zmiana utworu wysłana."
                         },
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -282,8 +303,8 @@ fun ControlsScreen(
         item {
             SectionTitle(
                 title = "Mapowanie przycisku fizycznego",
-                subtitle = "Kliknij element, aby zmienić przypisaną akcję multimedialną.",
                 icon = Icons.Default.TouchApp,
+                onInfoClick = { showButtonInfo = true },
             )
         }
 
@@ -294,7 +315,7 @@ fun ControlsScreen(
                         val action = state.settings.activeProfile.actionFor(click)
                         TextButton(
                             onClick = { selectedClick = click },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(16.dp),
                         ) {
                             Surface(
@@ -317,13 +338,85 @@ fun ControlsScreen(
                                 Text(click.displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                                 Text(action.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             }
-                            Text("Zmień", fontWeight = FontWeight.Bold)
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = "Zmień",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         if (index != ButtonClickType.entries.lastIndex) {
                             HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                         }
                     }
                 }
+            }
+        }
+    }
+
+    if (showVolumeInfo) {
+        InfoDialog(
+            title = "Regulacja głośności żyroskopem",
+            onDismiss = { showVolumeInfo = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "1. Trzymaj kapsel poziomo (przechył 0–25°) przez około 2 sekundy, aby bramka głośności się ustabilizowała.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "2. Gdy status zmieni się na gotowy, powolny obrót kapsla wokół osi Z będzie płynnie regulować głośność systemu.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "3. Gwałtowne potrząśnięcie lub przechylenie kapsla powyżej 25° natychmiast blokuje przypadkową zmianę głośności.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    if (showRotationInfo) {
+        InfoDialog(
+            title = "Zmiana utworu gestem obrotu",
+            onDismiss = { showRotationInfo = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "1. Odwróć kapsel górą do dołu i odczekaj 0,5 sekundy na potwierdzenie orientacji.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "2. Ruch dłoni w lewo (zgodnie z ruchem wskazówek zegara) przełącza na następny utwór.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "3. Ruch dłoni w prawo (przeciwnie do ruchu wskazówek) przełącza na poprzedni utwór.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Wymagany kąt obrotu można dostosować w Ustawieniach (domyślnie 200°).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    if (showButtonInfo) {
+        InfoDialog(
+            title = "Mapowanie przycisku",
+            onDismiss = { showButtonInfo = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Fizyczny przycisk na kapslu pozwala na wysyłanie komend bez dotykania ekranu telefonu.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Kliknij dowolny wiersz na liście, aby przypisać nową akcję dla pojedynczego, podwójnego lub potrójnego kliknięcia.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }
@@ -338,31 +431,6 @@ fun ControlsScreen(
                 selectedClick = null
             },
         )
-    }
-}
-
-@Composable
-private fun GestureActionRow(icon: ImageVector, movement: String, action: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.padding(7.dp).size(18.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Column(Modifier.weight(1f)) {
-            Text(movement, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-            Text(action, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 
@@ -453,3 +521,4 @@ private fun MediaActionDialog(
         },
     )
 }
+

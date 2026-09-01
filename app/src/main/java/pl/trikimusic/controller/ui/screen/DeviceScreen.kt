@@ -81,7 +81,6 @@ fun DeviceScreen(
         item {
             SectionTitle(
                 title = "Połączenie Bluetooth",
-                subtitle = "Stan kontrolera, zarządzanie urządzeniem i wyszukiwanie.",
                 icon = Icons.Default.Bluetooth,
             )
         }
@@ -103,14 +102,10 @@ fun DeviceScreen(
                     LoadingInline(
                         when (state.ble.connectionState) {
                             TrikiConnectionState.SCANNING -> "Szukam aktywnego Triki…"
-                            TrikiConnectionState.CONNECTING -> "Nawiązuję połączenie GATT…"
-                            TrikiConnectionState.CONNECTED -> "Odczytuję usługi i parametry…"
-                            TrikiConnectionState.RECONNECTING -> "Naciśnij przycisk Triki — telefon czeka na wybudzenie…"
-                            TrikiConnectionState.WAITING_FOR_WAKE -> if (state.ble.wakeWatcherArmed) {
-                                "Nasłuch w toku — naciśnij przycisk na kapslu…"
-                            } else {
-                                "Czekam, aż poprzednia sesja całkowicie zaśnie…"
-                            }
+                            TrikiConnectionState.CONNECTING -> "Nawiązuję połączenie…"
+                            TrikiConnectionState.CONNECTED -> "Konfiguruję usługi…"
+                            TrikiConnectionState.RECONNECTING -> "Naciśnij przycisk na kapslu…"
+                            TrikiConnectionState.WAITING_FOR_WAKE -> "Czekam na wybudzenie kapsla…"
                             else -> ""
                         },
                         working,
@@ -130,7 +125,7 @@ fun DeviceScreen(
                             MetricTile(
                                 icon = Icons.Default.BatteryFull,
                                 label = "Bateria",
-                                value = state.ble.battery.percent?.let { "$it%" } ?: "Nieudostępniona",
+                                value = state.ble.battery.percent?.let { "$it%" } ?: "—",
                             )
                             MetricTile(
                                 icon = Icons.Default.SignalCellularAlt,
@@ -212,7 +207,7 @@ fun DeviceScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                         ) {
-                            Text("Zapomnij zapamiętane urządzenie")
+                            Text("Zapomnij urządzenie")
                         }
                     }
                 }
@@ -223,7 +218,6 @@ fun DeviceScreen(
             item {
                 SectionTitle(
                     title = "Wykryte kontrolery",
-                    subtitle = "Wybierz urządzenie, aby nawiązać połączenie.",
                 )
             }
             items(state.ble.discoveredDevices, key = TrikiDevice::address) { device ->
@@ -231,7 +225,7 @@ fun DeviceScreen(
             }
         } else if (state.ble.connectionState == TrikiConnectionState.FOUND && state.ble.discoveredDevices.isEmpty()) {
             item {
-                EmptyState("Brak wyników wyszukiwania", "Naciśnij fizyczny przycisk na kapslu Triki, aby go wybudzić, a następnie ponów wyszukiwanie.")
+                EmptyState("Brak wyników wyszukiwania", "Naciśnij fizyczny przycisk na kapslu Triki, aby go wybudzić.")
             }
         }
 
@@ -239,7 +233,6 @@ fun DeviceScreen(
             item {
                 SectionTitle(
                     title = "Informacje o sprzęcie",
-                    subtitle = "Dane techniczne odczytane z kontrolera.",
                     icon = Icons.Default.Info,
                 )
             }
@@ -264,18 +257,17 @@ fun DeviceScreen(
         item {
             SectionTitle(
                 title = "Konfiguracja i uprawnienia",
-                subtitle = "Kalibracja położenia neutralnego oraz dostęp do funkcji systemowych.",
             )
         }
 
         item {
             NavigationRow(
                 icon = Icons.Default.Tune,
-                title = "Kalibracja czujników",
+                title = "Kalibracja czujników IMU",
                 subtitle = if (state.ble.connectionState == TrikiConnectionState.READY) {
-                    "Wyznacz pozycję neutralną, odchylenie i poziom szumu żyroskopu."
+                    "Wyznacz pozycję neutralną i poziom szumu żyroskopu."
                 } else {
-                    "Połącz Triki, aby rozpocząć procedurę kalibracji."
+                    "Wymaga aktywnego połączenia z Triki."
                 },
                 onClick = onCalibration,
                 enabled = state.ble.connectionState == TrikiConnectionState.READY,
@@ -286,7 +278,7 @@ fun DeviceScreen(
             NavigationRow(
                 icon = Icons.Default.Security,
                 title = "Uprawnienia systemowe",
-                subtitle = "Dostęp do Bluetooth w pobliżu, powiadomień usługi i sesji muzycznych.",
+                subtitle = "Bluetooth, powiadomienia i dostęp do multimediów.",
                 onClick = onPermissions,
             )
         }

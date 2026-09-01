@@ -111,23 +111,13 @@ fun InfoScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     InfoSection(
-                        "Połączenie Bluetooth",
-                        "Przy pierwszym uruchomieniu wybudź kapsel fizycznym przyciskiem, wyszukaj go i połącz. Telefon zapamięta kontroler; kolejne naciśnięcie przycisku automatycznie wznawia sesję.",
+                        "O projekcie",
+                        "Triki Music Controller to bezprzewodowy kontroler multimedialny bazujący na sensorach IMU (żyroskop, akcelerometr) oraz Bluetooth LE.",
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     InfoSection(
-                        "Regulacja głośności",
-                        "Utrzymuj przechył kapsla w zakresie 0–25° przez 2 sekundy bez gwałtownych szarpnięć (0,80–1,20 g). Po aktywacji bramki łagodny obrót wokół osi Z płynnie zmienia głośność.",
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                    InfoSection(
-                        "Zmiana utworu i oceny",
-                        "2× klik polubi utwór, 3× klik go odrzuci (potwierdzone tonem). Aby zmienić utwór gestem, odwróć kapsel górą do dołu, odczekaj 0,5 s i obróć dłonią: w lewo = następny, w prawo = poprzedni.",
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                    InfoSection(
-                        "Prywatność i dane",
-                        "Dane telemetryczne, profile przycisków i parametry kalibracji przetwarzane są wyłącznie lokalnie na Twoim urządzeniu.",
+                        "Prywatność i bezpieczeństwo",
+                        "Dane telemetryczne, kalibracja i profile przetwarzane są wyłącznie lokalnie na Twoim telefonie bez wysyłania do chmury.",
                     )
                 }
             }

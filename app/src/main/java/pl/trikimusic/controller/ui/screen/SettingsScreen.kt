@@ -66,7 +66,6 @@ fun SettingsScreen(
         item {
             SectionTitle(
                 title = "Połączenie i zasilanie",
-                subtitle = "Automatyczne wznawianie pracy i oszczędzanie baterii.",
                 icon = Icons.Default.BluetoothConnected,
             )
         }
@@ -76,18 +75,14 @@ fun SettingsScreen(
                 Column {
                     SettingSwitchRow(
                         title = "Sterowanie w tle",
-                        description = "Po naciśnięciu przycisku na kapslu telefon automatycznie wznawia połączenie w tle.",
+                        description = "Automatyczne wznawianie połączenia po naciśnięciu przycisku.",
                         checked = state.settings.backgroundEnabled,
                         onCheckedChange = viewModel::setBackgroundEnabled,
                     )
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     SettingSwitchRow(
-                        title = "Łącz tylko podczas użycia",
-                        description = if (state.settings.connectOnlyWhenNeeded) {
-                            "Po 12 sekundach bezczynności sesja jest usypiana w celu oszczędzania energii."
-                        } else {
-                            "Połączenie pozostaje aktywne przez cały czas działania aplikacji."
-                        },
+                        title = "Oszczędzanie energii",
+                        description = "Usypianie sesji po 12 sekundach bezczynności kontrolera.",
                         checked = state.settings.connectOnlyWhenNeeded,
                         onCheckedChange = viewModel::setConnectOnlyWhenNeeded,
                     )
@@ -97,8 +92,7 @@ fun SettingsScreen(
 
         item {
             SectionTitle(
-                title = "Gest obrotu (Zmiana utworu)",
-                subtitle = "Konfiguracja wymaganego kąta obrotu odwróconym kontrolerem.",
+                title = "Kąt obrotu (Zmiana utworu)",
                 icon = Icons.Default.SwapHoriz,
             )
         }
@@ -114,7 +108,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Kąt wymaganego obrotu", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Wymagany kąt", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
                             "${state.settings.rotationAngleDegrees}°",
                             style = MaterialTheme.typography.titleLarge,
@@ -145,12 +139,6 @@ fun SettingsScreen(
                             )
                         }
                     }
-
-                    Text(
-                        "Obrót odwróconym kapslem w lewo przełącza na następny utwór, w prawo na poprzedni.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
@@ -158,7 +146,6 @@ fun SettingsScreen(
         item {
             SectionTitle(
                 title = "Dźwięki i wygląd",
-                subtitle = "Informacje zwrotne oraz motyw interfejsu aplikacji.",
                 icon = Icons.Default.Palette,
             )
         }
@@ -167,8 +154,8 @@ fun SettingsScreen(
             TrikiCard {
                 Column {
                     SettingSwitchRow(
-                        title = "Sygnał dźwiękowy ocen (Like / Dislike)",
-                        description = "Odtwarzaj krótki ton potwierdzający polubienie (2× klik) lub odrzucenie utworu (3× klik).",
+                        title = "Sygnał ocen Like / Dislike",
+                        description = "Dźwiękowe potwierdzenie polubienia i odrzucenia utworu.",
                         checked = state.settings.enableSoundFeedback,
                         onCheckedChange = viewModel::setEnableSoundFeedback,
                     )
@@ -195,9 +182,8 @@ fun SettingsScreen(
 
         item {
             SectionTitle(
-                title = "Uprawnienia",
-                subtitle = "Zarządzanie dostępem do Bluetooth i odtwarzacza systemowego.",
-                icon = Icons.Default.Security,
+                title = "Narzędzia i diagnostyka",
+                icon = Icons.Default.Code,
             )
         }
 
@@ -205,16 +191,8 @@ fun SettingsScreen(
             NavigationRow(
                 icon = Icons.Default.Security,
                 title = "Uprawnienia systemowe",
-                subtitle = "Sprawdź status dostępu do urządzeń w pobliżu i powiadomień.",
+                subtitle = "Bluetooth, powiadomienia i odtwarzacz.",
                 onClick = onPermissions,
-            )
-        }
-
-        item {
-            SectionTitle(
-                title = "Narzędzia diagnostyczne",
-                subtitle = "Funkcje dla programistów oraz inspekcja pakietów BLE.",
-                icon = Icons.Default.Code,
             )
         }
 
@@ -222,7 +200,7 @@ fun SettingsScreen(
             TrikiCard {
                 SettingSwitchRow(
                     title = "Tryb deweloperski",
-                    description = "Aktywuje podgląd surowych danych telemetrycznych IMU, inspektor GATT i analizator pakietów.",
+                    description = "Dostęp do monitora IMU i inspektora Bluetooth LE.",
                     checked = state.settings.developerMode,
                     onCheckedChange = viewModel::setDeveloperMode,
                 )
@@ -233,8 +211,8 @@ fun SettingsScreen(
             item {
                 NavigationRow(
                     icon = Icons.Default.Sensors,
-                    title = "Monitor czujników (IMU)",
-                    subtitle = "Wykresy przyspieszenia, żyroskopu i symulacja kliknięć.",
+                    title = "Monitor czujników IMU",
+                    subtitle = "Wykresy przyspieszenia i żyroskopu na żywo.",
                     onClick = onSensor,
                 )
             }
@@ -242,25 +220,17 @@ fun SettingsScreen(
                 NavigationRow(
                     icon = Icons.Default.BugReport,
                     title = "Inspektor Bluetooth LE",
-                    subtitle = "Struktura usług GATT, pakiety RAW i dziennik zdarzeń.",
+                    subtitle = "Struktura GATT i dziennik pakietów RAW.",
                     onClick = onInspector,
                 )
             }
         }
 
         item {
-            SectionTitle(
-                title = "Informacje o projekcie",
-                subtitle = "Wersja, licencja, dziennik zmian i autorzy.",
-                icon = Icons.Default.Info,
-            )
-        }
-
-        item {
             NavigationRow(
                 icon = Icons.Default.Info,
                 title = "O aplikacji Triki",
-                subtitle = "Informacje o wydaniu, repozytorium GitHub i diagnostyka.",
+                subtitle = "Wersja, licencja i informacje o projekcie.",
                 onClick = onInfo,
             )
         }
@@ -270,9 +240,9 @@ fun SettingsScreen(
 @Composable
 private fun SettingSwitchRow(
     title: String,
-    description: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    description: String? = null,
 ) {
     Row(
         modifier = Modifier
@@ -284,9 +254,12 @@ private fun SettingSwitchRow(
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (description != null) {
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         Switch(checked = checked, onCheckedChange = null)
     }
 }
+
 

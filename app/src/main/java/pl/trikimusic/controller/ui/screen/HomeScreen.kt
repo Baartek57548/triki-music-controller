@@ -2,11 +2,13 @@ package pl.trikimusic.controller.ui.screen
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -45,6 +48,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +65,7 @@ import pl.trikimusic.controller.core.gesture.RotationGestureDirection
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.TrikiConnectionState
 import pl.trikimusic.controller.ui.MainUiState
+import pl.trikimusic.controller.ui.components.InfoDialog
 import pl.trikimusic.controller.ui.components.MetricTile
 import pl.trikimusic.controller.ui.components.StatusPill
 import pl.trikimusic.controller.ui.components.TrikiCard
@@ -73,6 +81,8 @@ fun HomeScreen(
     onOpenDevice: () -> Unit,
     onOpenPermissions: () -> Unit,
 ) {
+    var showGesturesHelp by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -85,10 +95,17 @@ fun HomeScreen(
     ) {
         item { TrikiHeroStatusCard(state, onOpenDevice) }
         item { NowPlayingCard(state, onMediaAction, onOpenPermissions) }
-        item { ControllerLiveCard(state) }
+        item { ControllerLiveCard(state, onOpenHelp = { showGesturesHelp = true }) }
         state.runtime.lastActionError?.let { message ->
             item { InlineControlError(message) }
         }
+    }
+
+    if (showGesturesHelp) {
+        GesturesHelpDialog(
+            angle = state.settings.rotationAngleDegrees,
+            onDismiss = { showGesturesHelp = false },
+        )
     }
 }
 
@@ -133,7 +150,7 @@ private fun TrikiHeroStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
                     )
                     Text(
                         connectionSummary(state),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -150,38 +167,22 @@ private fun TrikiHeroStatusCard(state: MainUiState, onOpenDevice: () -> Unit) {
                     MetricTile(
                         icon = Icons.Default.BatteryFull,
                         label = "Bateria",
-                        value = state.ble.battery.percent?.let { "$it%" } ?: "Brak danych",
+                        value = state.ble.battery.percent?.let { "$it%" } ?: "—",
                     )
                     MetricTile(
                         icon = Icons.Default.SignalCellularAlt,
                         label = "Sygnał",
                         value = signalQualityLabel(state.ble.rssi),
                     )
-                    OutlinedButton(
-                        onClick = onOpenDevice,
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    ) {
-                        Text("Zarządzaj")
-                    }
                 }
-            } else {
-                Text(
-                    connectionInstruction(state),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (state.ble.connectionState == TrikiConnectionState.ERROR) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-                Button(
-                    onClick = onOpenDevice,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                ) {
-                    Text(connectionActionLabel(state.ble.connectionState), fontWeight = FontWeight.SemiBold)
-                }
+            }
+
+            Button(
+                onClick = onOpenDevice,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text(connectionActionLabel(state.ble.connectionState), fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -193,7 +194,8 @@ private fun NowPlayingCard(
     onMediaAction: (MediaAction) -> Unit,
     onOpenPermissions: () -> Unit,
 ) {
-    val hasMetadata = state.media.hasPermission && state.media.hasActiveSession
+    val hasTrack = !state.media.title.isNullOrBlank()
+
     TrikiCard {
         Column(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -201,100 +203,72 @@ private fun NowPlayingCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "TERAZ ODTWARZANE",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                if (hasMetadata && state.media.appName != null) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                    ) {
-                        Text(
-                            state.media.appName,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (hasMetadata && state.media.artworkUri != null) {
-                    AsyncImage(
-                        model = state.media.artworkUri,
-                        contentDescription = "Okładka albumu",
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(RoundedCornerShape(18.dp)),
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(18.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.size(36.dp),
-                            tint = MaterialTheme.colorScheme.primary,
+                Surface(
+                    modifier = Modifier.size(80.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    if (state.media.artworkUri != null) {
+                        AsyncImage(
+                            model = state.media.artworkUri,
+                            contentDescription = "Okładka albumu",
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)),
                         )
+                    } else {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            )
+                        }
                     }
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Text(
-                        when {
-                            hasMetadata -> state.media.title ?: "Nieznany utwór"
-                            !state.media.hasPermission -> "Sterowanie muzyką"
-                            else -> "Brak aktywnego odtwarzania"
-                        },
+                        if (hasTrack) state.media.title.orEmpty() else "Brak odtwarzanego utworu",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        when {
-                            hasMetadata -> state.media.artist ?: state.media.album ?: "Nieznany wykonawca"
-                            !state.media.hasPermission -> "Sterowanie działa w tle; dostęp do tytułu i okładki jest opcjonalny."
-                            else -> "Uruchom odtwarzanie w Spotify, YouTube Music lub innej aplikacji."
-                        },
+                        if (hasTrack) state.media.artist ?: "Nieznany wykonawca" else "Uruchom odtwarzacz muzyki",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (hasMetadata) {
-                        Text(
-                            if (state.media.isPlaying) "Odtwarzanie aktywne" else "Wstrzymano",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (state.media.isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                    state.media.appName?.let { app ->
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        ) {
+                            Text(
+                                app,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
                     }
                 }
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             MediaControls(
                 isPlaying = state.media.isPlaying,
                 onMediaAction = onMediaAction,
             )
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -309,7 +283,7 @@ private fun NowPlayingCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("Głośność systemowa", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Głośność", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${state.media.volumePercent}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                     LinearProgressIndicator(
@@ -327,7 +301,7 @@ private fun NowPlayingCard(
 
             if (!state.media.hasPermission) {
                 OutlinedButton(onClick = onOpenPermissions, modifier = Modifier.fillMaxWidth()) {
-                    Text("Nadaj dostęp do okładek i tytułów")
+                    Text("Nadaj dostęp do powiadomień multimediów")
                 }
             }
         }
@@ -384,9 +358,13 @@ private fun MediaControls(
 }
 
 @Composable
-private fun ControllerLiveCard(state: MainUiState) {
+private fun ControllerLiveCard(
+    state: MainUiState,
+    onOpenHelp: () -> Unit,
+) {
     val presentation = controllerPresentation(state)
     val angle = state.settings.rotationAngleDegrees
+
     TrikiCard(
         containerColor = if (presentation.ready) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.40f)
@@ -418,27 +396,18 @@ private fun ControllerLiveCard(state: MainUiState) {
                     Text("Sterowanie Triki", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(presentation.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
-                state.runtime.lastAction?.takeIf { it != MediaAction.NONE }?.let { action ->
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    ) {
-                        Text(
-                            action.displayName,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                IconButton(
+                    onClick = onOpenHelp,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = "Przewodnik po gestach",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
-
-            Text(
-                presentation.instruction,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
             presentation.progress?.let { progress ->
                 LinearProgressIndicator(
@@ -447,30 +416,85 @@ private fun ControllerLiveCard(state: MainUiState) {
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-            ControlHintRow(Icons.AutoMirrored.Filled.VolumeUp, "Pochylenie i obrót", "Płynna regulacja głośności")
-            ControlHintRow(Icons.Default.SwapHoriz, "Odwrócenie + obrót $angle°", "Lewo: następny • prawo: poprzedni")
-            ControlHintRow(Icons.Default.TouchApp, "Fizyczny przycisk", "1× Play/Pause • 2× Like • 3× Dislike")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                    modifier = Modifier.weight(1f).clickable { onOpenHelp() },
+                ) {
+                    Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(2.dp))
+                        Text("Głośność", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                    modifier = Modifier.weight(1f).clickable { onOpenHelp() },
+                ) {
+                    Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.SwapHoriz, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(2.dp))
+                        Text("Obrót $angle°", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                    modifier = Modifier.weight(1f).clickable { onOpenHelp() },
+                ) {
+                    Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.TouchApp, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(2.dp))
+                        Text("Przycisk", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ControlHintRow(icon: ImageVector, gesture: String, result: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+private fun GesturesHelpDialog(angle: Int, onDismiss: () -> Unit) {
+    InfoDialog(title = "Przewodnik po gestach Triki", onDismiss = onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            HelpItem(
+                icon = Icons.AutoMirrored.Filled.VolumeUp,
+                title = "Regulacja głośności",
+                description = "Trzymaj kapsel w pozycji zbliżonej do poziomej (przechył 0–25°) przez około 2 sekundy. Po ustabilizowaniu obracaj kapsel wokół osi Z, aby płynnie zmieniać poziom dźwięku.",
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+            HelpItem(
+                icon = Icons.Default.SwapHoriz,
+                title = "Zmiana utworu (obrót $angle°)",
+                description = "Odwróć kapsel górą w dół i odczekaj 0,5 s na potwierdzenie pozycji. Następnie obróć dłoń: ruch w lewo przełącza na następny utwór, a ruch w prawo na poprzedni.",
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+            HelpItem(
+                icon = Icons.Default.TouchApp,
+                title = "Przycisk fizyczny",
+                description = "1× kliknięcie: Play/Pause. 2× kliknięcia: Polubienie utworu (Like). 3× kliknięcia: Odrzucenie utworu (Dislike).",
+            )
+        }
+    }
+}
+
+@Composable
+private fun HelpItem(icon: ImageVector, title: String, description: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
             shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(7.dp).size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp).size(18.dp), tint = MaterialTheme.colorScheme.primary)
         }
-        Column(Modifier.weight(1f)) {
-            Text(gesture, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-            Text(result, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -497,35 +521,14 @@ private fun connectionSummary(state: MainUiState): String = when (state.ble.conn
     TrikiConnectionState.READY -> state.ble.selectedDevice?.address
         ?: state.settings.knownDeviceAddress
         ?: "Połączono"
-    TrikiConnectionState.SCANNING -> "Wyszukiwanie aktywnego kontrolera…"
-    TrikiConnectionState.FOUND -> "Wykryto kontroler Triki"
+    TrikiConnectionState.SCANNING -> "Wyszukiwanie…"
+    TrikiConnectionState.FOUND -> "Wykryto kontroler"
     TrikiConnectionState.CONNECTING -> "Nawiązywanie połączenia…"
-    TrikiConnectionState.CONNECTED -> "Konfigurowanie usług urządzenia…"
-    TrikiConnectionState.WAITING_FOR_WAKE -> if (state.ble.wakeWatcherArmed) {
-        "Nasłuch w toku — naciśnij przycisk na kapslu"
-    } else {
-        "Oczekiwanie na przejście w stan uśpienia…"
-    }
-    TrikiConnectionState.RECONNECTING -> "Oczekiwanie na wybudzenie Triki…"
-    TrikiConnectionState.ERROR -> state.ble.errorMessage ?: "Wystąpił błąd połączenia"
-    TrikiConnectionState.DISCONNECTED -> state.settings.knownDeviceAddress?.let { "Zapamiętano: $it" } ?: "Brak połączonego urządzenia"
-}
-
-private fun connectionInstruction(state: MainUiState): String = when (state.ble.connectionState) {
-    TrikiConnectionState.DISCONNECTED -> if (state.settings.knownDeviceAddress != null) {
-        "Naciśnij przycisk na kapslu Triki, aby wybudzić urządzenie i wznowić połączenie."
-    } else {
-        "Naciśnij przycisk na kapslu Triki, a następnie kliknij przycisk poniżej, aby wyszukać kontroler."
-    }
-    TrikiConnectionState.SCANNING -> "Szukam urządzenia Triki w pobliżu. Upewnij się, że kapsel jest wybudzony."
-    TrikiConnectionState.FOUND -> "Znaleziono kontroler Triki. Trwa przygotowanie do połączenia."
-    TrikiConnectionState.CONNECTING -> "Łączę z kontrolerem Triki…"
-    TrikiConnectionState.CONNECTED -> "Odczytuję stan czujników i informacje o urządzeniu…"
-    TrikiConnectionState.WAITING_FOR_WAKE,
-    TrikiConnectionState.RECONNECTING,
-    -> "Naciśnij przycisk na kapslu Triki — telefon automatycznie wznowi połączenie."
-    TrikiConnectionState.ERROR -> state.ble.errorMessage ?: "Nie udało się połączyć z Triki. Naciśnij przycisk na kapslu i spróbuj ponownie."
-    TrikiConnectionState.READY -> "Sterowanie jest aktywne."
+    TrikiConnectionState.CONNECTED -> "Konfigurowanie…"
+    TrikiConnectionState.WAITING_FOR_WAKE -> "Oczekiwanie na wybudzenie…"
+    TrikiConnectionState.RECONNECTING -> "Wznawianie połączenia…"
+    TrikiConnectionState.ERROR -> state.ble.errorMessage ?: "Błąd połączenia"
+    TrikiConnectionState.DISCONNECTED -> state.settings.knownDeviceAddress?.let { "Zapamiętano: $it" } ?: "Brak urządzenia"
 }
 
 private fun connectionActionLabel(state: TrikiConnectionState): String = when (state) {
@@ -545,7 +548,6 @@ private data class ControllerCardPresentation(
     val ready: Boolean,
     val error: Boolean,
     val title: String,
-    val instruction: String,
     val progress: Float?,
 )
 
@@ -556,8 +558,7 @@ private fun controllerPresentation(state: MainUiState): ControllerCardPresentati
         state.ble.connectionState != TrikiConnectionState.READY -> ControllerCardPresentation(
             ready = false,
             error = false,
-            title = "Kontroler uśpiony lub rozłączony",
-            instruction = "Naciśnij przycisk na kapslu Triki, aby uruchomić sterowanie.",
+            title = "Kontroler rozłączony",
             progress = null,
         )
 
@@ -571,54 +572,48 @@ private fun controllerPresentation(state: MainUiState): ControllerCardPresentati
             HoldGesturePhase.HOLDING -> ControllerCardPresentation(
                 ready = false,
                 error = false,
-                title = "Przygotowanie zmiany utworu",
-                instruction = if (state.runtime.rotationGestureFaceDown) {
-                    "Kapsel odwrócony — stabilizacja %.0f%%".format(state.runtime.rotationGestureProgress * 100f)
+                title = if (state.runtime.rotationGestureFaceDown) {
+                    "Stabilizacja pozycji: %.0f%%".format(state.runtime.rotationGestureProgress * 100f)
                 } else {
-                    "Odwróć kapsel górą w dół i uspokój go przed ruchem."
+                    "Odwróć kapsel górą w dół"
                 },
                 progress = state.runtime.rotationGestureProgress,
             )
             HoldGesturePhase.READY -> ControllerCardPresentation(
                 ready = true,
                 error = false,
-                title = "Obróć o $rotationAngle°",
-                instruction = "Ruch w lewo = następny utwór, ruch w prawo = poprzedni.",
+                title = "Gotowy do obrotu ($rotationAngle°)",
                 progress = null,
             )
             HoldGesturePhase.TRACKING -> {
                 val dir = when (state.runtime.rotationGestureDirection) {
                     RotationGestureDirection.LEFT -> "w lewo (następny)"
                     RotationGestureDirection.RIGHT -> "w prawo (poprzedni)"
-                    null -> "obrotu"
+                    null -> "obrót"
                 }
                 ControllerCardPresentation(
                     ready = true,
                     error = false,
-                    title = "Rozpoznawanie: $dir",
-                    instruction = "Postęp obrotu: %.0f° / $rotationAngle°".format(state.runtime.rotationGestureProgress * rotationAngle),
+                    title = "Obrót $dir: %.0f°".format(state.runtime.rotationGestureProgress * rotationAngle),
                     progress = state.runtime.rotationGestureProgress,
                 )
             }
             HoldGesturePhase.COMPLETING -> ControllerCardPresentation(
                 ready = true,
                 error = false,
-                title = "Dokończ obrót do $rotationAngle°",
-                instruction = "Wykonaj pełny ruch, aby zmienić utwór.",
+                title = "Dokończ ruch do $rotationAngle°",
                 progress = 1f,
             )
             HoldGesturePhase.TRIGGERED -> ControllerCardPresentation(
                 ready = true,
                 error = false,
                 title = "Zmieniono utwór",
-                instruction = "Gest został rozpoznany i wysłany.",
                 progress = 1f,
             )
             else -> ControllerCardPresentation(
                 ready = true,
                 error = false,
                 title = "Gest obrotu",
-                instruction = "Odwróć kapsel i obróć o $rotationAngle°.",
                 progress = null,
             )
         }
@@ -626,8 +621,7 @@ private fun controllerPresentation(state: MainUiState): ControllerCardPresentati
         volume.ready -> ControllerCardPresentation(
             ready = true,
             error = false,
-            title = "Płynna regulacja głośności",
-            instruction = "Obracaj kapsel wokół osi Z, aby łagodnie zmieniać poziom dźwięku.",
+            title = "Regulacja głośności aktywna",
             progress = null,
         )
 
@@ -635,7 +629,6 @@ private fun controllerPresentation(state: MainUiState): ControllerCardPresentati
             ready = false,
             error = false,
             title = "Stabilizacja głośności…",
-            instruction = "Utrzymuj kapsel prawie poziomo (0–25°) i unikaj gwałtownych wstrząsów.",
             progress = state.runtime.volumeStabilizationProgress,
         )
 
@@ -643,7 +636,6 @@ private fun controllerPresentation(state: MainUiState): ControllerCardPresentati
             ready = false,
             error = false,
             title = volume.title,
-            instruction = volume.instruction,
             progress = null,
         )
     }

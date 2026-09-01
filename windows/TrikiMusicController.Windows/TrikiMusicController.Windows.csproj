@@ -5,9 +5,9 @@
     <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
     <RootNamespace>TrikiMusicController_Windows</RootNamespace>
     <AssemblyName>TrikiMusicController.Windows</AssemblyName>
-    <Version>2.9.6</Version>
-    <FileVersion>2.9.6.0</FileVersion>
-    <AssemblyVersion>2.9.6.0</AssemblyVersion>
+    <Version>2.9.7</Version>
+    <FileVersion>2.9.7.0</FileVersion>
+    <AssemblyVersion>2.9.7.0</AssemblyVersion>
     <Product>Triki Music Controller</Product>
     <Company>Bartek</Company>
     <Description>Sterowanie muzyką w Windows 11 za pomocą urządzenia Triki.</Description>

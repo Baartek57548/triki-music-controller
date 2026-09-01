@@ -9,6 +9,15 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "2.9.7",
+            "Przejrzysty interfejs i kontekstowe okna pomocy",
+            [
+                "Uproszczono ekrany aplikacji Android: usunięto zbędny tekst i instrukcje na stałe zaśmiecające karty główne.",
+                "Wprowadzono kontekstowe ikony informacji (i) otwierające dedykowane okna dialogowe z objaśnieniem mechaniki gestów tylko na życzenie użytkownika.",
+                "Zwiększono czytelność paneli sterowania, wskaźników postępu i kafelków telemetrycznych.",
+                "Zoptymalizowano układ zakładek i nawigacji zgodnie z nowoczesnymi standardami systemów mobilnych."
+            ]),
+        new ReleaseHighlight(
             "2.9.6",
             "Cicha aktualizacja i okno Co nowego",
             [
