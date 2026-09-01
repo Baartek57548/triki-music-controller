@@ -1,9 +1,10 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using TrikiMusicController_Windows.Models;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -207,7 +208,9 @@ public sealed class CompactHudWindow : Window
         _titleText.Text = string.IsNullOrWhiteSpace(trackTitle) || trackTitle == "—" ? "Głośność" : trackTitle;
         _subtitleText.Text = string.IsNullOrWhiteSpace(artist) || artist == "—" ? "System audio" : artist;
         _valueText.Text = $"{volumePercent}%";
+        _valueText.FontSize = 14;
         _progressBar.Value = volumePercent;
+        _progressBar.Visibility = Visibility.Visible;
 
         PositionWindowOnRight();
         if (_hwnd != IntPtr.Zero)
@@ -229,7 +232,38 @@ public sealed class CompactHudWindow : Window
         _titleText.Text = "Jasność ekranu";
         _subtitleText.Text = "Pozycja 90°";
         _valueText.Text = $"{brightnessPercent}%";
+        _valueText.FontSize = 14;
         _progressBar.Value = brightnessPercent;
+        _progressBar.Visibility = Visibility.Visible;
+
+        PositionWindowOnRight();
+        if (_hwnd != IntPtr.Zero)
+        {
+            ShowWindow(_hwnd, SwShowNoActivate);
+        }
+        else
+        {
+            AppWindow.Show();
+        }
+
+        _hideTimer.Stop();
+        _hideTimer.Start();
+    }
+
+    public void ShowTrack(string trackTitle, string artist, MediaAction action)
+    {
+        _fontIcon.Glyph = action switch
+        {
+            MediaAction.Previous => "\uE892", // Poprzedni utwór
+            MediaAction.Play or MediaAction.PlayPause => "\uE768", // Play
+            _ => "\uE893", // Następny utwór
+        };
+
+        _titleText.Text = string.IsNullOrWhiteSpace(trackTitle) || trackTitle == "—" ? "Odtwarzanie" : trackTitle;
+        _subtitleText.Text = string.IsNullOrWhiteSpace(artist) || artist == "—" ? (action == MediaAction.Previous ? "Poprzedni utwór" : "Następny utwór") : artist;
+        _valueText.Text = action == MediaAction.Previous ? "POPRZEDNI" : "NASTĘPNY";
+        _valueText.FontSize = 11;
+        _progressBar.Visibility = Visibility.Collapsed;
 
         PositionWindowOnRight();
         if (_hwnd != IntPtr.Zero)

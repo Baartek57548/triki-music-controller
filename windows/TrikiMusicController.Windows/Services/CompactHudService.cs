@@ -1,4 +1,5 @@
-﻿using Microsoft.UI.Dispatching;
+using Microsoft.UI.Dispatching;
+using TrikiMusicController_Windows.Models;
 using TrikiMusicController_Windows.Views;
 
 namespace TrikiMusicController_Windows.Services;
@@ -42,6 +43,22 @@ public sealed class CompactHudService
             {
                 var win = GetOrCreateWindow();
                 win.ShowBrightness(brightnessPercent);
+            }
+            catch
+            {
+                // UI dispatcher safety
+            }
+        });
+    }
+
+    public void ShowTrack(string trackTitle, string artist, MediaAction action)
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                var win = GetOrCreateWindow();
+                win.ShowTrack(trackTitle, artist, action);
             }
             catch
             {

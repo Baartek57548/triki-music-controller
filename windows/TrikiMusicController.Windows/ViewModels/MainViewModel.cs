@@ -33,6 +33,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _settingsStatus = string.Empty;
     private int _uiRefreshPending = 1;
     private DateTimeOffset? _lastPlaybackActiveAt;
+    private float _lastKnownVolume = -1f;
+    private string _lastKnownTitle = string.Empty;
     private readonly CompactHudService? _hud;
 
     public MainViewModel(
@@ -505,7 +507,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public Task SetLedAsync(bool enabled) => _bluetooth.SetLedAsync(enabled);
-    public async Task ExecuteMediaActionAsync(MediaAction action) => await _media.ExecuteAsync(action);
+    public async Task ExecuteMediaActionAsync(MediaAction action)
+    {
+        await _media.ExecuteAsync(action);
+        if (action is MediaAction.Next or MediaAction.Previous)
+        {
+            _hud?.ShowTrack(_lastMedia.Title, _lastMedia.Artist, action);
+        }
+    }
 
     private async Task SaveSettingsAsync()
     {
@@ -528,7 +537,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void MediaOnStateChanged(object? sender, MediaSnapshot state)
     {
         var wasPlaying = _lastMedia.IsPlaying;
-        var prevVolume = _lastMedia.VolumePercent;
+        var prevVolume = _lastKnownVolume >= 0 ? _lastKnownVolume : _lastMedia.VolumePercent;
+        _lastKnownVolume = state.VolumePercent;
         if (state.IsPlaying)
         {
             _lastPlaybackActiveAt = DateTimeOffset.UtcNow;
@@ -537,10 +547,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 _bluetooth.NotifyMediaPlaybackStarted();
             }
         }
-        if (Math.Abs(prevVolume - state.VolumePercent) > 0.01f && _lastBluetooth.ConnectionState == TrikiConnectionState.Ready)
+        if (Math.Abs(prevVolume - state.VolumePercent) > 0.01f && _bluetooth.State.ConnectionState == TrikiConnectionState.Ready)
         {
             _hud?.ShowVolume((int)MathF.Round(state.VolumePercent), state.Title, state.Artist);
         }
+        if (!string.IsNullOrWhiteSpace(state.Title) && state.Title != "—" && state.Title != _lastKnownTitle && !string.IsNullOrEmpty(_lastKnownTitle) && _bluetooth.State.ConnectionState == TrikiConnectionState.Ready)
+        {
+            _hud?.ShowTrack(state.Title, state.Artist, MediaAction.Next);
+        }
+        _lastKnownTitle = state.Title;
         MarkUiDirty();
     }
     private void RuntimeOnStateChanged(object? sender, RuntimeSnapshot state)
@@ -549,9 +564,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             _hud?.ShowBrightness((int)MathF.Round(brightness.BrightnessPercent));
         }
-        else if (state.Volume?.Action is MediaAction.VolumeUp or MediaAction.VolumeDown)
+        else if (state.LastAction is MediaAction.Next or MediaAction.Previous)
         {
-            _hud?.ShowVolume((int)MathF.Round(_lastMedia.VolumePercent), _lastMedia.Title, _lastMedia.Artist);
+            _hud?.ShowTrack(_media.State.Title, _media.State.Artist, state.LastAction.Value);
         }
         MarkUiDirty();
     }
