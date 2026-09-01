@@ -214,17 +214,26 @@
                                          AutomationProperties.Name="Postęp gestu obrotu" />
                         </StackPanel>
 
-                        <!-- Status gestu na żywo -->
-                        <Border Style="{StaticResource TileBorderStyle}">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="STATUS GESTU NA ŻYWO" Style="{StaticResource EyebrowTextStyle}" FontSize="10" />
-                                <TextBlock Text="{Binding GestureStatus}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-
-                        <TextBlock Style="{StaticResource MetadataTextStyle}">
-                            <Run Text="Kąt obrotu można dostosować w zakresie 90°–360° w zakładce Ustawienia." />
-                        </TextBlock>
+                        <!-- Regulacja kąta obrotu -->
+                        <StackPanel Spacing="6" Margin="0,4,0,0">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Czułość obrotu (kąt)" Style="{StaticResource MetadataTextStyle}" />
+                                <TextBlock Grid.Column="1" Text="{Binding RotationAngleLabel}" FontWeight="SemiBold" Style="{StaticResource MetadataTextStyle}" />
+                            </Grid>
+                            <Slider
+                                Minimum="90"
+                                Maximum="360"
+                                StepFrequency="5"
+                                TickFrequency="45"
+                                TickPlacement="Outside"
+                                Value="{Binding RotationAngleDegrees, Mode=TwoWay}"
+                                AutomationProperties.Name="Wymagany kąt obrotu do zmiany utworu"
+                                HorizontalAlignment="Stretch" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
