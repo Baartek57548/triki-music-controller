@@ -83,7 +83,7 @@ public sealed class FullRotationGestureDetectorTests
     }
 
     [Fact]
-    public void FilteredPhysicalTurnTriggersAt270DegreesButNotAt240Degrees()
+    public void FilteredPhysicalTurnTriggersAt200DegreesButNotAt160Degrees()
     {
         var detector = new FullRotationGestureDetector();
         var filter = new SensorFilter();
@@ -96,7 +96,7 @@ public sealed class FullRotationGestureDetectorTests
             var raw = SensorTestData.Filtered(timestampNanos, new Vector3f(0, 0, 1)).Source;
             detector.Process(filter.Process(raw, new CalibrationProfile()));
         }
-        for (var index = 0; index < 100; index++)
+        for (var index = 0; index < 65; index++)
         {
             timestampNanos += SensorTestData.SamplePeriodNanos;
             var raw = SensorTestData.Filtered(
@@ -109,7 +109,7 @@ public sealed class FullRotationGestureDetectorTests
 
         Assert.Empty(directions);
 
-        for (var index = 0; index < 13; index++)
+        for (var index = 0; index < 48; index++)
         {
             timestampNanos += SensorTestData.SamplePeriodNanos;
             var raw = SensorTestData.Filtered(

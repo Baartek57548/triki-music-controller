@@ -19,4 +19,10 @@ public sealed partial class AboutPage : Page
         if (((App)Microsoft.UI.Xaml.Application.Current).MainWindow is { } window)
             await window.CheckForUpdatesAsync(showUpToDateMessage: true);
     }
+
+    private async void WhatsNew_Click(object sender, RoutedEventArgs e)
+    {
+        if (((App)Microsoft.UI.Xaml.Application.Current).MainWindow is { } window)
+            await window.ShowWhatsNewDialogAsync();
+    }
 }

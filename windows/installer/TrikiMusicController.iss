@@ -1,5 +1,5 @@
 #define AppName "Triki Music Controller"
-#define AppVersion "2.9.5"
+#define AppVersion "2.9.6"
 #define AppPublisher "Bartek"
 #define AppExeName "TrikiMusicController.Windows.exe"
 #define AppMutex "Local\TrikiMusicController.BAEDA449-C844-43F1-8888-AE0EFE5FBB13"
@@ -68,6 +68,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Uruchom Triki Music Controller"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; Parameters: "--whats-new"; Flags: nowait; Check: WizardSilent
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/C taskkill /IM {#AppExeName} /F"; Flags: runhidden; RunOnceId: "StopTrikiMusicController"

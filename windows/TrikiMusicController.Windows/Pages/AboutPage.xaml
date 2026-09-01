@@ -71,10 +71,10 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="2">
                             <TextBlock Text="Zappki — Triki Music Controller dla Windows 11" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="Wersja 2.9.5 • Windows x64" Style="{StaticResource MetadataTextStyle}" />
+                            <TextBlock Text="Wersja 2.9.6 • Windows x64" Style="{StaticResource MetadataTextStyle}" />
                         </StackPanel>
                         <Border Grid.Column="1" Style="{StaticResource AccentPillBorderStyle}" VerticalAlignment="Center">
-                            <TextBlock Text="v2.9.5" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            <TextBlock Text="v2.9.6" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                         </Border>
                     </Grid>
 
@@ -86,6 +86,12 @@
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE895;" FontSize="14" />
                                 <TextBlock Text="Sprawdź aktualizacje" />
+                            </StackPanel>
+                        </Button>
+                        <Button Click="WhatsNew_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE789;" FontSize="14" />
+                                <TextBlock Text="Co nowego w tej wersji" />
                             </StackPanel>
                         </Button>
                         <Button Click="GitHub_Click">

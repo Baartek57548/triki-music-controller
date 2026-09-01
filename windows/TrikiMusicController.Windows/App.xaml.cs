@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.Windows.AppLifecycle;
+using TrikiMusicController_Windows.Models;
 using TrikiMusicController_Windows.Services;
 using ILaunchActivatedEventArgs = Windows.ApplicationModel.Activation.ILaunchActivatedEventArgs;
 
@@ -66,7 +67,37 @@ public partial class App : Microsoft.UI.Xaml.Application
             Services.Bluetooth.StateChanged += (_, _) => _dispatcherQueue.TryEnqueue(UpdateTrayStatus);
             Services.Media.StateChanged += (_, _) => _dispatcherQueue.TryEnqueue(UpdateTrayStatus);
 
-            HideMainWindow();
+            var commandLineArgs = Environment.GetCommandLineArgs();
+            var isWhatsNewRequested = commandLineArgs.Any(a => a.Equals("--whats-new", StringComparison.OrdinalIgnoreCase) || a.Equals("--updated", StringComparison.OrdinalIgnoreCase));
+            var isBackground = commandLineArgs.Any(a => a.Equals("--background", StringComparison.OrdinalIgnoreCase));
+
+            var previousSeenVersion = settings.Current.LastSeenVersion;
+            var isVersionUpdated = !string.IsNullOrWhiteSpace(previousSeenVersion) &&
+                                   !previousSeenVersion.Equals(AppInfo.Version, StringComparison.OrdinalIgnoreCase);
+
+            if (isWhatsNewRequested || isVersionUpdated)
+            {
+                settings.Current.LastSeenVersion = AppInfo.Version;
+                await settings.SaveAsync();
+                ShowMainWindow();
+                _dispatcherQueue.TryEnqueue(async () =>
+                {
+                    if (MainWindow is { } win)
+                    {
+                        await win.ShowWhatsNewDialogAsync();
+                    }
+                });
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(previousSeenVersion))
+                {
+                    settings.Current.LastSeenVersion = AppInfo.Version;
+                    await settings.SaveAsync();
+                }
+                HideMainWindow();
+            }
+
             await Services.ViewModel.InitializeAsync();
             UpdateTrayStatus();
         }
@@ -82,10 +113,23 @@ public partial class App : Microsoft.UI.Xaml.Application
     private void MainInstance_Activated(object? sender, AppActivationArguments args)
     {
         if (args.Kind != ExtendedActivationKind.Launch ||
-            args.Data is not ILaunchActivatedEventArgs launch ||
-            IsBackgroundLaunch(launch.Arguments))
+            args.Data is not ILaunchActivatedEventArgs launch)
             return;
-        _dispatcherQueue?.TryEnqueue(ShowMainWindow);
+
+        var isBackground = IsBackgroundLaunch(launch.Arguments);
+        var isWhatsNew = launch.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Any(a => a.Equals("--whats-new", StringComparison.OrdinalIgnoreCase) || a.Equals("--updated", StringComparison.OrdinalIgnoreCase));
+
+        if (isBackground && !isWhatsNew) return;
+
+        _dispatcherQueue?.TryEnqueue(async () =>
+        {
+            ShowMainWindow();
+            if (isWhatsNew && MainWindow is { } win)
+            {
+                await win.ShowWhatsNewDialogAsync();
+            }
+        });
     }
 
     public void Shutdown()

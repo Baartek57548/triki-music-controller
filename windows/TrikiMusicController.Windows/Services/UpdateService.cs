@@ -216,21 +216,26 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    public void LaunchInstaller(string installerPath)
+    public void LaunchInstaller(string installerPath, bool silent = true)
     {
         ThrowIfDisposed();
         var fullPath = Path.GetFullPath(installerPath);
         var expectedDirectory = Path.GetFullPath(_updatesDirectory) + Path.DirectorySeparatorChar;
         if (!fullPath.StartsWith(expectedDirectory, StringComparison.OrdinalIgnoreCase) || !File.Exists(fullPath))
             throw new UpdateException("Nie można uruchomić instalatora spoza chronionego katalogu aktualizacji.");
+
+        var arguments = silent
+            ? "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS"
+            : "/SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS";
+
         var process = Process.Start(new ProcessStartInfo
         {
             FileName = fullPath,
-            Arguments = "/SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+            Arguments = arguments,
             UseShellExecute = true,
         });
         if (process is null)
-            throw new UpdateException("Windows nie uruchomił kreatora aktualizacji.");
+            throw new UpdateException("Windows nie uruchomił procesu instalatora aktualizacji.");
     }
 
     private static async Task CopyWithLimitAsync(

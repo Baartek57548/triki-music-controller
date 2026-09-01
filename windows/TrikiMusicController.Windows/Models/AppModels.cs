@@ -92,6 +92,8 @@ public sealed class AppSettings
     public CalibrationProfile Calibration { get; set; } = new();
     /// <summary>Fizyczny kąt obrotu (w stopniach) wymagany do zmiany utworu. Zakres: 90–360.</summary>
     public int RotationAngleDegrees { get; set; } = 200;
+    /// <summary>Wersja aplikacji, dla której użytkownik widział już okno Co nowego.</summary>
+    public string? LastSeenVersion { get; set; }
 
     public ulong? KnownDeviceAddress => ulong.TryParse(
         KnownDeviceAddressHex,
@@ -112,7 +114,7 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "2.9.5";
+    public const string Version = "2.9.6";
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }
