@@ -9,6 +9,14 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.1",
+            "Poprawki czułości i osi Air Mouse oraz w pełni cicha automatyczna instalacja",
+            [
+                "Zoptymalizowano czułość myszki w powietrzu (obniżona bazowa prędkość, precyzyjniejszy ruch piksel po pikselu).",
+                "Odwrócono pionową oś ruchu kursora (ruch ręką w górę przesuwa kursor w górę, w dół przesuwa w dół).",
+                "Wprowadzono w 100% automatyczną instalację aktualizacji od A do Z (ciche zastąpienie plików i restart bez dodatkowych okien)."
+            ]),
+        new ReleaseHighlight(
             "3.1.0",
             "Tryb myszki żyroskopowej (Air Mouse) i baza wiedzy Obsidian",
             [

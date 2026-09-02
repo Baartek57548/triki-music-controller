@@ -147,9 +147,7 @@ public sealed partial class MainWindow : Window
                     progressText.Text = $"Pobrano {value.Percentage:0}% — po pobraniu zostanie sprawdzony SHA-256.";
                 });
                 var installer = await App.Services.Updates.DownloadAsync(update, progress);
-                progressDialog.Hide();
-                await progressOperation;
-                App.Services.Updates.LaunchInstaller(installer, silent: false);
+                App.Services.Updates.LaunchInstaller(installer, silent: true);
                 Environment.Exit(0);
             }
             catch (Exception error)

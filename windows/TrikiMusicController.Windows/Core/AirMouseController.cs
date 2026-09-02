@@ -14,7 +14,7 @@ public sealed class AirMouseController
     private const float EdgeMaxAbsZ = 0.40f;
     private const float EdgeMinPlaneAcc = 0.70f;
     private const float InvertedMinZ = 0.35f;
-    private const float GyroDeadbandDps = 3.5f;
+    private const float GyroDeadbandDps = 4.0f;
     private const float ScrollThresholdDegrees = 10.0f;
     private const long MaximumSampleGapNanos = 250_000_000;
 
@@ -98,10 +98,10 @@ public sealed class AirMouseController
         if (accZ >= InvertedMinZ)
         {
             // W pozycji odwróconej:
-            // Panning poziomy (Yaw) odpowiada osi Z żyroskopu
-            // Przechylanie góra/dół (Pitch) odpowiada osi X żyroskopu
+            // Panning poziomy (Yaw): oś Z żyroskopu (obrót w prawo = ujemny Z -> dodatni DeltaX)
+            // Przechylanie pionowe (Pitch): oś X żyroskopu (ruch w górę = ujemny X -> ujemny DeltaY / w dół = dodatni X -> dodatni DeltaY)
             var rawYaw = -sample.GyroscopeDps.Z;
-            var rawPitch = -sample.GyroscopeDps.X;
+            var rawPitch = sample.GyroscopeDps.X;
 
             var deadYaw = ApplyDeadband(rawYaw, GyroDeadbandDps);
             var deadPitch = ApplyDeadband(rawPitch, GyroDeadbandDps);
@@ -109,9 +109,9 @@ public sealed class AirMouseController
             var accelX = ApplyVelocityCurve(deadYaw);
             var accelY = ApplyVelocityCurve(deadPitch);
 
-            // Filtr wygładzający
-            _smoothedDeltaX = _smoothedDeltaX * 0.35f + accelX * 0.65f;
-            _smoothedDeltaY = _smoothedDeltaY * 0.35f + accelY * 0.65f;
+            // Filtr wygładzający (EMA)
+            _smoothedDeltaX = _smoothedDeltaX * 0.45f + accelX * 0.55f;
+            _smoothedDeltaY = _smoothedDeltaY * 0.45f + accelY * 0.55f;
 
             var dx = (int)MathF.Round(_smoothedDeltaX);
             var dy = (int)MathF.Round(_smoothedDeltaY);
@@ -136,8 +136,8 @@ public sealed class AirMouseController
     {
         var abs = MathF.Abs(angularVelocityDps);
         if (abs <= 0f) return 0f;
-        // Balistyka: czułość liniowa + nieliniowe przyspieszenie przy szybszym ruchu
-        var speed = abs * 0.38f + (abs * abs) * 0.006f;
+        // Obniżona, precyzyjna czułość liniowa + nieliniowe przyspieszenie przy dynamicznym ruchu
+        var speed = abs * 0.18f + (abs * abs) * 0.0020f;
         return MathF.Sign(angularVelocityDps) * speed;
     }
 }

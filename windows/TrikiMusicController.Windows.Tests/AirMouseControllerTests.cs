@@ -42,6 +42,28 @@ public sealed class AirMouseControllerTests
     }
 
     [Fact]
+    public void Process_WhenTiltingUpAndDown_GeneratesCorrectVerticalMovement()
+    {
+        var controller = new AirMouseController { IsActive = true };
+
+        // Tilting UP: Gyroscope X is negative in sensor frame -> DeltaY < 0 (cursor moves UP)
+        var sUp1 = SensorTestData.Filtered(1_000_000_000L, new Vector3f(0f, 0f, 1.0f), new Vector3f(-25f, 0f, 0f));
+        var sUp2 = SensorTestData.Filtered(1_020_000_000L, new Vector3f(0f, 0f, 1.0f), new Vector3f(-25f, 0f, 0f));
+        controller.Process(sUp1);
+        var outUp = controller.Process(sUp2);
+        Assert.True(outUp.DeltaY < 0, $"Oczekiwano ruchu w górę (DeltaY < 0), otrzymano {outUp.DeltaY}");
+
+        controller.Reset();
+
+        // Tilting DOWN: Gyroscope X is positive in sensor frame -> DeltaY > 0 (cursor moves DOWN)
+        var sDown1 = SensorTestData.Filtered(2_000_000_000L, new Vector3f(0f, 0f, 1.0f), new Vector3f(25f, 0f, 0f));
+        var sDown2 = SensorTestData.Filtered(2_020_000_000L, new Vector3f(0f, 0f, 1.0f), new Vector3f(25f, 0f, 0f));
+        controller.Process(sDown1);
+        var outDown = controller.Process(sDown2);
+        Assert.True(outDown.DeltaY > 0, $"Oczekiwano ruchu w dół (DeltaY > 0), otrzymano {outDown.DeltaY}");
+    }
+
+    [Fact]
     public void Process_WhenBelowDeadband_SuppressesJitter()
     {
         var controller = new AirMouseController { IsActive = true };
