@@ -64,6 +64,23 @@ public sealed class AirMouseControllerTests
     }
 
     [Fact]
+    public void Process_WhenTiltingSteeplyUpwards_ContinuesCursorMovement()
+    {
+        var controller = new AirMouseController { IsActive = true };
+
+        // Steep upward tilt (pointing almost straight up: AccX is -0.90g, AccZ is 0.10g, AccY is 0)
+        var s1 = SensorTestData.Filtered(1_000_000_000L, new Vector3f(-0.90f, 0f, 0.10f), new Vector3f(-30f, 0f, 0f));
+        var s2 = SensorTestData.Filtered(1_020_000_000L, new Vector3f(-0.90f, 0f, 0.10f), new Vector3f(-30f, 0f, 0f));
+
+        controller.Process(s1);
+        var output = controller.Process(s2);
+
+        Assert.True(output.IsActive);
+        Assert.False(output.IsScrollMode);
+        Assert.True(output.DeltaY < 0, $"Oczekiwano ruchu w górę przy stromym uniesieniu (DeltaY < 0), otrzymano {output.DeltaY}");
+    }
+
+    [Fact]
     public void Process_WhenBelowDeadband_SuppressesJitter()
     {
         var controller = new AirMouseController { IsActive = true };
@@ -80,16 +97,16 @@ public sealed class AirMouseControllerTests
     {
         var controller = new AirMouseController { IsActive = true };
 
-        // Pozycja 90° na krawędzi (Z bliskie 0, wektor XY ~ 1.0g)
+        // Pozycja 90° na bocznej krawędzi (AccY ~ 1.0g, AccZ bliskie 0)
         // Obrót wokół Z o 30 dps przez 500 ms = 15 stopni obrotu (> 10 stopni progu)
-        var s1 = SensorTestData.Filtered(1_000_000_000L, new Vector3f(1.0f, 0f, 0.05f), new Vector3f(0f, 0f, 30f));
+        var s1 = SensorTestData.Filtered(1_000_000_000L, new Vector3f(0f, 1.0f, 0.05f), new Vector3f(0f, 0f, 30f));
         controller.Process(s1);
 
         var totalScrollDelta = 0;
         var sawScrollMode = false;
         for (int i = 1; i <= 25; i++)
         {
-            var s = SensorTestData.Filtered(1_000_000_000L + i * 20_000_000L, new Vector3f(1.0f, 0f, 0.05f), new Vector3f(0f, 0f, 30f));
+            var s = SensorTestData.Filtered(1_000_000_000L + i * 20_000_000L, new Vector3f(0f, 1.0f, 0.05f), new Vector3f(0f, 0f, 30f));
             var output = controller.Process(s);
             if (output.IsScrollMode) sawScrollMode = true;
             totalScrollDelta += output.ScrollDelta;

@@ -9,6 +9,14 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.2",
+            "Pełny zasięg pionowy kursora myszy i ulepszona ergonomia Air Mouse",
+            [
+                "Odblokowano pełny zasięg ruchu kursora w pionie (swobodny ruch do samej góry i dołu ekranu bez blokady kątowej).",
+                "Udoskonalono detekcję trybu kółka myszy (Scroll) na bocznej krawędzi, eliminując przypadkowy scroll przy uniesieniu dłoni.",
+                "Zbalansowano czułość i dodano wzmocnienie osi pionowej dopasowane do ergonomii nadgarstka."
+            ]),
+        new ReleaseHighlight(
             "3.1.1",
             "Poprawki czułości i osi Air Mouse oraz w pełni cicha automatyczna instalacja",
             [

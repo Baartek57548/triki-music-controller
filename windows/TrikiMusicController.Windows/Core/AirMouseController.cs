@@ -11,10 +11,10 @@ public sealed record AirMouseOutput(
 
 public sealed class AirMouseController
 {
-    private const float EdgeMaxAbsZ = 0.40f;
-    private const float EdgeMinPlaneAcc = 0.70f;
-    private const float InvertedMinZ = 0.35f;
-    private const float GyroDeadbandDps = 4.0f;
+    private const float EdgeMinLateralAccY = 0.70f;
+    private const float EdgeMaxAbsZ = 0.35f;
+    private const float TableRestMaxZ = -0.65f;
+    private const float GyroDeadbandDps = 3.5f;
     private const float ScrollThresholdDegrees = 10.0f;
     private const long MaximumSampleGapNanos = 250_000_000;
 
@@ -55,11 +55,21 @@ public sealed class AirMouseController
         }
         _lastTimestampNanos = now;
 
+        var accY = sample.AccelerometerG.Y;
         var accZ = sample.AccelerometerG.Z;
-        var planeAcc = MathF.Sqrt(sample.AccelerometerG.X * sample.AccelerometerG.X + sample.AccelerometerG.Y * sample.AccelerometerG.Y);
 
-        // Wykrywanie trybu kółka myszy (Scroll w pozycji 90°)
-        if (MathF.Abs(accZ) <= EdgeMaxAbsZ && planeAcc >= EdgeMinPlaneAcc)
+        // Jeśli urządzenie leży płasko na stole (pozycją muzyczną do góry, Z ujemne), wstrzymaj ruch kursora
+        if (accZ <= TableRestMaxZ)
+        {
+            _smoothedDeltaX = 0f;
+            _smoothedDeltaY = 0f;
+            _accumulatedScrollAngle = 0f;
+            IsScrollMode = false;
+            return new AirMouseOutput(IsActive: true, IsScrollMode: false, 0, 0, 0);
+        }
+
+        // Wykrywanie trybu kółka myszy (Scroll): kapsel obrócony na boczną krawędź 90° (|Y| >= 0.70g, |Z| <= 0.35g)
+        if (MathF.Abs(accY) >= EdgeMinLateralAccY && MathF.Abs(accZ) <= EdgeMaxAbsZ)
         {
             IsScrollMode = true;
             _smoothedDeltaX = 0f;
@@ -91,42 +101,34 @@ public sealed class AirMouseController
                 ScrollDelta: scrollSteps);
         }
 
-        // Tryb kursora myszy (pozycja odwrócona kapsla / w dłoni)
+        // Tryb kursora myszy (w dłoni, w pełnym zakresie pochylenia w górę/dół bez ograniczeń kątowych)
         IsScrollMode = false;
         _accumulatedScrollAngle = 0f;
 
-        if (accZ >= InvertedMinZ)
-        {
-            // W pozycji odwróconej:
-            // Panning poziomy (Yaw): oś Z żyroskopu (obrót w prawo = ujemny Z -> dodatni DeltaX)
-            // Przechylanie pionowe (Pitch): oś X żyroskopu (ruch w górę = ujemny X -> ujemny DeltaY / w dół = dodatni X -> dodatni DeltaY)
-            var rawYaw = -sample.GyroscopeDps.Z;
-            var rawPitch = sample.GyroscopeDps.X;
+        // Panning poziomy (Yaw): oś Z żyroskopu (obrót w prawo = ujemny Z -> dodatni DeltaX)
+        // Przechylanie pionowe (Pitch): oś X żyroskopu (ruch w górę = ujemny X -> ujemny DeltaY / w dół = dodatni X -> dodatni DeltaY)
+        var rawYaw = -sample.GyroscopeDps.Z;
+        var rawPitch = sample.GyroscopeDps.X;
 
-            var deadYaw = ApplyDeadband(rawYaw, GyroDeadbandDps);
-            var deadPitch = ApplyDeadband(rawPitch, GyroDeadbandDps);
+        var deadYaw = ApplyDeadband(rawYaw, GyroDeadbandDps);
+        var deadPitch = ApplyDeadband(rawPitch, GyroDeadbandDps);
 
-            var accelX = ApplyVelocityCurve(deadYaw);
-            var accelY = ApplyVelocityCurve(deadPitch);
+        var accelX = ApplyVelocityCurve(deadYaw);
+        var accelY = ApplyVelocityCurve(deadPitch) * 1.15f; // Dopasowanie do naturalnej ergonomii ruchu nadgarstka
 
-            // Filtr wygładzający (EMA)
-            _smoothedDeltaX = _smoothedDeltaX * 0.45f + accelX * 0.55f;
-            _smoothedDeltaY = _smoothedDeltaY * 0.45f + accelY * 0.55f;
+        // Filtr wygładzający (EMA)
+        _smoothedDeltaX = _smoothedDeltaX * 0.40f + accelX * 0.60f;
+        _smoothedDeltaY = _smoothedDeltaY * 0.40f + accelY * 0.60f;
 
-            var dx = (int)MathF.Round(_smoothedDeltaX);
-            var dy = (int)MathF.Round(_smoothedDeltaY);
+        var dx = (int)MathF.Round(_smoothedDeltaX);
+        var dy = (int)MathF.Round(_smoothedDeltaY);
 
-            return new AirMouseOutput(
-                IsActive: true,
-                IsScrollMode: false,
-                DeltaX: dx,
-                DeltaY: dy,
-                ScrollDelta: 0);
-        }
-
-        _smoothedDeltaX = 0f;
-        _smoothedDeltaY = 0f;
-        return new AirMouseOutput(IsActive: true, IsScrollMode: false, 0, 0, 0);
+        return new AirMouseOutput(
+            IsActive: true,
+            IsScrollMode: false,
+            DeltaX: dx,
+            DeltaY: dy,
+            ScrollDelta: 0);
     }
 
     private static float ApplyDeadband(float value, float deadband) =>
@@ -136,8 +138,8 @@ public sealed class AirMouseController
     {
         var abs = MathF.Abs(angularVelocityDps);
         if (abs <= 0f) return 0f;
-        // Obniżona, precyzyjna czułość liniowa + nieliniowe przyspieszenie przy dynamicznym ruchu
-        var speed = abs * 0.18f + (abs * abs) * 0.0020f;
+        // Płynna czułość bazowa z dynamicznym przyspieszeniem przy szybszym ruchu dłoni
+        var speed = abs * 0.22f + (abs * abs) * 0.0035f;
         return MathF.Sign(angularVelocityDps) * speed;
     }
 }
