@@ -1,4 +1,4 @@
-﻿---
+---
 title: Architektura Aplikacji Android
 tags:
   - architecture

@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -343,6 +343,31 @@ public sealed class CompactHudWindow : Window
         _progressBar.Visibility = Visibility.Collapsed;
 
         ApplyThumbnail(thumbnailBytes);
+
+        PositionWindowOnRight();
+        if (_hwnd != IntPtr.Zero)
+        {
+            ShowWindow(_hwnd, SwShowNoActivate);
+        }
+        else
+        {
+            AppWindow.Show();
+        }
+
+        _hideTimer.Stop();
+        _hideTimer.Start();
+    }
+
+    public void ShowMouseMode(bool enabled, bool isScroll = false)
+    {
+        _fontIcon.Glyph = isScroll ? "\uE8B0" : "\uE962";
+        _albumArtImage.Visibility = Visibility.Collapsed;
+        _fontIcon.Visibility = Visibility.Visible;
+        _titleText.Text = enabled ? (isScroll ? "Kółko myszy (Scroll)" : "Tryb myszki (Air Mouse)") : "Tryb myszki wyłączony";
+        _subtitleText.Text = enabled ? (isScroll ? "Obrót w pozycji 90°" : "1x LPM • 2x PPM • Przytrzymaj 4s aby wyłączyć") : "Powrót do sterowania muzyką";
+        _valueText.Text = enabled ? (isScroll ? "SCROLL" : "AKTYWNY") : "WYŁĄCZONY";
+        _valueText.FontSize = 11;
+        _progressBar.Visibility = Visibility.Collapsed;
 
         PositionWindowOnRight();
         if (_hwnd != IntPtr.Zero)

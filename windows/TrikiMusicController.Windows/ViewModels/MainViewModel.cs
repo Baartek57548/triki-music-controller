@@ -237,18 +237,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         HoldGesturePhase.Tracking or HoldGesturePhase.Completing => _lastRuntime.Gesture.StabilizationProgress,
         _ => _lastRuntime.Volume is { TiltStable: false } volume ? volume.StabilizationProgress : 0,
     };
-    public string ControllerStatusTitle => _lastBluetooth.ConnectionState != TrikiConnectionState.Ready
-        ? "Sterowanie nieaktywne"
-        : _lastRuntime.Gesture.Phase switch
-        {
-            HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => "Przygotowywanie zmiany utworu…",
-            HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction == RotationGestureDirection.Left
-                ? "Następny utwór"
-                : "Poprzedni utwór",
-            HoldGesturePhase.Rearming => "Ustabilizuj Triki",
-            HoldGesturePhase.Triggered => "Gest rozpoznany",
-            _ => VolumeControlTitle,
-        };
+
+    public bool IsMouseMode => _lastRuntime.IsMouseMode;
+    public bool IsMouseScrollMode => _lastRuntime.IsMouseScrollMode;
+    public string MouseModeStatusText => _lastRuntime.IsMouseMode
+        ? (_lastRuntime.IsMouseScrollMode ? "Aktywny (Kółko przewijania • pozycja 90°)" : "Aktywny (Kursor myszy • 1x LPM, 2x PPM)")
+        : "Nieaktywny (Przytrzymaj przycisk 4s, aby włączyć)";
+
+    public string ControllerStatusTitle => _lastRuntime.IsMouseMode
+        ? (_lastRuntime.IsMouseScrollMode ? "Tryb myszki (Scroll 90°)" : "Tryb myszki (Kursor)")
+        : _lastBluetooth.ConnectionState != TrikiConnectionState.Ready
+            ? "Sterowanie nieaktywne"
+            : _lastRuntime.Gesture.Phase switch
+            {
+                HoldGesturePhase.Holding when _lastRuntime.Gesture.FaceDown => "Przygotowywanie zmiany utworu…",
+                HoldGesturePhase.Tracking => _lastRuntime.Gesture.Direction == RotationGestureDirection.Left
+                    ? "Następny utwór"
+                    : "Poprzedni utwór",
+                HoldGesturePhase.Rearming => "Ustabilizuj Triki",
+                HoldGesturePhase.Triggered => "Gest rozpoznany",
+                _ => VolumeControlTitle,
+            };
     public string ControllerStatusDetails => _lastBluetooth.ConnectionState != TrikiConnectionState.Ready
         ? "Połącz Triki, aby uruchomić gesty i przycisk."
         : _lastRuntime.Gesture.Phase switch

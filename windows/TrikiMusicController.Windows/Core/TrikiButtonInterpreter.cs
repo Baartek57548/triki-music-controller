@@ -38,6 +38,19 @@ public sealed class TrikiButtonInterpreter
         return true;
     }
 
+    public bool CheckAndConsumeHoldDuration(long now, long requiredDurationNanos)
+    {
+        if (!IsPressed || _currentHoldConsumed || _pressedAtNanos is not long pressedAt)
+            return false;
+
+        if (now - pressedAt >= requiredDurationNanos)
+        {
+            ConsumeCurrentHold();
+            return true;
+        }
+        return false;
+    }
+
     public void Reset()
     {
         ProtocolMode = TrikiButtonProtocolMode.Unknown;

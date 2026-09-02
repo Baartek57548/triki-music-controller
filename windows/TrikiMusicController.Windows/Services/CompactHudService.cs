@@ -66,4 +66,20 @@ public sealed class CompactHudService
             }
         });
     }
+
+    public void ShowMouseMode(bool enabled, bool isScroll = false)
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                var win = GetOrCreateWindow();
+                win.ShowMouseMode(enabled, isScroll);
+            }
+            catch
+            {
+                // UI dispatcher safety
+            }
+        });
+    }
 }

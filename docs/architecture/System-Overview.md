@@ -1,4 +1,4 @@
-﻿---
+---
 title: Całościowy Przegląd Architektury Systemu
 tags:
   - architecture

@@ -10,15 +10,44 @@ public sealed class FeedbackToneService : IDisposable
     private const double Amplitude = 0.18;
     private static readonly ToneStep[] LikeSequence = [new(660, 55), new(880, 65)];
     private static readonly ToneStep[] DislikeSequence = [new(520, 60), new(330, 70)];
+    private static readonly ToneStep[] MouseOnSequence = [new(587, 50), new(880, 75)];
+    private static readonly ToneStep[] MouseOffSequence = [new(880, 50), new(587, 75)];
     private readonly object _sync = new();
     private readonly TonePlayback? _likeTone;
     private readonly TonePlayback? _dislikeTone;
+    private readonly TonePlayback? _mouseOnTone;
+    private readonly TonePlayback? _mouseOffTone;
     private bool _disposed;
 
     public FeedbackToneService()
     {
         _likeTone = TryCreatePlayback(LikeSequence);
         _dislikeTone = TryCreatePlayback(DislikeSequence);
+        _mouseOnTone = TryCreatePlayback(MouseOnSequence);
+        _mouseOffTone = TryCreatePlayback(MouseOffSequence);
+    }
+
+    public void PlayMouseMode(bool enabled)
+    {
+        var selected = enabled ? _mouseOnTone : _mouseOffTone;
+        if (selected is null) return;
+
+        lock (_sync)
+        {
+            if (_disposed) return;
+            try
+            {
+                _likeTone?.Stop();
+                _dislikeTone?.Stop();
+                _mouseOnTone?.Stop();
+                _mouseOffTone?.Stop();
+                selected.Play();
+            }
+            catch (InvalidOperationException error)
+            {
+                System.Diagnostics.Trace.WriteLine($"Nie udało się odtworzyć sygnału trybu myszki: {error}");
+            }
+        }
     }
 
     public void PlayRatingAction(MediaAction action)

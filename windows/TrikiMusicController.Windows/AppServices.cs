@@ -12,19 +12,21 @@ public sealed class AppServices : IDisposable
         Settings = settings;
         Volume = new SystemVolumeService();
         Brightness = new SystemBrightnessService();
+        Mouse = new SystemMouseService();
         Media = new MediaControlService(Volume);
         Updates = new UpdateService();
         Bluetooth = new BluetoothService();
         RatingFeedback = new FeedbackToneService();
         Spotify = new SpotifyConnectService();
         Hud = new CompactHudService(dispatcherQueue);
-        Runtime = new TrikiRuntimeEngine(Bluetooth, Media, Volume, Brightness, Settings, RatingFeedback);
+        Runtime = new TrikiRuntimeEngine(Bluetooth, Media, Volume, Brightness, Mouse, Settings, RatingFeedback, Hud);
         ViewModel = new MainViewModel(dispatcherQueue, Settings, Bluetooth, Media, Runtime, Hud);
     }
 
     public SettingsService Settings { get; }
     public SystemVolumeService Volume { get; }
     public SystemBrightnessService Brightness { get; }
+    public SystemMouseService Mouse { get; }
     public SpotifyConnectService Spotify { get; }
     public CompactHudService Hud { get; }
     public MediaControlService Media { get; }

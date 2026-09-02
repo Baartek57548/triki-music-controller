@@ -38,6 +38,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- Nagłówek strony -->
@@ -329,8 +330,33 @@
                 </StackPanel>
             </Border>
 
+            <!-- Karta Trybu Myszki Żyroskopowej (Air Mouse) -->
+            <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="14">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="40" Height="40" CornerRadius="20" Background="{ThemeResource AccentFillColorTertiaryBrush}" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE962;" FontSize="18" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="TRYB MYSZKI ŻYROSKOPOWEJ" Style="{StaticResource EyebrowTextStyle}" />
+                            <TextBlock Text="Sterowanie kursorem i kółkiem myszy (Air Mouse)" Style="{StaticResource SectionTitleStyle}" />
+                        </StackPanel>
+                        <Border Grid.Column="2" Style="{StaticResource PillBorderStyle}" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding MouseModeStatusText}" Style="{StaticResource MetadataTextStyle}" />
+                        </Border>
+                    </Grid>
+
+                    <TextBlock Text="Przytrzymaj fizyczny przycisk przez 4 sekundy, aby włączyć lub wyłączyć tryb myszki. W pozycji odwróconej kapsel steruje kursorem na ekranie (1 klik = LPM, 2 kliki = PPM). Obrócenie kapsla na krawędź pod kątem 90° aktywuje kółko przewijania (scroll)." Style="{StaticResource MetadataTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
             <!-- Karta Ostatniej Akcji -->
-            <Border Grid.Row="3" Margin="0,0,0,16" Style="{StaticResource CardBorderStyle}">
+            <Border Grid.Row="4" Margin="0,0,0,16" Style="{StaticResource CardBorderStyle}">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

@@ -11,17 +11,14 @@
             "id": "f2367f7d6b4a8cb8",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "Bez nazwy.canvas",
-                "viewState": {
-                  "x": 0,
-                  "y": 0,
-                  "zoom": 0
-                }
+                "file": "docs/architecture/Windows-Architecture.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "Bez nazwy"
+              "icon": "lucide-file",
+              "title": "Windows-Architecture"
             }
           }
         ]
@@ -102,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Bez nazwy.canvas",
+                "file": "docs/architecture/Windows-Architecture.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -121,7 +118,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Bez nazwy.canvas",
+                "file": "docs/architecture/Windows-Architecture.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -164,7 +161,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Bez nazwy.canvas",
+                "file": "docs/architecture/Windows-Architecture.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -193,6 +190,10 @@
   },
   "active": "f2367f7d6b4a8cb8",
   "lastOpenFiles": [
+    "docs/architecture/System-Overview.md",
+    "docs/architecture/Android-Architecture.md",
+    "docs/ARCHITECTURE.md",
+    "Bez nazwy.canvas",
     "app/build/outputs/apk/release/output-metadata.json",
     "app/build/outputs/apk/release/baselineProfiles/1/app-release.dm",
     "app/build/outputs/apk/release/baselineProfiles/0/app-release.dm",
@@ -203,8 +204,6 @@
     "app/build/intermediates/incremental/packageRelease/tmp/release/zip-cache/javaResources0",
     "app/build/outputs/apk/release/app-release.apk.idsig",
     "app/build/outputs/apk/release/app-release.apk",
-    "app/build/intermediates/incremental/packageRelease/tmp/release/dex-renamer-state.txt",
-    "Bez nazwy.canvas",
     "README.md",
     "docs/releases/Release-v2.9.9.md",
     "docs/releases/Release-v3.0.0.md",
@@ -227,8 +226,6 @@
     "docs/core/Sensor-Filtering.md",
     "docs/core/BLE-Protocol.md",
     "docs/architecture/Windows-Architecture.md",
-    "docs/architecture/Android-Architecture.md",
-    "docs/architecture/System-Overview.md",
     "docs/INDEX.md"
   ]
 }
