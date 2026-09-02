@@ -121,6 +121,12 @@
                         <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
                         <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Click="Permissions_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE72E;" FontSize="14" />
+                                    <TextBlock Text="Uprawnienia systemowe" />
+                                </StackPanel>
+                            </Button>
                             <Button Click="About_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE946;" FontSize="14" />

@@ -1,4 +1,4 @@
-﻿---
+---
 title: Architektura i Układ Ekranu Ustawień
 tags:
   - ui
@@ -34,5 +34,6 @@ Powiązane węzły:
 4. **O Aplikacji i Narzędzia**:
    - *Informacje o wersji*: Wyświetlanie aktualnej wersji programu powiązanej dynamicznie z `AppInfo.Version`.
    - *Sprawdź aktualizacje*: Bezpośrednie wywołanie sprawdzania wydań na GitHubie.
+   - *Uprawnienia systemowe*: Przejrzysty panel uprawnień Bluetooth, multimediów, jasności WMI oraz skrót do Ustawień systemowych.
    - *Informacje i repozytorium*: Przejście do oficjalnego repozytorium GitHub i listy nowości.
    - *Diagnostyka IMU*: Narzędzia zaawansowanego podglądu surowych danych i procedury kalibracji.

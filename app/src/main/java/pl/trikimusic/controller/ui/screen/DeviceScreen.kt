@@ -57,7 +57,6 @@ fun DeviceScreen(
     contentPadding: PaddingValues,
     viewModel: MainViewModel,
     onCalibration: () -> Unit,
-    onPermissions: () -> Unit,
 ) {
     var ledOn by remember { mutableStateOf(false) }
     val working = state.ble.connectionState in setOf(
@@ -189,7 +188,7 @@ fun DeviceScreen(
 
                             else -> {
                                 Button(
-                                    onClick = { if (state.permissions.bluetoothPermissionsGranted) viewModel.startScan() else onPermissions() },
+                                    onClick = viewModel::startScan,
                                     enabled = !working,
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(14.dp),
@@ -271,15 +270,6 @@ fun DeviceScreen(
                 },
                 onClick = onCalibration,
                 enabled = state.ble.connectionState == TrikiConnectionState.READY,
-            )
-        }
-
-        item {
-            NavigationRow(
-                icon = Icons.Default.Security,
-                title = "Uprawnienia systemowe",
-                subtitle = "Bluetooth, powiadomienia i dostęp do multimediów.",
-                onClick = onPermissions,
             )
         }
     }

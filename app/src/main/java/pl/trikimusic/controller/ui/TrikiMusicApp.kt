@@ -189,7 +189,6 @@ fun TrikiMusicApp(
                     contentPadding = padding,
                     viewModel = viewModel,
                     onCalibration = { navController.navigate(Routes.CALIBRATION) },
-                    onPermissions = { navController.navigate(Routes.PERMISSIONS) },
                 )
             }
             composable(MainDestination.SETTINGS.route) {
