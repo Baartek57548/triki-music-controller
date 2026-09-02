@@ -13,6 +13,14 @@ Najnowsze stabilne wydanie znajduje się na stronie [GitHub Releases](https://gi
 
 Obie aplikacje sprawdzają nowe stabilne wydanie przy uruchomieniu. Pobieranie i instalacja wymagają decyzji użytkownika; plik jest przyjmowany tylko z tego repozytorium i weryfikowany przez rozmiar oraz SHA-256 z metadanych GitHub.
 
+## Baza Wiedzy (Obsidian Knowledge Vault)
+
+Projekt posiada kompletną, modularną bazę wiedzy zintegrowaną z **Obsidian Graph View**:
+- [[docs/INDEX.md|Główny Indeks Grafu]]: Centralny punkt wejścia do dokumentacji technicznej.
+- **Architektura**: [[docs/architecture/System-Overview.md|System Overview]], [[docs/architecture/Android-Architecture.md|Android]], [[docs/architecture/Windows-Architecture.md|Windows]].
+- **Algorytmy i BLE**: [[docs/core/BLE-Protocol.md|Protokół BLE]], [[docs/core/Sensor-Filtering.md|Filtracja IMU]], [[docs/core/Gyro-Volume-Control.md|Głośność]], [[docs/core/Inverted-Capsule-Gestures.md|Odwrócony kapsel]], [[docs/core/Edge-Brightness-Control.md|Jasność 90°]].
+- **Decyzje i Wydania**: [[docs/decisions/Architecture-Decisions.md|Rejestr ADR]], [[docs/releases/Releases-Overview.md|Dziennik wydań]].
+
 ## Funkcje
 
 - pełny cykl BLE: skan pierwszego urządzenia na żądanie, zapamiętanie po udanym połączeniu, automatyczne wybudzanie, discovery, NUS notifications, timeout, RSSI i bateria;
