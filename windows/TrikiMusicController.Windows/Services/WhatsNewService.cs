@@ -9,6 +9,18 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.0",
+            "Tryb myszki żyroskopowej (Air Mouse) i baza wiedzy Obsidian",
+            [
+                "Wprowadzono tryb myszki żyroskopowej (Air Mouse) aktywowany przytrzymaniem przycisku przez 4 sekundy.",
+                "Płynne sterowanie kursorem na ekranie w pozycji odwróconej kapsla z nieliniową balistyką prędkościową.",
+                "Obsługa kliknięć myszy fizycznym przyciskiem (1 klik = LPM, 2 kliki = PPM / menu kontekstowe).",
+                "Kółko przewijania (Scroll) sterowane obrotem kapsla na krawędzi pod kątem 90°.",
+                "Powiadomienia OSD w mini-nakładce Windows Compact HUD ze dedykowanymi ikonami Fluent.",
+                "Uporządkowano sekcję uprawnień systemowych w Ustawieniach aplikacji.",
+                "Wbudowano kompletną bazę wiedzy i interaktywny graf projektu Obsidian Graph View."
+            ]),
+        new ReleaseHighlight(
             "3.0.1",
             "Uporządkowanie Ustawień, okładki albumów w HUD i regulacja jasności",
             [
