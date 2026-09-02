@@ -22,7 +22,7 @@ public sealed class EdgePoseBrightnessControllerTests
     }
 
     [Fact]
-    public void EdgePoseStabilizesAfter400ms()
+    public void EdgePoseStabilizesAfter150ms()
     {
         var controller = new EdgePoseBrightnessController(50f);
         var t0 = 1_000_000_000L;
@@ -32,28 +32,28 @@ public sealed class EdgePoseBrightnessControllerTests
             new Vector3f(0f, 1f, 0f),
             new Vector3f(0f, 0f, 0f));
 
-        var res0 = controller.Process(sample0);
+        var res0 = controller.Process(sample0, isButtonPressed: false);
         Assert.True(res0.Active);
         Assert.False(res0.Ready);
 
-        // After 200ms -> still stabilizing
-        var sample200 = SensorTestData.Filtered(
-            t0 + 200_000_000L,
+        // After 80ms -> still stabilizing
+        var sample80 = SensorTestData.Filtered(
+            t0 + 80_000_000L,
             new Vector3f(0f, 1f, 0f),
             new Vector3f(0f, 0f, 0f));
-        var res200 = controller.Process(sample200);
-        Assert.True(res200.Active);
-        Assert.False(res200.Ready);
-        Assert.True(res200.StabilizationProgress >= 0.5f);
+        var res80 = controller.Process(sample80, isButtonPressed: false);
+        Assert.True(res80.Active);
+        Assert.False(res80.Ready);
+        Assert.True(res80.StabilizationProgress >= 0.5f);
 
-        // After 400ms -> Ready!
-        var sample400 = SensorTestData.Filtered(
-            t0 + 400_000_000L,
+        // After 150ms -> Ready!
+        var sample150 = SensorTestData.Filtered(
+            t0 + 150_000_000L,
             new Vector3f(0f, 1f, 0f),
             new Vector3f(0f, 0f, 0f));
-        var res400 = controller.Process(sample400);
-        Assert.True(res400.Active);
-        Assert.True(res400.Ready);
+        var res150 = controller.Process(sample150, isButtonPressed: true);
+        Assert.True(res150.Active);
+        Assert.True(res150.Ready);
     }
 
     [Fact]

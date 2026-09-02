@@ -1,5 +1,5 @@
 #define AppName "Triki Music Controller"
-#define AppVersion "3.1.4"
+#define AppVersion "3.1.5"
 #define AppPublisher "Bartek"
 #define AppExeName "TrikiMusicController.Windows.exe"
 #define AppMutex "Local\TrikiMusicController.BAEDA449-C844-43F1-8888-AE0EFE5FBB13"

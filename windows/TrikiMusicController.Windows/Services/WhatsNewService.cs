@@ -9,6 +9,14 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.5",
+            "Naprawa i optymalizacja sterowania jasnością ekranu na krawędzi 90°",
+            [
+                "Naprawiono wywołania systemowe WMI oraz dodano obsługę DDC/CI dla zewnętrznych monitorów.",
+                "Wyeliminowano resetowanie trybu jasności przy szybkich obrotach dłoni (rozszerzona histereza akceleracji).",
+                "Skrócono czas stabilizacji pozycji do 150 ms i natychmiastową reakcję przy wciśniętym przycisku."
+            ]),
+        new ReleaseHighlight(
             "3.1.4",
             "Stabilizacja krawędziowa i pełny audyt modułu Air Mouse",
             [
