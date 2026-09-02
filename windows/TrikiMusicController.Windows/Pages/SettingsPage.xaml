@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Page
     x:Class="TrikiMusicController_Windows.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -108,7 +108,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Triki Music Controller" FontWeight="SemiBold" />
-                                <TextBlock Text="Wersja 3.0.0 (WinUI 3 • 64-bit)" Style="{StaticResource MetadataTextStyle}" />
+                                <TextBlock Text="{Binding AppVersionDisplay}" Style="{StaticResource MetadataTextStyle}" />
                             </StackPanel>
                             <Button Grid.Column="1" Style="{StaticResource AccentButtonStyle}" Click="CheckUpdates_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="8">

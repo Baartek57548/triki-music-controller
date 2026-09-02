@@ -1,0 +1,198 @@
+{
+  "main": {
+    "id": "0921130c7c89dc43",
+    "type": "split",
+    "children": [
+      {
+        "id": "cb5c8f4339e2f3be",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1ac4822d81e836fe",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "Nowa karta"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "7d878a4b18e529e2",
+    "type": "split",
+    "children": [
+      {
+        "id": "f69805a7d3130161",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3bc08e61293335c5",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Przeglądarka plików"
+            }
+          },
+          {
+            "id": "c8235607df7e2636",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Wyszukiwarka"
+            }
+          },
+          {
+            "id": "66c0b504b22574ad",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Ulubione"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "73dbf6fe81ef661d",
+    "type": "split",
+    "children": [
+      {
+        "id": "9f37e8bb6060f61f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "072d30269cf0df37",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Linki zwrotne"
+            }
+          },
+          {
+            "id": "b4c55e4fd170ecc2",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Łącza wychodzące"
+            }
+          },
+          {
+            "id": "dde40f5c326185ae",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tagi"
+            }
+          },
+          {
+            "id": "f6f897050a4599e0",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Wszystkie atrybuty"
+            }
+          },
+          {
+            "id": "57731818bd3dfde5",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Konspekt"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Otwórz okno szybkiego wyboru": false,
+      "graph:Otwórz podgląd grafu": false,
+      "canvas:Stwórz nową tablicę": false,
+      "daily-notes:Otwórz dzisiejszy dziennik": false,
+      "templates:Wstaw szablon": false,
+      "command-palette:Otwórz paletę poleceń": false,
+      "bases:Stwórz nową bazę danych": false
+    }
+  },
+  "active": "1ac4822d81e836fe",
+  "lastOpenFiles": [
+    "windows/artifacts/installer/triki-music-controller-windows-v3.0.1-setup.e32.tmp",
+    "windows/TrikiMusicController.Windows/obj/Release/net10.0-windows10.0.26100.0/win-x64/Pages/SettingsPage.xaml",
+    "windows/TrikiMusicController.Windows/obj/Release/net10.0-windows10.0.26100.0/win-x64/Pages/AboutPage.xaml",
+    "windows/TrikiMusicController.Windows/obj/Release/net10.0-windows10.0.26100.0/win-x64/App.xaml",
+    "windows/TrikiMusicController.Windows/obj/Release/net10.0-windows10.0.26100.0/win-x64/XamlTypeInfo.g.cs.backup",
+    "windows/TrikiMusicController.Windows/obj/Release/net10.0-windows10.0.26100.0/win-x64/Pages/SettingsPage.g.cs.backup",
+    "windows/TrikiMusicController.Windows/obj/Release/net10.0-windows10.0.26100.0/win-x64/Pages/AboutPage.g.cs.backup",
+    "windows/TrikiMusicController.Windows/obj/Release/net10.0-windows10.0.26100.0/win-x64/App.g.cs.backup",
+    "windows/TrikiMusicController.Windows/obj/Debug/net10.0-windows10.0.26100.0/win-x64/Pages/SettingsPage.xaml",
+    "windows/TrikiMusicController.Windows/obj/Debug/net10.0-windows10.0.26100.0/win-x64/Pages/AboutPage.xaml",
+    "windows/TrikiMusicController.Windows/obj/Debug/net10.0-windows10.0.26100.0/win-x64/App.xaml"
+  ]
+}

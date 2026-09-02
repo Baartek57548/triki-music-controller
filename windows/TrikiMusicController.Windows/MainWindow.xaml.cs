@@ -149,8 +149,8 @@ public sealed partial class MainWindow : Window
                 var installer = await App.Services.Updates.DownloadAsync(update, progress);
                 progressDialog.Hide();
                 await progressOperation;
-                App.Services.Updates.LaunchInstaller(installer, silent: true);
-                ((App)Microsoft.UI.Xaml.Application.Current).Shutdown();
+                App.Services.Updates.LaunchInstaller(installer, silent: false);
+                Environment.Exit(0);
             }
             catch (Exception error)
             {

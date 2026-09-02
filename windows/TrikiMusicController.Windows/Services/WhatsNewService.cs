@@ -9,6 +9,16 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.0.1",
+            "Uporządkowanie Ustawień, okładki albumów w HUD i regulacja jasności",
+            [
+                "Przebudowano Ustawienia w przejrzystą architekturę 4 kategorii (Połączenie i zasilanie, Działanie i wygląd, Integracje, O aplikacji).",
+                "Dodano wyświetlanie rzeczywistej okładki albumu w mini-nakładce Windows (Compact HUD) przy zmianie utworu i głośności.",
+                "Płynna regulacja głośności bez przeskoków wskaźnika.",
+                "Wprowadzono regulację jasności ekranu w pozycji 90° z wymogiem przytrzymania przycisku.",
+                "Przeniesiono konfigurację kąta obrotu do zakładki Sterowanie."
+            ]),
+        new ReleaseHighlight(
             "2.9.9",
             "Uporządkowanie zakładki Sterowanie w Windows",
             [

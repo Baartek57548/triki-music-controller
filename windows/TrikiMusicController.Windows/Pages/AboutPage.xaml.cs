@@ -9,6 +9,7 @@ public sealed partial class AboutPage : Page
     public AboutPage()
     {
         InitializeComponent();
+        DataContext = App.Services.ViewModel;
     }
 
     private async void GitHub_Click(object sender, RoutedEventArgs e) =>

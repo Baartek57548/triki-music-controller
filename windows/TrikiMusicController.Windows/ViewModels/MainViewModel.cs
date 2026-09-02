@@ -81,6 +81,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         new("Dark", "Ciemny"),
     ];
 
+    public string AppVersion => AppInfo.Version;
+    public string AppVersionTag => $"v{AppInfo.Version}";
+    public string AppVersionDisplay => $"Wersja {AppInfo.Version} (WinUI 3 • 64-bit)";
+    public string AboutVersionDisplay => $"Wersja {AppInfo.Version} • Windows x64";
+
     public TrikiDeviceInfo? SelectedDevice
     {
         get => _selectedDevice;
