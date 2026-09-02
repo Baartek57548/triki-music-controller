@@ -9,7 +9,7 @@ public sealed class SystemMouseService
     private const uint MouseEventfLeftDown = 0x0002;
     private const uint MouseEventfLeftUp = 0x0004;
     private const uint MouseEventfRightDown = 0x0008;
-    private const uint MouseEventfRightUp = 0x0009;
+    private const uint MouseEventfRightUp = 0x0010;
     private const uint MouseEventfWheel = 0x0800;
     private const int WheelDelta = 120;
 
@@ -86,7 +86,7 @@ public sealed class SystemMouseService
                 mi = new MOUSEINPUT
                 {
                     dwFlags = MouseEventfWheel,
-                    mouseData = (uint)(steps * WheelDelta),
+                    mouseData = unchecked((uint)(steps * WheelDelta)),
                 }
             }
         };

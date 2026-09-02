@@ -11,8 +11,10 @@ public sealed record AirMouseOutput(
 
 public sealed class AirMouseController
 {
-    private const float EdgeMinLateralAccY = 0.70f;
-    private const float EdgeMaxAbsZ = 0.35f;
+    private const float EdgeEnterLateralAccY = 0.70f;
+    private const float EdgeEnterMaxAbsZ = 0.35f;
+    private const float EdgeExitLateralAccY = 0.55f;
+    private const float EdgeExitMaxAbsZ = 0.50f;
     private const float TableRestMaxZ = -0.65f;
     private const float GyroDeadbandDps = 3.0f;
     private const float ScrollThresholdDegrees = 8.0f;
@@ -48,8 +50,8 @@ public sealed class AirMouseController
     public void NotifyClickTransient(long now)
     {
         _suppressMotionUntilNanos = Math.Max(_suppressMotionUntilNanos, now + ClickSuppressionDurationNanos);
-        _smoothedDeltaX *= 0.1f;
-        _smoothedDeltaY *= 0.1f;
+        _smoothedDeltaX = 0f;
+        _smoothedDeltaY = 0f;
         _subpixelX = 0f;
         _subpixelY = 0f;
     }
@@ -62,6 +64,12 @@ public sealed class AirMouseController
             return new AirMouseOutput(IsActive: false, IsScrollMode: false, 0, 0, 0);
         }
 
+        if (!float.IsFinite(sample.GyroscopeDps.X) || !float.IsFinite(sample.GyroscopeDps.Y) || !float.IsFinite(sample.GyroscopeDps.Z) ||
+            !float.IsFinite(sample.AccelerometerG.X) || !float.IsFinite(sample.AccelerometerG.Y) || !float.IsFinite(sample.AccelerometerG.Z))
+        {
+            return new AirMouseOutput(IsActive: true, IsScrollMode: false, 0, 0, 0);
+        }
+
         var now = sample.Source.TimestampNanos;
         var dt = 0.02f;
         if (_lastTimestampNanos is long previous)
@@ -70,6 +78,14 @@ public sealed class AirMouseController
             if (deltaNanos is > 0 and <= MaximumSampleGapNanos)
             {
                 dt = deltaNanos / 1_000_000_000f;
+            }
+            else
+            {
+                _smoothedDeltaX = 0f;
+                _smoothedDeltaY = 0f;
+                _subpixelX = 0f;
+                _subpixelY = 0f;
+                _accumulatedScrollAngle = 0f;
             }
         }
         _lastTimestampNanos = now;
@@ -89,8 +105,14 @@ public sealed class AirMouseController
             return new AirMouseOutput(IsActive: true, IsScrollMode: false, 0, 0, 0);
         }
 
-        // Wykrywanie trybu kółka myszy (Scroll): kapsel obrócony na boczną krawędź 90° (|Y| >= 0.70g, |Z| <= 0.35g)
-        if (MathF.Abs(accY) >= EdgeMinLateralAccY && MathF.Abs(accZ) <= EdgeMaxAbsZ)
+        // Wykrywanie trybu kółka myszy (Scroll) z histerezą:
+        // Wejście w tryb 90°: |Y| >= 0.70g i |Z| <= 0.35g
+        // Utrzymanie trybu (histereza): |Y| >= 0.55g i |Z| <= 0.50g
+        var shouldScroll = IsScrollMode
+            ? (MathF.Abs(accY) >= EdgeExitLateralAccY && MathF.Abs(accZ) <= EdgeExitMaxAbsZ)
+            : (MathF.Abs(accY) >= EdgeEnterLateralAccY && MathF.Abs(accZ) <= EdgeEnterMaxAbsZ);
+
+        if (shouldScroll)
         {
             IsScrollMode = true;
             _smoothedDeltaX = 0f;
@@ -107,13 +129,15 @@ public sealed class AirMouseController
             var scrollSteps = 0;
             if (_accumulatedScrollAngle >= ScrollThresholdDegrees)
             {
-                scrollSteps = -(int)(_accumulatedScrollAngle / ScrollThresholdDegrees); // Obrót w prawo -> scroll w dół
-                _accumulatedScrollAngle %= ScrollThresholdDegrees;
+                var steps = (int)(_accumulatedScrollAngle / ScrollThresholdDegrees);
+                scrollSteps = -steps; // Obrót w prawo -> scroll w dół
+                _accumulatedScrollAngle -= steps * ScrollThresholdDegrees;
             }
             else if (_accumulatedScrollAngle <= -ScrollThresholdDegrees)
             {
-                scrollSteps = (int)(MathF.Abs(_accumulatedScrollAngle) / ScrollThresholdDegrees); // Obrót w lewo -> scroll w górę
-                _accumulatedScrollAngle %= ScrollThresholdDegrees;
+                var steps = (int)(- _accumulatedScrollAngle / ScrollThresholdDegrees);
+                scrollSteps = steps; // Obrót w lewo -> scroll w górę
+                _accumulatedScrollAngle += steps * ScrollThresholdDegrees;
             }
 
             return new AirMouseOutput(

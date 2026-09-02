@@ -9,6 +9,14 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.4",
+            "Stabilizacja krawędziowa i pełny audyt modułu Air Mouse",
+            [
+                "Dodano histerezę przełączania trybu Scroll (90°), eliminując niestabilność przy granicznych kątach dłoni.",
+                "Naprawiono stałą Win32 PPM (MOUSEEVENTF_RIGHTUP) oraz rzutowanie liczb ze znakiem dla kółka myszy.",
+                "Wdrożono zabezpieczenie przed przerwami w strumieniu danych (gap reset) oraz zabezpieczenie wartości nieliczbowych (NaN/Infinity)."
+            ]),
+        new ReleaseHighlight(
             "3.1.3",
             "Dopracowanie Air Mouse: akumulator sub-pikselowy i stabilizacja kliknięcia",
             [
