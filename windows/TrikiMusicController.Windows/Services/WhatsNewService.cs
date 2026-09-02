@@ -9,6 +9,15 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.3",
+            "Dopracowanie Air Mouse: akumulator sub-pikselowy i stabilizacja kliknięcia",
+            [
+                "Dodano akumulator sub-pikselowy, zapewniający jedwabiście płynne mikro-celowanie bez utraty powolnych ruchów.",
+                "Wdrożono tłumienie drgań kliknięcia (Click-Jitter Lock) – kursor nie ucieka z celu przy wciskaniu fizycznego przycisku.",
+                "Zaimplementowano adaptacyjny filtr EMA (wysokie tłumienie drżenia przy wolnym ruchu + zerowy lag przy szybkim zamachu).",
+                "Zwiększono responsywność kółka myszy na bocznej krawędzi (8° na krok przewijania)."
+            ]),
+        new ReleaseHighlight(
             "3.1.2",
             "Pełny zasięg pionowy kursora myszy i ulepszona ergonomia Air Mouse",
             [

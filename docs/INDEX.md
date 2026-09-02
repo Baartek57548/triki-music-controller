@@ -43,6 +43,7 @@ Witamy w centralnej bazie wiedzy i grafie powiązań projektu **Triki Music Cont
 
 ### 5. Wydania i Dziennik Zmian (`#releases`)
 - [[Releases-Overview]] — Przegląd wszystkich wydań aplikacji.
+- [[Release-v3.1.3]] — Wersja 3.1.3: Dopracowanie Air Mouse (sub-piksele, click-lock, szybszy scroll).
 - [[Release-v3.1.2]] — Wersja 3.1.2: Pełny zasięg pionowy kursora do samej góry, ulepszona detekcja krawędzi.
 - [[Release-v3.1.1]] — Wersja 3.1.1: Poprawki osi pionowej i czułości Air Mouse, cicha automatyczna instalacja.
 - [[Release-v3.1.0]] — Wersja 3.1.0: Tryb myszki żyroskopowej (Air Mouse), uprawnienia w Ustawieniach, baza wiedzy Obsidian.

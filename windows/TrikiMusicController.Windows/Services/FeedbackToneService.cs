@@ -84,6 +84,8 @@ public sealed class FeedbackToneService : IDisposable
             _disposed = true;
             _likeTone?.Dispose();
             _dislikeTone?.Dispose();
+            _mouseOnTone?.Dispose();
+            _mouseOffTone?.Dispose();
         }
     }
 

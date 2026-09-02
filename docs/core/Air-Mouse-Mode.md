@@ -1,4 +1,4 @@
-﻿---
+---
 title: Tryb Myszki Żyroskopowej (Air Mouse)
 tags:
   - core
@@ -38,18 +38,21 @@ stateDiagram-v2
 - Wyzwolenie jest potwierdzane dźwiękiem oraz komunikatem w Windows Compact HUD (*„Tryb myszki: Aktywny”*).
 - Puszczenie przycisku po 4 sekundach jest automatycznie pochłaniane (`ConsumeCurrentHold`) — nie wywołuje kliknięcia myszy ani pauzy muzyki.
 
-### 2. Sterowanie Kursorem w Powietrzu (Pozycja odwrócona)
-- Gdy kapsel znajduje się w pozycji odwróconej ($a_z \ge +0.35g$), odczyty żyroskopu (Pitch / Yaw) są przeliczane na ruch kursora myszy $\Delta X, \Delta Y$ za pomocą natywnego Windows API `SendInput`.
-- Zastosowano filtr wygładzający oraz nieliniową balistykę przyspieszenia:
-  $$v = \text{sign}(\omega) \cdot (|\omega| \cdot 0.38 + |\omega|^2 \cdot 0.006)$$
-- Drobne ruchy dłoni pozwalają na pikselową precyzję, a szybsze ruchy pozwalają błyskawicznie przebyć cały ekran.
+### 2. Sterowanie Kursorem w Powietrzu
+- Gdy kontroler jest trzymany w dłoni, odczyty żyroskopu (Pitch / Yaw) są przeliczane na ruch kursora myszy $\Delta X, \Delta Y$ za pomocą natywnego Windows API `SendInput`.
+- **Sub-pikselowy akumulator ułamkowy**: Zapobiega utracie powolnych mikroruchów, zapewniając płynność 1:1 przy precyzyjnym celowaniu.
+- **Tłumienie drgań kliknięcia (Click-Jitter Suppression)**: W momencie wciśnięcia przycisku ruch kursora jest stabilizowany przez 90 ms, eliminując przypadkowe zerwanie celownika pod wpływem mechanicznego nacisku palca.
+- **Adaptacyjny filtr EMA**: Dynamicznie przełącza się z mocnego filtrowania drżenia dłoni przy wolnym ruchu na zerowe opóźnienie przy szybkim zamachu.
+- **Nieliniowa balistyka prędkościowa**:
+  $$v = \text{sign}(\omega) \cdot (|\omega_{\text{soft}}| \cdot 0.20 + |\omega_{\text{soft}}|^2 \cdot 0.0030)$$
+- **Ergonomiczne dopasowanie osi pionowej**: 1.15x mnożnik skali dla osi Pitch, odpowiadający naturalnemu zakresowi ruchu nadgarstka.
 
 ### 3. Przyciski Myszy
 - **1x Kliknięcie** -> Lewy Przycisk Myszy (LPM).
 - **2x Kliknięcie** / **3x Kliknięcie** -> Prawy Przycisk Myszy (PPM / Menu kontekstowe).
 
-### 4. Kółko Przewijania (Scroll w pozycji 90°)
-- Po obróceniu kontrolera na krawędź ($90^\circ$), moduł przełącza się w tryb scrolla:
+### 4. Kółko Przewijania (Scroll na bocznej krawędzi 90°)
+- Po obróceniu kontrolera na boczną krawędź ($|a_y| \ge 0.70g, |a_z| \le 0.35g$), moduł przełącza się w tryb scrolla:
   - Obrót w prawo (zgodnie z ruchem wskazówek zegara) przewija dokument / stronę w dół (`ScrollDelta < 0`).
   - Obrót w lewo (przeciwnie do wskazówek zegara) przewija w górę (`ScrollDelta > 0`).
-  - Czułość: $10^\circ$ obrotu = 1 krok scrolla (`WHEEL_DELTA = 120`).
+  - Czułość: $8^\circ$ obrotu = 1 krok scrolla (`WHEEL_DELTA = 120`).

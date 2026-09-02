@@ -132,6 +132,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
 
                 if (buttonEvent is not null)
                 {
+                    _airMouseController.NotifyClickTransient(sample.TimestampNanos);
                     if (buttonEvent.Type == ButtonClickType.Single)
                     {
                         _mouse.LeftClick();
@@ -169,6 +170,11 @@ public sealed class TrikiRuntimeEngine : IDisposable
                 }
                 else
                 {
+                    if (isButtonPressed)
+                    {
+                        _airMouseController.NotifyClickTransient(sample.TimestampNanos);
+                    }
+
                     var mouseOutput = _airMouseController.Process(filtered);
                     if (mouseOutput.IsScrollMode)
                     {

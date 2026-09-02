@@ -81,6 +81,29 @@ public sealed class AirMouseControllerTests
     }
 
     [Fact]
+    public void Process_WhenClickTransientActive_SuppressesMotion()
+    {
+        var controller = new AirMouseController { IsActive = true };
+        var t = 1_000_000_000L;
+
+        var s1 = SensorTestData.Filtered(t, new Vector3f(0f, 0f, 1.0f), new Vector3f(0f, 0f, -30f));
+        controller.Process(s1);
+
+        controller.NotifyClickTransient(t);
+
+        // W oknie 90 ms od kliknięcia ruch jest tłumiony (ochrona przed zerwaniem celownika)
+        var sDuring = SensorTestData.Filtered(t + 40_000_000L, new Vector3f(0f, 0f, 1.0f), new Vector3f(0f, 0f, -30f));
+        var outDuring = controller.Process(sDuring);
+        Assert.Equal(0, outDuring.DeltaX);
+        Assert.Equal(0, outDuring.DeltaY);
+
+        // Po wygaśnięciu okna tłumienia ruch zostaje wznowiony
+        var sAfter = SensorTestData.Filtered(t + 120_000_000L, new Vector3f(0f, 0f, 1.0f), new Vector3f(0f, 0f, -30f));
+        var outAfter = controller.Process(sAfter);
+        Assert.True(outAfter.DeltaX > 0);
+    }
+
+    [Fact]
     public void Process_WhenBelowDeadband_SuppressesJitter()
     {
         var controller = new AirMouseController { IsActive = true };
