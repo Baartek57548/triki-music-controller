@@ -43,6 +43,18 @@ class TrikiButtonInterpreter {
         return true
     }
 
+    fun checkAndConsumeHoldDuration(now: Long, requiredDurationNanos: Long): Boolean {
+        val pressedAt = pressedAtNanos
+        if (!isPressed || currentHoldConsumed || pressedAt == null) {
+            return false
+        }
+        if (now - pressedAt >= requiredDurationNanos) {
+            consumeCurrentHold()
+            return true
+        }
+        return false
+    }
+
     fun reset() {
         protocolMode = TrikiButtonProtocolMode.UNKNOWN
         lastTimestampNanos = null

@@ -46,14 +46,22 @@ public static class MediaActionNames
 
 public sealed record ButtonClickEvent(ButtonClickType Type, long TimestampNanos);
 
-public sealed record MediaActionOption(MediaAction Action, string Name)
+public sealed record MediaActionOption(MediaAction Action, string DisplayName)
 {
-    public override string ToString() => Name;
+    public string Name => DisplayName;
+    public override string ToString() => DisplayName;
 }
 
-public sealed record ThemeOption(string Value, string Name)
+public sealed record ThemeOption(string Value, string DisplayName)
 {
-    public override string ToString() => Name;
+    public string Name => DisplayName;
+    public override string ToString() => DisplayName;
+}
+
+public sealed record MultiDeviceArbitrationOption(MultiDeviceArbitrationMode Mode, string DisplayName)
+{
+    public string Name => DisplayName;
+    public override string ToString() => DisplayName;
 }
 
 public enum TrikiButtonProtocolMode

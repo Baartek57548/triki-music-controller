@@ -9,6 +9,14 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.6",
+            "Kompleksowy audyt projektu, synchronizacja platform i optymalizacje",
+            [
+                "Przeprowadzono pełny audyt cyklu życia zasobów (IDisposable), eliminując potencjalne wycieki pamięci.",
+                "Zsynchronizowano platformę Android (pełny parytet algorytmów gestów, histerez i obsługi przycisków z Windows).",
+                "Wdrożono wielopoziomowy zestaw testów E2E i audyt grafu wiedzy Obsidian (0 uszkodzonych powiązań)."
+            ]),
+        new ReleaseHighlight(
             "3.1.5",
             "Naprawa i optymalizacja sterowania jasnością ekranu na krawędzi 90°",
             [

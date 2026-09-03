@@ -64,8 +64,8 @@ public partial class App : Microsoft.UI.Xaml.Application
                 action => _ = Services.Media.ExecuteAsync(action),
                 () => _ = Services.ViewModel.ConnectOrDisconnectAsync());
 
-            Services.Bluetooth.StateChanged += (_, _) => _dispatcherQueue.TryEnqueue(UpdateTrayStatus);
-            Services.Media.StateChanged += (_, _) => _dispatcherQueue.TryEnqueue(UpdateTrayStatus);
+            Services.Bluetooth.StateChanged += OnBluetoothStateChanged;
+            Services.Media.StateChanged += OnMediaStateChanged;
 
             var commandLineArgs = Environment.GetCommandLineArgs();
             var isWhatsNewRequested = commandLineArgs.Any(a => a.Equals("--whats-new", StringComparison.OrdinalIgnoreCase) || a.Equals("--updated", StringComparison.OrdinalIgnoreCase));
@@ -213,6 +213,16 @@ public partial class App : Microsoft.UI.Xaml.Application
         }
     }
 
+    private void OnBluetoothStateChanged(object? sender, BluetoothSnapshot state)
+    {
+        _dispatcherQueue?.TryEnqueue(UpdateTrayStatus);
+    }
+
+    private void OnMediaStateChanged(object? sender, MediaSnapshot state)
+    {
+        _dispatcherQueue?.TryEnqueue(UpdateTrayStatus);
+    }
+
     private void Window_Closed(object sender, WindowEventArgs args)
     {
         if (sender is Window closedWindow)
@@ -231,7 +241,12 @@ public partial class App : Microsoft.UI.Xaml.Application
     {
         if (_applicationResourcesDisposed) return;
         _applicationResourcesDisposed = true;
-        Services?.Dispose();
+        if (Services is not null)
+        {
+            Services.Bluetooth.StateChanged -= OnBluetoothStateChanged;
+            Services.Media.StateChanged -= OnMediaStateChanged;
+            Services.Dispose();
+        }
         if (_mainInstance is not null)
             _mainInstance.Activated -= MainInstance_Activated;
         ReleaseSingleInstanceMutex();

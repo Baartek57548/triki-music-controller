@@ -22,6 +22,14 @@ public sealed partial class MainWindow : Window
         RootFrame.Navigate(typeof(MainPage));
         Navigation.SelectedItem = HomeItem;
         Activated += MainWindow_Activated;
+        Closed += MainWindow_Closed;
+    }
+
+    private void MainWindow_Closed(object sender, WindowEventArgs args)
+    {
+        Activated -= MainWindow_Activated;
+        Closed -= MainWindow_Closed;
+        _updateGate.Dispose();
     }
 
     public void ApplyTheme(string theme)

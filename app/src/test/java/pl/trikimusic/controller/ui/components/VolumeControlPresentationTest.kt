@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.domain.model.OrientationData
 import pl.trikimusic.controller.domain.model.RawVector3
@@ -31,10 +32,24 @@ class VolumeControlPresentationTest {
     @Test
     fun `vertical and upside down poses provide distinct corrective guidance`() {
         val vertical = uiState(runtime = runtime(withinRange = false, tilt = 90f))
-        val upsideDown = uiState(runtime = runtime(withinRange = false, tilt = 180f))
+        val upsideDown = uiState(
+            settings = AppSettings(rotationAngleDegrees = 200),
+            runtime = runtime(withinRange = false, tilt = 180f),
+        )
+        val upsideDownCustom = uiState(
+            settings = AppSettings(rotationAngleDegrees = 315),
+            runtime = runtime(withinRange = false, tilt = 180f),
+        )
 
         assertEquals(VolumeGateState.OUTSIDE_TILT_RANGE, vertical.volumeControlPresentation().state)
-        assertEquals(VolumeGateState.UPSIDE_DOWN, upsideDown.volumeControlPresentation().state)
+
+        val presentationDefault = upsideDown.volumeControlPresentation()
+        assertEquals(VolumeGateState.UPSIDE_DOWN, presentationDefault.state)
+        assertTrue(presentationDefault.instruction.contains("200°"))
+
+        val presentationCustom = upsideDownCustom.volumeControlPresentation()
+        assertEquals(VolumeGateState.UPSIDE_DOWN, presentationCustom.state)
+        assertTrue(presentationCustom.instruction.contains("315°"))
     }
 
     @Test
@@ -87,8 +102,10 @@ class VolumeControlPresentationTest {
 
     private fun uiState(
         connectionState: TrikiConnectionState = TrikiConnectionState.READY,
+        settings: AppSettings = AppSettings(),
         runtime: RuntimeState,
     ) = MainUiState(
+        settings = settings,
         ble = TrikiBleState(connectionState = connectionState),
         runtime = runtime,
     )

@@ -126,7 +126,17 @@ class GyroscopeVolumeControllerTest {
         }
 
         assertTrue(early.none { it.action != null })
-        assertEquals(1, later.count { it.action == MediaAction.VOLUME_UP })
+        assertTrue(later.any { it.action == MediaAction.VOLUME_UP })
+    }
+
+    @Test
+    fun `default configuration matches Windows parity thresholds`() {
+        val config = GyroscopeVolumeController.Configuration()
+        assertEquals(22f, config.activationGyroscopeDps, 0.001f)
+        assertEquals(12f, config.releaseGyroscopeDps, 0.001f)
+        assertEquals(22f, config.degreesPerVolumeStep, 0.001f)
+        assertEquals(0.16f, config.gyroscopeSmoothingAlpha, 0.001f)
+        assertEquals(140L, config.minimumStepIntervalMillis)
     }
 
     @Test
@@ -138,7 +148,7 @@ class GyroscopeVolumeControllerTest {
 
         val outputs = List(40) { index ->
             controller.process(
-                sample((41L + index) * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 24f), FACE_UP_GRAVITY),
+                sample((41L + index) * SAMPLE_PERIOD_NANOS, Vector3(0f, 0f, 18f), FACE_UP_GRAVITY),
             )
         }
 

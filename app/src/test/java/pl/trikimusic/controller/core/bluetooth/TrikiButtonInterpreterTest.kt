@@ -97,6 +97,37 @@ class TrikiButtonInterpreterTest {
     }
 
     @Test
+    fun `checkAndConsumeHoldDuration consumes hold when duration is reached`() {
+        val fixture = Fixture().apply { identifyButtonFirmware() }
+
+        // Press and hold for 20 frames (approx 384 ms)
+        fixture.feed(1, frames = 20)
+        assertTrue(fixture.interpreter.isPressed)
+
+        // 500 ms required -> not yet reached (has been ~384 ms)
+        assertFalse(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 500_000_000L))
+
+        // Feed another 10 frames -> total ~576 ms
+        fixture.feed(1, frames = 10)
+        assertTrue(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 500_000_000L))
+
+        // Subsequent call returns false because it was already consumed
+        assertFalse(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 500_000_000L))
+
+        // Releasing after hold consumed produces no click events
+        fixture.feed(0, frames = 25)
+        assertTrue(fixture.events.isEmpty())
+        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
+    }
+
+    @Test
+    fun `checkAndConsumeHoldDuration returns false when not pressed`() {
+        val fixture = Fixture().apply { identifyButtonFirmware() }
+        assertFalse(fixture.interpreter.isPressed)
+        assertFalse(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 100_000_000L))
+    }
+
+    @Test
     fun `unexpected status cancels a pending click and selects counter mode`() {
         val fixture = Fixture().apply { identifyButtonFirmware() }
 
@@ -125,7 +156,9 @@ class TrikiButtonInterpreterTest {
     private class Fixture {
         val interpreter = TrikiButtonInterpreter()
         val events = mutableListOf<ButtonClickType>()
-        private var timestampNanos = 0L
+        var timestampNanos = 0L
+            private set
+        val currentTimestamp: Long get() = timestampNanos
         private var nextFrameIndex = 0L
 
         fun identifyButtonFirmware() {

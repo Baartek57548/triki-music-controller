@@ -1,6 +1,20 @@
-# Architektura
+---
+title: Architektura Systemu (Legacy Reference)
+tags:
+  - architecture
+  - legacy
+---
 
-## Cele
+# Architektura Systemu (Legacy Reference)
+
+Powiązane węzły:
+- [[INDEX]] — główny indeks bazy wiedzy.
+- [[System-Overview]] — nowoczesny całościowy przegląd architektury.
+- [[Android-Architecture]] — architektura aplikacji mobilnej Android.
+- [[Windows-Architecture]] — architektura aplikacji desktopowej Windows.
+- [[TRIKI_PROTOCOL]] — specyfikacja protokołu sprzętowego BLE.
+
+---
 
 Architektura oddziela elementy platformowe Androida i Windows (GATT, cykl życia, sesje multimedialne i głośność) od deterministycznej logiki IMU. Dzięki temu parser, filtr, regulator głośności oraz gesty są testowane bez telefonu i fizycznego Triki: na JVM dla Androida i w xUnit dla Windows.
 

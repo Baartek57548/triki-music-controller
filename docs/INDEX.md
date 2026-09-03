@@ -17,9 +17,11 @@ Witamy w centralnej bazie wiedzy i grafie powiązań projektu **Triki Music Cont
 - [[System-Overview]] — Całościowy model przepływu danych i zasady podziału na warstwy.
 - [[Android-Architecture]] — Architektura aplikacji mobilnej (Kotlin, Jetpack Compose, StateFlow).
 - [[Windows-Architecture]] — Architektura aplikacji desktopowej (C# / .NET 10, WinUI 3, Compact HUD).
+- [[ARCHITECTURE]] — Historyczna specyfikacja monolityczna architektury i warstw (Legacy Reference).
 
 ### 2. Algorytmy i Silnik Sterowania (`#core` `#imu` `#ble`)
 - [[BLE-Protocol]] — Specyfikacja pakietu 20-bajtowego, usługi GATT i zarządzanie wybudzeniem (`WakeAdvertisementGate`).
+- [[TRIKI_PROTOCOL]] — Wczesny protokół badawczy BLE Żabka Triki i inżynieria wsteczna (Research Reference).
 - [[Sensor-Filtering]] — Kalibracja, filtr Median3, filtr komplementarny i adaptacyjna martwa strefa żyroskopu.
 - [[Gyro-Volume-Control]] — Płynna regulacja głośności w pozycji stojącej z 2-sekundową bramką stabilizacji.
 - [[Inverted-Capsule-Gestures]] — Przełączanie utworów (Next/Previous) gestem odwróconego kapsla z konfigurowalnym kątem (`90°–360°`).
@@ -43,6 +45,7 @@ Witamy w centralnej bazie wiedzy i grafie powiązań projektu **Triki Music Cont
 
 ### 5. Wydania i Dziennik Zmian (`#releases`)
 - [[Releases-Overview]] — Przegląd wszystkich wydań aplikacji.
+- [[Release-v3.1.6]] — Wersja 3.1.6: Kompleksowy audyt architektury, synchronizacja platform i testy E2E.
 - [[Release-v3.1.5]] — Wersja 3.1.5: Naprawa regulacji jasności ekranu (WMI + DDC/CI, histereza).
 - [[Release-v3.1.4]] — Wersja 3.1.4: Histereza krawędziowa, poprawka flagi PPM, zabezpieczenie strumienia.
 - [[Release-v3.1.3]] — Wersja 3.1.3: Dopracowanie Air Mouse (sub-piksele, click-lock, szybszy scroll).

@@ -15,6 +15,7 @@ Powiązane węzły:
 - [[Sensor-Filtering]] — wstępne przetwarzanie i filtracja sygnałów IMU.
 - [[Settings-Architecture]] — model konfiguracji i synchronizacji stanu.
 - [[ADR-002-Dual-Platform-Core-Parity]] — zasada 100% spójności algorytmów między platformami.
+- [[ARCHITECTURE]] — historyczna specyfikacja warstw i komponentów (Legacy Reference).
 
 ---
 

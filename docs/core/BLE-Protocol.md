@@ -1,4 +1,4 @@
-﻿---
+---
 title: Protokół Komunikacji BLE
 tags:
   - core
@@ -13,6 +13,7 @@ Powiązane węzły:
 - [[Sensor-Filtering]] — proces dekodowania i kalibracji surowych próbek.
 - [[Button-Interpreter]] — interpretacja pola statusu (przycisk fizyczny).
 - [[System-Overview]] — architektura systemu.
+- [[TRIKI_PROTOCOL]] — wczesna specyfikacja inżynierii wstecznej i testów sprzętowych (Research Reference).
 
 ---
 

@@ -1,4 +1,4 @@
-﻿---
+---
 title: Wydanie v3.1.0
 tags:
   - releases
@@ -31,4 +31,4 @@ Powiązane węzły:
    - Dodano panel informacyjny uprawnień w *Ustawieniach* Windows z bezpośrednim skrótem do Ustawień systemowych (`ms-settings:privacy-radios`).
 
 3. **Zintegrowana Baza Wiedzy Obsidian Knowledge Vault**:
-   - Kompleksowa dokumentacja techniczna w katalogu `docs/` z powiązaniami dwukierunkowymi `[[wikilinks]]`, rejestrem decyzji architektonicznych (ADR) oraz kolorowaniem węzłów w widoku grafu.
+   - Kompleksowa dokumentacja techniczna w katalogu `docs/` z powiązaniami dwukierunkowymi (wikilinks), rejestrem decyzji architektonicznych (ADR) oraz kolorowaniem węzłów w widoku grafu.

@@ -1,6 +1,22 @@
-# Protokół Żabka Triki
+---
+title: Protokół Żabka Triki (Research Reference)
+tags:
+  - core
+  - ble
+  - protocol
+  - legacy
+---
 
-## Metoda i poziom pewności
+# Protokół Żabka Triki (Research Reference)
+
+Powiązane węzły:
+- [[INDEX]] — główny indeks bazy wiedzy.
+- [[BLE-Protocol]] — zunifikowana specyfikacja protokołu BLE.
+- [[Sensor-Filtering]] — filtracja i fuzja sensorów IMU.
+- [[Button-Interpreter]] — interpretacja przycisku i debouncing.
+- [[ARCHITECTURE]] — specyfikacja architektury systemu.
+
+---
 
 Poniższe dane pochodzą z porównania [Maku-hub/TrikiScope](https://github.com/Maku-hub/TrikiScope), [koksny/TRIKI-Control](https://github.com/koksny/TRIKI-Control) oraz pomiarów sprzętowych opisanych w [matiaspalmac/everything-imu](https://github.com/matiaspalmac/everything-imu/blob/main/DEVICES.md). Źródła pokazują co najmniej dwa warianty firmware, dlatego parser przyjmuje wspólny, potwierdzony podzbiór zamiast uznawać jedną obserwację za jedyną wersję protokołu.
 

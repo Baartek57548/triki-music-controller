@@ -12,7 +12,8 @@ Poniżej znajduje się chronologiczny wykaz wydań projektu **Triki Music Contro
 
 ## Wykaz Wydań
 
-- [[Release-v3.1.5]] — Wersja 3.1.5 (Aktualna stabilna): Pełna naprawa regulacji jasności ekranu (WMI + DDC/CI dla monitorów zewnętrznych, histereza akceleracji).
+- [[Release-v3.1.6]] — Wersja 3.1.6 (Aktualna stabilna): Kompleksowy audyt architektury, pełny cykl IDisposable, synchronizacja platformy Android i zestaw testów E2E.
+- [[Release-v3.1.5]] — Wersja 3.1.5: Pełna naprawa regulacji jasności ekranu (WMI + DDC/CI dla monitorów zewnętrznych, histereza akceleracji).
 - [[Release-v3.1.4]] — Wersja 3.1.4: Histereza krawędziowa scrolla 90°, poprawka flagi Win32 PPM, zabezpieczenie strumienia danych (86 testów).
 - [[Release-v3.1.3]] — Wersja 3.1.3: Dopracowanie Air Mouse (sub-pikselowy akumulator, click-lock, adaptacyjny EMA, szybszy scroll).
 - [[Release-v3.1.2]] — Wersja 3.1.2: Pełny zasięg pionowy kursora do samej góry ekranu, udoskonalona detekcja bocznej krawędzi dla scrolla.

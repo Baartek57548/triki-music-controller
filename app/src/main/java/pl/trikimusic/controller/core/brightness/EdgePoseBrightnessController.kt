@@ -1,4 +1,4 @@
-﻿package pl.trikimusic.controller.core.brightness
+package pl.trikimusic.controller.core.brightness
 
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -18,18 +18,20 @@ class EdgePoseBrightnessController(
     private val stabilizationNanos: Long = DEFAULT_STABILIZATION_NANOS,
 ) {
     companion object {
-        const val DEFAULT_STABILIZATION_NANOS = 400_000_000L // 400 ms
-        const val DEGREES_PER_PERCENT_BRIGHTNESS = 3.6f // 360 deg = 100%
-        const val GYROSCOPE_DEADBAND_DPS = 4.0f
-        const val MAXIMUM_Z_AXIS_DEVIATION_G = 0.40f
-        const val MINIMUM_PLANE_ACCELERATION_G = 0.75f
-        const val MAXIMUM_PLANE_ACCELERATION_G = 1.25f
+        const val DEFAULT_STABILIZATION_NANOS = 150_000_000L // 150 ms szybkiej stabilizacji
+        const val DEGREES_PER_PERCENT_BRIGHTNESS = 2.5f // 250 deg = 100% jasności
+        const val GYROSCOPE_DEADBAND_DPS = 3.0f
+        const val EDGE_ENTER_MAX_Z = 0.45f
+        const val EDGE_EXIT_MAX_Z = 0.60f
+        const val MINIMUM_PLANE_ACCELERATION_G = 0.65f
+        const val MAXIMUM_PLANE_ACCELERATION_G = 1.35f
     }
 
     private var currentBrightnessPercent = initialBrightnessPercent.coerceIn(0f, 100f)
     private var stabilizationStartNanos: Long? = null
     private var lastTimestampNanos: Long? = null
     private var accumulatedDegrees = 0f
+    private var isCurrentlyInEdge = false
 
     fun getBrightness(): Float = currentBrightnessPercent
 
@@ -41,20 +43,24 @@ class EdgePoseBrightnessController(
         stabilizationStartNanos = null
         lastTimestampNanos = null
         accumulatedDegrees = 0f
+        isCurrentlyInEdge = false
     }
 
     fun process(sample: FilteredSensorData, isButtonPressed: Boolean = true): BrightnessControlResult {
         val accZ = abs(sample.accelerometerG.z)
         val planeAcc = sqrt(
             sample.accelerometerG.x * sample.accelerometerG.x +
-            sample.accelerometerG.y * sample.accelerometerG.y
+            sample.accelerometerG.y * sample.accelerometerG.y,
         )
 
-        val isEdgePose = accZ <= MAXIMUM_Z_AXIS_DEVIATION_G &&
-            planeAcc >= MINIMUM_PLANE_ACCELERATION_G &&
-            planeAcc <= MAXIMUM_PLANE_ACCELERATION_G &&
-            abs(sample.accelerationMagnitude - 1f) <= 0.25f
+        // Histereza pozycji krawędziowej 90°
+        val isEdgePose = if (isCurrentlyInEdge) {
+            accZ <= EDGE_EXIT_MAX_Z && planeAcc >= MINIMUM_PLANE_ACCELERATION_G * 0.8f
+        } else {
+            accZ <= EDGE_ENTER_MAX_Z && planeAcc >= MINIMUM_PLANE_ACCELERATION_G && planeAcc <= MAXIMUM_PLANE_ACCELERATION_G
+        }
 
+        isCurrentlyInEdge = isEdgePose
         val timestamp = sample.source.timestampNanos
 
         if (!isEdgePose) {
@@ -87,7 +93,7 @@ class EdgePoseBrightnessController(
         val elapsedStabilization = timestamp - stabilizationStartNanos!!
         val stabilizationProgress = (elapsedStabilization.toFloat() / stabilizationNanos).coerceIn(0f, 1f)
 
-        if (elapsedStabilization < stabilizationNanos) {
+        if (elapsedStabilization < stabilizationNanos && !isButtonPressed) {
             lastTimestampNanos = timestamp
             return BrightnessControlResult(
                 active = true,
@@ -115,7 +121,8 @@ class EdgePoseBrightnessController(
         var deltaPercent = 0f
         val prevTimestamp = lastTimestampNanos
         if (prevTimestamp != null && timestamp > prevTimestamp) {
-            val dtSeconds = (timestamp - prevTimestamp) / 1_000_000_000f
+            val deltaNanos = timestamp - prevTimestamp
+            val dtSeconds = if (deltaNanos > 250_000_000L) 0.02f else (deltaNanos / 1_000_000_000f)
             val gyroZ = sample.gyroscopeDps.z
 
             if (abs(gyroZ) >= GYROSCOPE_DEADBAND_DPS) {

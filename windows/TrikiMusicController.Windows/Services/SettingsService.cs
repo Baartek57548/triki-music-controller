@@ -18,9 +18,14 @@ public sealed class SettingsService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Converters = { new JsonStringEnumConverter() },
     };
-    private readonly string _settingsDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "TrikiMusicController");
+    private readonly string _settingsDirectory;
+
+    public SettingsService(string? customSettingsDirectory = null)
+    {
+        _settingsDirectory = customSettingsDirectory ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "TrikiMusicController");
+    }
 
     public AppSettings Current { get; private set; } = new();
 
@@ -92,7 +97,7 @@ public sealed class SettingsService
 
     private string SettingsPath => Path.Combine(_settingsDirectory, "settings.json");
 
-    private static AppSettings Normalize(AppSettings settings)
+    internal static AppSettings Normalize(AppSettings settings)
     {
         settings.Theme = settings.Theme is "System" or "Light" or "Dark" ? settings.Theme : "System";
         settings.SingleClickAction = NormalizeAction(settings.SingleClickAction, MediaAction.PlayPause);
@@ -128,7 +133,7 @@ public sealed class SettingsService
     private static MediaAction NormalizeAction(MediaAction action, MediaAction fallback) =>
         Enum.IsDefined(action) ? action : fallback;
 
-    private static CalibrationProfile NormalizeCalibration(CalibrationProfile? calibration)
+    internal static CalibrationProfile NormalizeCalibration(CalibrationProfile? calibration)
     {
         if (calibration is null ||
             !InRange(calibration.AccelerometerBiasX, 4f) ||

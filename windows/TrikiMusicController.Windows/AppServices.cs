@@ -45,5 +45,6 @@ public sealed class AppServices : IDisposable
         Bluetooth.Dispose();
         Media.Dispose();
         Updates.Dispose();
+        Hud.Dispose();
     }
 }

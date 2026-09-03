@@ -11,9 +11,6 @@ using TrikiMusicController_Windows.Services;
 
 namespace TrikiMusicController_Windows.ViewModels;
 
-public sealed record ThemeOption(string Value, string DisplayName);
-public sealed record MediaActionOption(MediaAction Action, string DisplayName);
-public sealed record MultiDeviceArbitrationOption(MultiDeviceArbitrationMode Mode, string DisplayName);
 
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {

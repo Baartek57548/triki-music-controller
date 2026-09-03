@@ -38,7 +38,7 @@ fun MainUiState.volumeControlPresentation(): VolumeControlPresentation = when {
     runtime.volumeTiltDegrees >= UPSIDE_DOWN_TILT_DEGREES -> VolumeControlPresentation(
         VolumeGateState.UPSIDE_DOWN,
         "Tryb zmiany utworu",
-        "Ustabilizuj odwrócone Triki, a następnie obróć je o 270°.",
+        "Ustabilizuj odwrócone Triki, a następnie obróć je o ${settings.rotationAngleDegrees}°.",
         false,
     )
 

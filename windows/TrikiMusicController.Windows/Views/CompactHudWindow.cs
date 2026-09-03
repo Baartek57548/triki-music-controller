@@ -12,7 +12,7 @@ using WinRT.Interop;
 
 namespace TrikiMusicController_Windows.Views;
 
-public sealed class CompactHudWindow : Window
+public sealed class CompactHudWindow : Window, IDisposable
 {
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -381,5 +381,19 @@ public sealed class CompactHudWindow : Window
 
         _hideTimer.Stop();
         _hideTimer.Start();
+    }
+
+    public void Dispose()
+    {
+        _hideTimer.Stop();
+        HideHud();
+        try
+        {
+            Close();
+        }
+        catch
+        {
+            // Ignore if window is already closed or closing
+        }
     }
 }

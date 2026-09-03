@@ -40,8 +40,10 @@ public sealed class BluetoothService : IDisposable
     private long _lastAutoConnectAttemptNanos;
     private long _lastDiscoveryPublishNanos;
     private long _lastSampleReceivedNanos;
+    private long _lastTelemetryPublishNanos;
     private const long AutoConnectCooldownNanos = 2_500_000_000;
     private const long DiscoveryPublishThrottleNanos = 400_000_000;
+    private const long TelemetryPublishThrottleNanos = 250_000_000;
 
     public event EventHandler<BluetoothSnapshot>? StateChanged;
     public event EventHandler<TrikiSensorData>? SampleReceived;
@@ -446,13 +448,30 @@ public sealed class BluetoothService : IDisposable
                 SampleReceived?.Invoke(this, sample);
             }
             var statistics = _decoder.Statistics;
-            UpdateState(state => state with
+            var sampleRate = CalculateSampleRate();
+            var now = _lastSampleReceivedNanos;
+            bool shouldPublishTelemetry;
+            BluetoothSnapshot snapshot;
+            lock (_stateLock)
             {
-                SampleRateHz = CalculateSampleRate(),
-                DecodedFrames = statistics.DecodedFrames,
-                DiscardedStartupFrames = statistics.DiscardedStartupFrames,
-                DroppedProtocolBytes = statistics.DroppedBytes,
-            });
+                State = State with
+                {
+                    SampleRateHz = sampleRate,
+                    DecodedFrames = statistics.DecodedFrames,
+                    DiscardedStartupFrames = statistics.DiscardedStartupFrames,
+                    DroppedProtocolBytes = statistics.DroppedBytes,
+                };
+                snapshot = State;
+                shouldPublishTelemetry = now - _lastTelemetryPublishNanos >= TelemetryPublishThrottleNanos;
+                if (shouldPublishTelemetry)
+                {
+                    _lastTelemetryPublishNanos = now;
+                }
+            }
+            if (shouldPublishTelemetry)
+            {
+                StateChanged?.Invoke(this, snapshot);
+            }
         }
         catch (Exception error)
         {
@@ -639,6 +658,7 @@ public sealed class BluetoothService : IDisposable
         CancelWakeWatcher();
         DisposeWatcher();
         CleanupConnection();
+        _connectionGate.Dispose();
     }
 
     private static readonly TimeSpan WakeArmPollInterval = TimeSpan.FromMilliseconds(250);
