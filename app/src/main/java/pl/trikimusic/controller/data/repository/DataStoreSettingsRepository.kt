@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.io.IOException
-import kotlin.math.abs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -18,13 +17,9 @@ import pl.trikimusic.controller.domain.model.AppSettings
 import pl.trikimusic.controller.domain.model.ButtonClickType
 import pl.trikimusic.controller.domain.model.ButtonMapping
 import pl.trikimusic.controller.domain.model.CalibrationProfile
-import pl.trikimusic.controller.domain.model.ControlProfile
 import pl.trikimusic.controller.domain.model.LogCategory
 import pl.trikimusic.controller.domain.model.MediaAction
 import pl.trikimusic.controller.domain.model.ThemePreference
-import pl.trikimusic.controller.domain.model.defaultButtonMappings
-import pl.trikimusic.controller.domain.model.defaultProfiles
-import pl.trikimusic.controller.domain.model.withCurrentOrientationConvention
 import pl.trikimusic.controller.domain.repository.SettingsRepository
 
 private val Context.trikiDataStore: DataStore<Preferences> by preferencesDataStore(name = "triki_settings")
@@ -121,48 +116,6 @@ class DataStoreSettingsRepository(
             logger.log(LogCategory.PERMISSION, "Nieprawidłowe ustawienia zostały zastąpione domyślnymi.", error)
             AppSettings()
         }
-    }
-
-    private fun AppSettings.normalized(): AppSettings {
-        val safeProfiles = profiles.ifEmpty { defaultProfiles() }
-            .map { profile -> profile.migrateLegacyButtonDefaults() }
-        val safeActive = activeProfileId.takeIf { id -> safeProfiles.any { it.id == id } } ?: safeProfiles.first().id
-        return copy(
-            profiles = safeProfiles,
-            activeProfileId = safeActive,
-            calibration = calibration.sanitized(),
-        )
-    }
-
-    private fun ControlProfile.migrateLegacyButtonDefaults(): ControlProfile {
-        if (!builtIn) return this
-        val actionByClick = buttonMappings.associate { mapping -> mapping.click to mapping.action }
-        val usesLegacyDefaults = actionByClick[ButtonClickType.SINGLE] == MediaAction.PLAY_PAUSE &&
-            actionByClick[ButtonClickType.DOUBLE] == MediaAction.NEXT &&
-            actionByClick[ButtonClickType.TRIPLE] == MediaAction.PREVIOUS
-        return if (usesLegacyDefaults) copy(buttonMappings = defaultButtonMappings()) else this
-    }
-
-    private fun CalibrationProfile.sanitized(): CalibrationProfile {
-        val safe = isValid &&
-            calibratedAtMillis?.let { it >= 0L } == true &&
-            listOf(accelerometerBiasX, accelerometerBiasY, accelerometerBiasZ).all { it.isFinite() && abs(it) <= 4f } &&
-            listOf(gyroscopeBiasX, gyroscopeBiasY, gyroscopeBiasZ).all { it.isFinite() && abs(it) <= 2_000f } &&
-            accelerometerNoise.isFinite() && accelerometerNoise in 0f..4f &&
-            gyroscopeNoise.isFinite() && gyroscopeNoise in 0f..2_000f &&
-            neutralPitch.isFinite() && neutralRoll.isFinite()
-        if (!safe) return CalibrationProfile()
-
-        val migrated = withCurrentOrientationConvention()
-        return migrated.copy(
-            neutralPitch = normalizeDegrees(migrated.neutralPitch),
-            neutralRoll = normalizeDegrees(migrated.neutralRoll),
-        )
-    }
-
-    private fun normalizeDegrees(value: Float): Float {
-        val normalized = Math.IEEEremainder(value.toDouble(), 360.0).toFloat()
-        return if (normalized == -180f) 180f else normalized
     }
 
     private companion object {

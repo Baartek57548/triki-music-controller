@@ -13,9 +13,12 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.bluetooth.le.ScanFilter
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import java.nio.charset.StandardCharsets
 import java.util.ArrayDeque
 import java.util.UUID
@@ -64,6 +67,11 @@ class TrikiBleManager(
     private val metadataValues = mutableMapOf<UUID, ByteArray>()
     private val sampleRateWindow = ArrayDeque<Long>()
     private val wakeAdvertisementGate = WakeAdvertisementGate()
+    private val callbackHandler = Handler(Looper.getMainLooper())
+    private var setupTimeoutJob: Job? = null
+    private var streamWatchdogJob: Job? = null
+    private var awaitingFirstFrame = false
+    private var lastValidFrameNanos = 0L
 
     val state: StateFlow<TrikiBleState> = mutableState.asStateFlow()
     val samples: SharedFlow<TrikiSensorData> = mutableSamples.asSharedFlow()
@@ -359,7 +367,12 @@ class TrikiBleManager(
             .setScanMode(scanMode)
             .setReportDelay(0L)
             .build()
-        scanner.startScan(null, settings, callback)
+        val filters = if (waitingForWake) {
+            listOf(ScanFilter.Builder().setDeviceAddress(requireNotNull(autoConnectAddress)).build())
+        } else {
+            null
+        }
+        scanner.startScan(filters, settings, callback)
         scanCallback = callback
     }
 
@@ -459,7 +472,11 @@ class TrikiBleManager(
             },
         )
         gattUsesAutoConnect = useAutoConnect
-        bluetoothGatt = device.connectGatt(context, useAutoConnect, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        bluetoothGatt = requireNotNull(device.connectGatt(
+            context, useAutoConnect, gattCallback, BluetoothDevice.TRANSPORT_LE,
+            BluetoothDevice.PHY_LE_1M_MASK, callbackHandler,
+        )) { "Android nie utworzył klienta GATT." }
+        if (!useAutoConnect) armSetupTimeout(requireNotNull(bluetoothGatt), 30_000L)
     }
 
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
@@ -471,12 +488,16 @@ class TrikiBleManager(
                 return
             }
             if (status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
+                armSetupTimeout(gatt)
                 mutableState.update { it.copy(connectionState = TrikiConnectionState.CONNECTED, errorMessage = null) }
                 logger.log(LogCategory.BLE, "Połączono; rozpoczynam discovery services.")
                 if (!gatt.discoverServices()) recoverFromGattSetupFailure(gatt, "Nie udało się rozpocząć odkrywania usług GATT.")
                 return
             }
             if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                setupTimeoutJob?.cancel()
+                streamWatchdogJob?.cancel()
+                awaitingFirstFrame = false
                 logger.log(LogCategory.BLE, "Połączenie BLE przerwane (status=$status).")
                 rssiJob?.cancel()
                 rssiJob = null
@@ -595,6 +616,7 @@ class TrikiBleManager(
 
     @SuppressLint("MissingPermission")
     private fun readNextMetadata(gatt: BluetoothGatt) {
+        armSetupTimeout(gatt)
         val next = metadataQueue.pollFirst()
         if (next == null) {
             enableNotifications(gatt, TrikiProtocol.NUS_TX_UUID)
@@ -608,6 +630,7 @@ class TrikiBleManager(
 
     @SuppressLint("MissingPermission")
     private fun enableNotifications(gatt: BluetoothGatt, characteristicUuid: UUID): Boolean {
+        if (characteristicUuid == TrikiProtocol.NUS_TX_UUID) armSetupTimeout(gatt)
         val characteristic = findCharacteristic(gatt, characteristicUuid)
         if (characteristic == null) {
             handleNotificationSetupFailure(gatt, characteristicUuid, "Brak charakterystyki notyfikacji $characteristicUuid.")
@@ -649,11 +672,11 @@ class TrikiBleManager(
             recoverFromGattSetupFailure(gatt, "Komenda startowa Triki została odrzucona: $status")
             return
         }
-        reconnectAttempt = 0
-        autoReconnectAuthorized = true
+        awaitingFirstFrame = true
+        armSetupTimeout(gatt, 5_000L)
         mutableState.update {
             it.copy(
-                connectionState = TrikiConnectionState.READY,
+                connectionState = TrikiConnectionState.CONNECTED,
                 errorMessage = null,
                 decodedFrames = 0L,
                 discardedStartupFrames = 0L,
@@ -663,7 +686,26 @@ class TrikiBleManager(
             )
         }
         logger.log(LogCategory.PROTOCOL, "Wysłano komendę stabilnego strumienia ~53 Hz: 20 10 00 D0 07 34 00 03.")
+    }
+
+    private fun confirmStreamReady(gatt: BluetoothGatt) {
+        awaitingFirstFrame = false
+        setupTimeoutJob?.cancel()
+        setupTimeoutJob = null
+        reconnectAttempt = 0
+        autoReconnectAuthorized = true
+        mutableState.update { it.copy(connectionState = TrikiConnectionState.READY, errorMessage = null) }
         startRssiPolling(gatt)
+        streamWatchdogJob?.cancel()
+        streamWatchdogJob = scope.launch {
+            while (gatt === bluetoothGatt) {
+                delay(1_000L)
+                if (System.nanoTime() - lastValidFrameNanos > 3_000_000_000L) {
+                    recoverFromGattSetupFailure(gatt, "Przerwano strumień IMU; ponawiam połączenie.")
+                    break
+                }
+            }
+        }
         scope.launch {
             delay(BATTERY_NOTIFY_DELAY_MILLIS)
             val battery = findCharacteristic(gatt, TrikiProtocol.BATTERY_LEVEL_UUID)
@@ -715,6 +757,10 @@ class TrikiBleManager(
         if (uuid != TrikiProtocol.NUS_TX_UUID) return
 
         val samples = decoder.decode(value, System.nanoTime())
+        if (samples.isNotEmpty()) {
+            lastValidFrameNanos = System.nanoTime()
+            if (awaitingFirstFrame) bluetoothGatt?.let(::confirmStreamReady)
+        }
         samples.forEach { sample ->
             mutableSamples.tryEmit(sample)
             sampleRateWindow.addLast(sample.timestampNanos)
@@ -857,6 +903,8 @@ class TrikiBleManager(
     }
 
     private fun cancelWakeWatcher() {
+        arbitrationDelayJob?.cancel()
+        arbitrationDelayJob = null
         waitingForWake = false
         wakeWatcherArmed = false
         wakeArmJob?.cancel()
@@ -877,8 +925,23 @@ class TrikiBleManager(
         val target = specificGatt ?: bluetoothGatt
         runCatching { target?.close() }
         if (target === bluetoothGatt || specificGatt == null) {
+            setupTimeoutJob?.cancel()
+            setupTimeoutJob = null
+            streamWatchdogJob?.cancel()
+            streamWatchdogJob = null
+            awaitingFirstFrame = false
             bluetoothGatt = null
             gattUsesAutoConnect = false
+        }
+    }
+
+    private fun armSetupTimeout(gatt: BluetoothGatt, timeoutMillis: Long = 10_000L) {
+        setupTimeoutJob?.cancel()
+        setupTimeoutJob = scope.launch {
+            delay(timeoutMillis)
+            if (gatt === bluetoothGatt) {
+                recoverFromGattSetupFailure(gatt, "Przekroczono czas oczekiwania na odpowiedź GATT lub dane IMU.")
+            }
         }
     }
 

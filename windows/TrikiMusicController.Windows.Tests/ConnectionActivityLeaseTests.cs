@@ -1,9 +1,29 @@
 using TrikiMusicController_Windows.Core;
+using TrikiMusicController_Windows.Models;
 
 namespace TrikiMusicController.Windows.Tests;
 
 public sealed class ConnectionActivityLeaseTests
 {
+    [Theory]
+    [InlineData(-1f)]
+    [InlineData(1f)]
+    public void StationarySensorAndRealGestureDetectorParkOnceAfterTwelveSeconds(float gravityZ)
+    {
+        var lease = new ConnectionActivityLease();
+        var filter = new SensorFilter();
+        var detector = new FullRotationGestureDetector();
+        var parks = new List<long>();
+        for (var index = 0; index <= 1_500; index++)
+        {
+            var input = SensorTestData.Filtered(index * SensorTestData.SamplePeriodNanos, new Vector3f(0, 0, gravityZ));
+            var filtered = filter.Process(input.Source, new CalibrationProfile());
+            var gesture = detector.Process(filtered);
+            if (lease.Observe(filtered, false, false, gesture.Phase)) parks.Add(input.Source.TimestampNanos);
+        }
+        Assert.Equal(new[] { ConnectionActivityLease.DefaultIdleTimeoutNanos }, parks);
+    }
+
     [Fact]
     public void ParksExactlyOnceAfterIdleTimeout()
     {

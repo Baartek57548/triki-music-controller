@@ -122,7 +122,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
                 _hud.ShowMouseMode(_airMouseController.IsActive);
             }
 
-            var isButtonPressed = _buttonInterpreter.IsPressed || sample.Status == 1;
+            var isButtonPressed = _buttonInterpreter.IsPressed;
 
             if (_airMouseController.IsActive)
             {
@@ -211,16 +211,10 @@ public sealed class TrikiRuntimeEngine : IDisposable
                 {
                     _buttonInterpreter.ConsumeCurrentHold();
                 }
-                var explicitConnectionActivity = buttonEvent is not null ||
-                    _buttonInterpreter.IsPressed ||
-                    brightness.Active ||
-                    gesture.Phase is HoldGesturePhase.Holding or
-                        HoldGesturePhase.Ready or
-                        HoldGesturePhase.Tracking or
-                        HoldGesturePhase.Completing or
-                        HoldGesturePhase.Triggered;
                 shouldParkConnection = _settings.Current.ConnectOnlyWhenNeeded &&
-                    _connectionActivityLease.Observe(filtered, explicitConnectionActivity);
+                    _connectionActivityLease.Observe(filtered,
+                        buttonEvent is not null || _buttonInterpreter.ShouldSuppressMotionControl,
+                        brightness.Active, gesture.Phase);
 
                 if (brightness.Active)
                 {

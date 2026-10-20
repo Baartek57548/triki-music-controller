@@ -36,6 +36,10 @@ public sealed class ConnectionActivityLease
         return Observe(sample.Source.TimestampNanos, explicitActivity || sensorActivity);
     }
 
+    public bool Observe(FilteredSensorData sample, bool buttonActivity, bool brightnessActivity, HoldGesturePhase gesturePhase) =>
+        Observe(sample, buttonActivity || brightnessActivity ||
+            gesturePhase is HoldGesturePhase.Tracking or HoldGesturePhase.Completing or HoldGesturePhase.Triggered);
+
     public bool Observe(long timestampNanos, bool active)
     {
         if (timestampNanos < 0)

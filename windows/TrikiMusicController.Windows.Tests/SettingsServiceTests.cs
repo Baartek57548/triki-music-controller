@@ -101,7 +101,7 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void Normalize_LegacyDefaultActions_MigratesToLikeAndDislike()
+    public void Normalize_CustomNavigationActions_PreservesUserChoice()
     {
         var legacy = new AppSettings
         {
@@ -113,12 +113,12 @@ public sealed class SettingsServiceTests : IDisposable
         var normalized = SettingsService.Normalize(legacy);
 
         Assert.Equal(MediaAction.PlayPause, normalized.SingleClickAction);
-        Assert.Equal(MediaAction.Like, normalized.DoubleClickAction);
-        Assert.Equal(MediaAction.Dislike, normalized.TripleClickAction);
+        Assert.Equal(MediaAction.Next, normalized.DoubleClickAction);
+        Assert.Equal(MediaAction.Previous, normalized.TripleClickAction);
     }
 
     [Fact]
-    public void Normalize_ConnectOnlyWhenNeeded_EnforcesAutoReconnect()
+    public void Normalize_DisabledAutoReconnect_DisablesOnDemandMode()
     {
         var settings = new AppSettings
         {
@@ -128,7 +128,8 @@ public sealed class SettingsServiceTests : IDisposable
 
         var normalized = SettingsService.Normalize(settings);
 
-        Assert.True(normalized.AutoReconnect);
+        Assert.False(normalized.AutoReconnect);
+        Assert.False(normalized.ConnectOnlyWhenNeeded);
     }
 
     [Theory]

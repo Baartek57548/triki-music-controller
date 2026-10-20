@@ -32,6 +32,7 @@ public sealed partial class DevicePage : Page
     private async Task RunAsync(Func<Task> action)
     {
         try { await action(); }
+        catch (OperationCanceledException) { }
         catch (Exception error)
         {
             var dialog = new ContentDialog { Title = "Bluetooth", Content = error.Message, CloseButtonText = "OK", XamlRoot = XamlRoot };

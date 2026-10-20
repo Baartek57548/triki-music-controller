@@ -23,9 +23,6 @@ import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import pl.trikimusic.controller.core.logging.AppLogger
 import pl.trikimusic.controller.domain.model.AppUpdateInfo
 import pl.trikimusic.controller.domain.model.LogCategory
@@ -35,15 +32,12 @@ class GitHubUpdateManager(
     private val context: Context,
     private val logger: AppLogger,
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun checkForUpdate(currentVersionName: String): AppUpdateInfo? = withContext(Dispatchers.IO) {
         val currentVersion = SemanticVersion.parse(currentVersionName)
             ?: throw UpdateException("Nieprawidłowa wersja bieżącej aplikacji: $currentVersionName")
         val response = getText(LATEST_RELEASE_API_URL)
-        val release = runCatching { json.decodeFromString(GitHubRelease.serializer(), response) }
-            .getOrElse { error -> throw UpdateException("GitHub zwrócił nieprawidłowe metadane wydania.", error) }
-        val update = release.toUpdateInfo(currentVersion)
+        val update = ReleaseMetadataParser.parse(response, currentVersion)
         logger.log(
             LogCategory.UPDATE,
             update?.let { "Dostępna aktualizacja ${it.versionName}." }
@@ -59,6 +53,7 @@ class GitHubUpdateManager(
     ): File = withContext(Dispatchers.IO) {
         validateAssetUrl(update.apkDownloadUrl)
         require(update.apkSizeBytes in 1L..MAX_APK_SIZE_BYTES) { "Nieprawidłowy rozmiar APK." }
+        require(update.apkSha256?.matches(Regex("[0-9a-fA-F]{64}")) == true) { "Brak prawidłowej sumy SHA-256 APK." }
 
         val updateDirectory = File(context.cacheDir, UPDATE_CACHE_DIRECTORY).apply {
             check(exists() || mkdirs()) { "Nie udało się przygotować katalogu aktualizacji." }
@@ -87,6 +82,7 @@ class GitHubUpdateManager(
                     while (true) {
                         coroutineContext.ensureActive()
                         val count = input.read(buffer)
+                        coroutineContext.ensureActive()
                         if (count < 0) break
                         if (count == 0) continue
                         downloadedBytes += count
@@ -117,10 +113,14 @@ class GitHubUpdateManager(
                 throw UpdateException("Suma SHA-256 pobranego APK jest nieprawidłowa.")
             }
         }
-        verifyApkIdentity(temporary, currentVersionCode)
-        check(temporary.renameTo(target)) {
+        try {
+            coroutineContext.ensureActive()
+            verifyApkIdentity(temporary, currentVersionCode, update.versionName)
+            coroutineContext.ensureActive()
+            check(temporary.renameTo(target)) { "Nie udało się zatwierdzić pobranej aktualizacji." }
+        } catch (error: Exception) {
             temporary.delete()
-            "Nie udało się zatwierdzić pobranej aktualizacji."
+            throw error
         }
         onProgress(1f)
         logger.log(LogCategory.UPDATE, "Pobrano i zweryfikowano ${update.versionName}, sha256=$actualSha256.")
@@ -203,39 +203,6 @@ class GitHubUpdateManager(
         }
     }
 
-    private fun GitHubRelease.toUpdateInfo(currentVersion: SemanticVersion): AppUpdateInfo? {
-        if (draft || prerelease) return null
-        val releaseVersion = SemanticVersion.parse(tagName)
-            ?: throw UpdateException("Tag najnowszego wydania ma nieprawidłowy format: $tagName")
-        if (releaseVersion <= currentVersion) return null
-
-        val candidates = assets.filter { asset ->
-            asset.state.equals("uploaded", ignoreCase = true) &&
-                asset.name.endsWith(".apk", ignoreCase = true) &&
-                !asset.name.contains("debug", ignoreCase = true) &&
-                asset.size in 1L..MAX_APK_SIZE_BYTES
-        }
-        val asset = candidates.singleOrNull()
-            ?: candidates.singleOrNull { it.name.startsWith("triki-music-controller", ignoreCase = true) }
-            ?: throw UpdateException("Wydanie $tagName nie zawiera jednoznacznego pliku APK.")
-        validateAssetUrl(asset.browserDownloadUrl)
-        val digest = asset.digest
-            ?.takeIf { it.startsWith("sha256:", ignoreCase = true) }
-            ?.substringAfter(':')
-            ?.takeIf { it.matches(Regex("[0-9a-fA-F]{64}")) }
-        return AppUpdateInfo(
-            versionName = releaseVersion.toString(),
-            tagName = tagName,
-            releaseName = name.ifBlank { tagName },
-            releaseNotes = body.trim().take(MAX_RELEASE_NOTES_CHARS),
-            releaseUrl = htmlUrl,
-            apkDownloadUrl = asset.browserDownloadUrl,
-            apkFileName = asset.name,
-            apkSizeBytes = asset.size,
-            apkSha256 = digest,
-        )
-    }
-
     private fun validateAssetUrl(value: String) {
         val uri = runCatching { URI(value) }.getOrElse { throw UpdateException("Nieprawidłowy adres APK.", it) }
         val expectedPathPrefix = "/$GITHUB_OWNER/$GITHUB_REPOSITORY/releases/download/"
@@ -247,7 +214,7 @@ class GitHubUpdateManager(
         ) { "Adres APK nie wskazuje na zaufane wydanie projektu." }
     }
 
-    private fun verifyApkIdentity(apk: File, currentVersionCode: Long) {
+    private fun verifyApkIdentity(apk: File, currentVersionCode: Long, expectedVersionName: String) {
         val packageManager = context.packageManager
         val archive = getArchivePackageInfo(packageManager, apk)
             ?: throw UpdateException("Android nie rozpoznaje pobranego pliku jako APK.")
@@ -258,6 +225,7 @@ class GitHubUpdateManager(
         if (archiveVersionCode <= currentVersionCode) {
             throw UpdateException("APK nie ma wyższego versionCode ($archiveVersionCode).")
         }
+        if (archive.versionName != expectedVersionName) throw UpdateException("Wersja APK nie zgadza się z metadanymi wydania.")
         val installed = getInstalledPackageInfo(packageManager)
         val installedSigners = signingCertificateDigests(installed)
         val archiveSigners = signingCertificateDigests(archive)
@@ -310,26 +278,6 @@ class GitHubUpdateManager(
         }
     }
 
-    @Serializable
-    private data class GitHubRelease(
-        @SerialName("tag_name") val tagName: String,
-        val name: String = "",
-        val body: String = "",
-        @SerialName("html_url") val htmlUrl: String,
-        val draft: Boolean = false,
-        val prerelease: Boolean = false,
-        val assets: List<GitHubAsset> = emptyList(),
-    )
-
-    @Serializable
-    private data class GitHubAsset(
-        val name: String,
-        val state: String = "",
-        val size: Long,
-        val digest: String? = null,
-        @SerialName("browser_download_url") val browserDownloadUrl: String,
-    )
-
     private fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> "%02x".format(byte) }
 
     private companion object {
@@ -347,7 +295,6 @@ class GitHubUpdateManager(
         const val DOWNLOAD_BUFFER_SIZE = 32 * 1_024
         const val JSON_BUFFER_SIZE = 4 * 1_024
         const val MAX_RELEASE_JSON_CHARS = 1_000_000
-        const val MAX_RELEASE_NOTES_CHARS = 4_000
         const val MAX_APK_SIZE_BYTES = 100L * 1_024L * 1_024L
     }
 }

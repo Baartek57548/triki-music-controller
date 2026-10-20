@@ -2,6 +2,7 @@ package pl.trikimusic.controller.core.bluetooth
 
 import kotlin.math.abs
 import pl.trikimusic.controller.domain.model.FilteredSensorData
+import pl.trikimusic.controller.core.gesture.HoldGesturePhase
 
 class ConnectionActivityLease(
     private val idleTimeoutNanos: Long = DEFAULT_IDLE_TIMEOUT_NANOS,
@@ -49,6 +50,19 @@ class ConnectionActivityLease(
         }
         return false
     }
+
+    fun observe(
+        sample: FilteredSensorData,
+        buttonActivity: Boolean,
+        brightnessActivity: Boolean,
+        gesturePhase: HoldGesturePhase,
+    ): Boolean = observe(
+        sample,
+        buttonActivity || brightnessActivity || when (gesturePhase) {
+            HoldGesturePhase.TRACKING, HoldGesturePhase.COMPLETING, HoldGesturePhase.TRIGGERED -> true
+            else -> false
+        },
+    )
 
     fun reset() {
         lastActivityTimestampNanos = null

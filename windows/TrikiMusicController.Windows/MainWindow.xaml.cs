@@ -9,7 +9,10 @@ namespace TrikiMusicController_Windows;
 public sealed partial class MainWindow : Window
 {
     private readonly SemaphoreSlim _updateGate = new(1, 1);
+    private readonly SemaphoreSlim _dialogGate = new(1, 1);
+    private readonly CancellationTokenSource _windowLifetime = new();
     private bool _automaticUpdateCheckStarted;
+    private AppUpdateInfo? _pendingStartupUpdate;
 
     public MainWindow()
     {
@@ -29,7 +32,7 @@ public sealed partial class MainWindow : Window
     {
         Activated -= MainWindow_Activated;
         Closed -= MainWindow_Closed;
-        _updateGate.Dispose();
+        _windowLifetime.Cancel();
     }
 
     public void ApplyTheme(string theme)
@@ -94,7 +97,8 @@ public sealed partial class MainWindow : Window
             AppUpdateInfo? update;
             try
             {
-                update = await App.Services.Updates.CheckAsync();
+                update = _pendingStartupUpdate ?? await App.Services.Updates.CheckAsync(_windowLifetime.Token);
+                _pendingStartupUpdate = null;
             }
             catch (Exception error)
             {
@@ -132,7 +136,7 @@ public sealed partial class MainWindow : Window
                 CloseButtonText = "Później",
                 DefaultButton = ContentDialogButton.Primary,
             };
-            if (await prompt.ShowAsync() != ContentDialogResult.Primary) return;
+            if (await ShowDialogAsync(prompt) != ContentDialogResult.Primary) return;
 
             var progressBar = new ProgressBar { Minimum = 0, Maximum = 100, Value = 0, Width = 360 };
             var progressText = new TextBlock { Text = "Przygotowywanie pobierania…", TextWrapping = TextWrapping.Wrap };
@@ -145,8 +149,11 @@ public sealed partial class MainWindow : Window
                     Spacing = 12,
                     Children = { progressText, progressBar },
                 },
+                CloseButtonText = "Anuluj",
             };
-            var progressOperation = progressDialog.ShowAsync();
+            using var downloadCancellation = CancellationTokenSource.CreateLinkedTokenSource(_windowLifetime.Token);
+            progressDialog.CloseButtonClick += (_, _) => downloadCancellation.Cancel();
+            var progressOperation = ShowDialogAsync(progressDialog);
             try
             {
                 var progress = new Progress<UpdateDownloadProgress>(value =>
@@ -154,9 +161,16 @@ public sealed partial class MainWindow : Window
                     progressBar.Value = value.Percentage;
                     progressText.Text = $"Pobrano {value.Percentage:0}% — po pobraniu zostanie sprawdzony SHA-256.";
                 });
-                var installer = await App.Services.Updates.DownloadAsync(update, progress);
+                var installer = await App.Services.Updates.DownloadAsync(update, progress, downloadCancellation.Token);
+                progressDialog.Hide();
+                await progressOperation;
                 App.Services.Updates.LaunchInstaller(installer, silent: true);
-                Environment.Exit(0);
+                ((App)Application.Current).Shutdown();
+            }
+            catch (OperationCanceledException)
+            {
+                progressDialog.Hide();
+                await progressOperation;
             }
             catch (Exception error)
             {
@@ -188,9 +202,32 @@ public sealed partial class MainWindow : Window
 
     private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
-        if (_automaticUpdateCheckStarted) return;
+        if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        if (_pendingStartupUpdate is not null)
+        {
+            await CheckForUpdatesAsync(showUpToDateMessage: false);
+            return;
+        }
+        await CheckForUpdatesOnStartupAsync();
+    }
+
+    public async Task CheckForUpdatesOnStartupAsync()
+    {
+        if (_automaticUpdateCheckStarted || _windowLifetime.IsCancellationRequested) return;
         _automaticUpdateCheckStarted = true;
-        await CheckForUpdatesAsync(showUpToDateMessage: false);
+        try
+        {
+            _pendingStartupUpdate = await App.Services.Updates.CheckAsync(_windowLifetime.Token);
+            if (_pendingStartupUpdate is { } update)
+            {
+                ((App)Application.Current).NotifyUpdateAvailable(update.Version);
+                if (AppWindow.IsVisible) await CheckForUpdatesAsync(showUpToDateMessage: false);
+            }
+        }
+        catch (Exception error)
+        {
+            System.Diagnostics.Debug.WriteLine($"Sprawdzanie aktualizacji przy starcie: {error}");
+        }
     }
 
     public async Task ShowWhatsNewDialogAsync(ReleaseHighlight? specificRelease = null)
@@ -252,7 +289,7 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            await dialog.ShowAsync();
+            await ShowDialogAsync(dialog);
         }
         catch (Exception error)
         {
@@ -269,6 +306,19 @@ public sealed partial class MainWindow : Window
             Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
             CloseButtonText = "OK",
         };
-        await dialog.ShowAsync();
+        await ShowDialogAsync(dialog);
+    }
+
+    private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog)
+    {
+        await _dialogGate.WaitAsync(_windowLifetime.Token);
+        try
+        {
+            return await dialog.ShowAsync();
+        }
+        finally
+        {
+            _dialogGate.Release();
+        }
     }
 }

@@ -129,7 +129,8 @@ public sealed class AppSettings
 
 public static class AppInfo
 {
-    public const string Version = "3.1.6";
+    public static string Version => typeof(AppInfo).Assembly.GetName().Version?.ToString(3)
+        ?? throw new InvalidOperationException("Brak wersji aplikacji w metadanych zestawu.");
     public const string GitHubOwner = "Baartek57548";
     public const string GitHubRepository = "triki-music-controller";
 }

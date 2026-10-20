@@ -15,6 +15,8 @@ val releaseSigningProperties = Properties().apply {
         releaseSigningPropertiesFile.inputStream().use(::load)
     }
 }
+val releaseStorePath = System.getenv("TRIKI_KEYSTORE_PATH") ?: releaseSigningProperties.getProperty("storeFile")
+val hasReleaseSigning = !releaseStorePath.isNullOrBlank()
 
 android {
     namespace = "pl.trikimusic.controller"
@@ -24,18 +26,18 @@ android {
         applicationId = "pl.trikimusic.controller"
         minSdk = 26
         targetSdk = 36
-        versionCode = 46
-        versionName = "3.1.6"
+        versionCode = 47
+        versionName = "3.1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {
-        if (releaseSigningPropertiesFile.isFile) {
+        if (hasReleaseSigning) {
             create("release") {
                 val configuredStoreFile = File(
-                    releaseSigningProperties.getProperty("storeFile")
+                    releaseStorePath
                         ?: error("Missing storeFile in release signing properties"),
                 )
                 storeFile = if (configuredStoreFile.isAbsolute) {
@@ -43,11 +45,11 @@ android {
                 } else {
                     releaseSigningPropertiesFile.parentFile.resolve(configuredStoreFile)
                 }
-                storePassword = releaseSigningProperties.getProperty("storePassword")
+                storePassword = System.getenv("TRIKI_KEYSTORE_PASSWORD") ?: releaseSigningProperties.getProperty("storePassword")
                     ?: error("Missing storePassword in release signing properties")
-                keyAlias = releaseSigningProperties.getProperty("keyAlias")
+                keyAlias = System.getenv("TRIKI_KEY_ALIAS") ?: releaseSigningProperties.getProperty("keyAlias")
                     ?: error("Missing keyAlias in release signing properties")
-                keyPassword = releaseSigningProperties.getProperty("keyPassword")
+                keyPassword = System.getenv("TRIKI_KEY_PASSWORD") ?: releaseSigningProperties.getProperty("keyPassword")
                     ?: error("Missing keyPassword in release signing properties")
                 enableV1Signing = true
                 enableV2Signing = true
@@ -65,7 +67,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            if (releaseSigningPropertiesFile.isFile) {
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
             proguardFiles(
@@ -87,6 +89,13 @@ android {
 
     packaging.resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
 }
+
+val verifyReleaseSigning by tasks.registering {
+    doLast {
+        check(hasReleaseSigning) { "Release APK requires the existing Triki signing key; unsigned releases are forbidden." }
+    }
+}
+tasks.matching { it.name == "packageRelease" }.configureEach { dependsOn(verifyReleaseSigning) }
 
 kotlin {
     compilerOptions {

@@ -16,6 +16,8 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -72,12 +74,12 @@ class TrikiForegroundService : Service() {
         container.logger.log(LogCategory.SERVICE, "Uruchomiono usługę autołączenia Triki w tle.")
         stateJob?.cancel()
         stateJob = container.scope.launch {
-            container.bleManager.state.collectLatest { state ->
+            container.bleManager.state.map { it.connectionState }.distinctUntilChanged().collectLatest { connectionState ->
                 getSystemService(NotificationManager::class.java).notify(
                     NOTIFICATION_ID,
-                    buildNotification(state.connectionState),
+                    buildNotification(connectionState),
                 )
-                if (state.connectionState in setOf(TrikiConnectionState.DISCONNECTED, TrikiConnectionState.ERROR)) {
+                if (connectionState in setOf(TrikiConnectionState.DISCONNECTED, TrikiConnectionState.ERROR)) {
                     delay(IDLE_STOP_DELAY_MILLIS)
                     val settings = container.settings.value
                     if (

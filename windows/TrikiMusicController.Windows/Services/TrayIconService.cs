@@ -88,6 +88,7 @@ public sealed class TrayIconService : IDisposable
             Visible = true,
         };
         _notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
+        _notifyIcon.BalloonTipClicked += NotifyIcon_DoubleClick;
     }
 
     public void UpdateStatus(string statusHeader, string tooltipText, bool isConnected, bool isPlaying)
@@ -130,6 +131,7 @@ public sealed class TrayIconService : IDisposable
         _disposed = true;
         _notifyIcon.Visible = false;
         _notifyIcon.DoubleClick -= NotifyIcon_DoubleClick;
+        _notifyIcon.BalloonTipClicked -= NotifyIcon_DoubleClick;
         _notifyIcon.Dispose();
         _contextMenu.Dispose();
         _icon.Dispose();

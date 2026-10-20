@@ -100,6 +100,7 @@ public partial class App : Microsoft.UI.Xaml.Application
 
             await Services.ViewModel.InitializeAsync();
             UpdateTrayStatus();
+            if (MainWindow is { } mainWindow) _ = mainWindow.CheckForUpdatesOnStartupAsync();
         }
         catch (Exception error)
         {
@@ -131,6 +132,9 @@ public partial class App : Microsoft.UI.Xaml.Application
             }
         });
     }
+
+    internal void NotifyUpdateAvailable(Version version) =>
+        _trayIcon?.ShowToastNotification($"Dostępna aktualizacja {version}", "Otwórz Triki, aby pobrać i zainstalować nową wersję.");
 
     public void Shutdown()
     {

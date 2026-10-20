@@ -51,9 +51,14 @@ public sealed class UpdateService : IDisposable
             "TrikiMusicController",
             "Updates");
 
-    public async Task<AppUpdateInfo?> CheckAsync(CancellationToken cancellationToken = default)
+    public Task<AppUpdateInfo?> CheckAsync(CancellationToken cancellationToken = default) => CheckAsync(AppInfo.Version, cancellationToken);
+
+    internal async Task<AppUpdateInfo?> CheckAsync(string installedVersion, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        cancellationToken = timeout.Token;
         var endpoint = new Uri($"https://api.github.com/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepository}/releases/latest");
         using var response = await _client.GetAsync(endpoint, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
@@ -83,12 +88,13 @@ public sealed class UpdateService : IDisposable
         if (release.Draft || release.Prerelease)
             return null;
         var releaseVersion = ParseVersion(release.TagName);
-        var currentVersion = ParseVersion(AppInfo.Version);
+        var currentVersion = ParseVersion(installedVersion);
         if (releaseVersion <= currentVersion)
             return null;
 
+        if (release.Assets is null) throw new UpdateException("Brak listy plików wydania.");
         var candidates = release.Assets
-            .Where(asset => asset.Name.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase)
+            .Where(asset => !string.IsNullOrWhiteSpace(asset.Name) && asset.Name.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase)
                 && asset.Name.EndsWith(InstallerSuffix, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         if (candidates.Length != 1)
@@ -118,6 +124,10 @@ public sealed class UpdateService : IDisposable
     {
         ThrowIfDisposed();
         ValidateDownloadRequest(update);
+        ValidateDownloadUri(update.DownloadUri.AbsoluteUri, update.TagName, update.AssetName);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(10));
+        cancellationToken = timeout.Token;
         Directory.CreateDirectory(_updatesDirectory);
         var destination = Path.Combine(_updatesDirectory, update.AssetName);
         var temporary = destination + ".download";
@@ -130,7 +140,7 @@ public sealed class UpdateService : IDisposable
                 if (!response.IsSuccessStatusCode)
                     throw new UpdateException($"Pobieranie instalatora zakończyło się kodem HTTP {(int)response.StatusCode}.");
                 var declaredLength = response.Content.Headers.ContentLength;
-                if (declaredLength is <= 0 or > MaximumInstallerBytes || declaredLength != update.SizeBytes)
+                if (declaredLength is long length && (length <= 0 || length > MaximumInstallerBytes || length != update.SizeBytes))
                     throw new UpdateException("Rozmiar instalatora nie zgadza się z metadanymi wydania.");
 
                 await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))

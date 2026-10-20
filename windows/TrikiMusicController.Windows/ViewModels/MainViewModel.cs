@@ -326,11 +326,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (_settings.Current.AutoReconnect == value) return;
             _settings.Current.AutoReconnect = value;
+            if (!value && _settings.Current.ConnectOnlyWhenNeeded)
+            {
+                _settings.Current.ConnectOnlyWhenNeeded = false;
+                OnPropertyChanged(nameof(ConnectOnlyWhenNeeded));
+                OnPropertyChanged(nameof(ConnectionModeSummary));
+            }
             _bluetooth.ConfigureRememberedDevice(
                 _settings.Current.KnownDeviceAddress,
                 _settings.Current.KnownDeviceName,
                 value,
-                _settings.Current.ConnectOnlyWhenNeeded);
+                _settings.Current.ConnectOnlyWhenNeeded,
+            _settings.Current.MultiDeviceArbitration);
             OnPropertyChanged();
             _ = SaveSettingsAsync();
         }
@@ -396,7 +403,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => AvailableThemes.FirstOrDefault(option => option.Value == _settings.Current.Theme) ?? AvailableThemes[0];
         set
         {
-            if (_settings.Current.Theme == value.Value) return;
+            if (value is null || _settings.Current.Theme == value.Value) return;
             _settings.Current.Theme = value.Value;
             ((App)Microsoft.UI.Xaml.Application.Current).MainWindow?.ApplyTheme(value.Value);
             OnPropertyChanged();
@@ -407,17 +414,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public MediaActionOption SingleClickAction
     {
         get => OptionFor(_settings.Current.SingleClickAction);
-        set { if (_settings.Current.SingleClickAction == value.Action) return; _settings.Current.SingleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
+        set { if (value is null || _settings.Current.SingleClickAction == value.Action) return; _settings.Current.SingleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
     }
     public MediaActionOption DoubleClickAction
     {
         get => OptionFor(_settings.Current.DoubleClickAction);
-        set { if (_settings.Current.DoubleClickAction == value.Action) return; _settings.Current.DoubleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
+        set { if (value is null || _settings.Current.DoubleClickAction == value.Action) return; _settings.Current.DoubleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
     }
     public MediaActionOption TripleClickAction
     {
         get => OptionFor(_settings.Current.TripleClickAction);
-        set { if (_settings.Current.TripleClickAction == value.Action) return; _settings.Current.TripleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
+        set { if (value is null || _settings.Current.TripleClickAction == value.Action) return; _settings.Current.TripleClickAction = value.Action; OnPropertyChanged(); _ = SaveSettingsAsync(); }
     }
 
     public bool EnableSoundFeedback
@@ -471,7 +478,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _settings.Current.KnownDeviceAddress,
             _settings.Current.KnownDeviceName,
             _settings.Current.AutoReconnect,
-            _settings.Current.ConnectOnlyWhenNeeded);
+            _settings.Current.ConnectOnlyWhenNeeded,
+            _settings.Current.MultiDeviceArbitration);
         await _media.InitializeAsync();
         await _bluetooth.StartAsync();
         _uiTimer.Start();
@@ -489,7 +497,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             selected.BluetoothAddress,
             selected.Name,
             _settings.Current.AutoReconnect,
-            _settings.Current.ConnectOnlyWhenNeeded);
+            _settings.Current.ConnectOnlyWhenNeeded,
+            _settings.Current.MultiDeviceArbitration);
         OnPropertyChanged(nameof(RememberedDevice));
     }
 
@@ -513,14 +522,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             null,
             null,
             _settings.Current.AutoReconnect,
-            _settings.Current.ConnectOnlyWhenNeeded);
+            _settings.Current.ConnectOnlyWhenNeeded,
+            _settings.Current.MultiDeviceArbitration);
         OnPropertyChanged(nameof(RememberedDevice));
     }
 
     public Task SetLedAsync(bool enabled) => _bluetooth.SetLedAsync(enabled);
     public async Task ExecuteMediaActionAsync(MediaAction action)
     {
-        await _media.ExecuteAsync(action);
+        var result = await _media.ExecuteAsync(action);
+        if (!result.Succeeded) throw new InvalidOperationException(result.Message);
         if (action is MediaAction.Next or MediaAction.Previous)
         {
             _hud?.ShowTrack(_media.State.Title, _media.State.Artist, action, _media.State.ThumbnailBytes);

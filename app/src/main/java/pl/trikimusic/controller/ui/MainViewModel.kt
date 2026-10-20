@@ -311,8 +311,10 @@ class MainViewModel(
     fun downloadAvailableUpdate() {
         val update = mutableUpdate.value.info ?: return
         if (updateDownloadJob?.isActive == true) return
+        val previousDownload = updateDownloadJob
         updateDownloadJob = viewModelScope.launch {
             mutableUpdate.value = UpdateUiState(stage = UpdateStage.DOWNLOADING, info = update)
+            previousDownload?.join()
             try {
                 val apk = container.updateManager.downloadAndVerify(
                     update = update,
@@ -388,7 +390,6 @@ class MainViewModel(
 
     fun dismissUpdate() {
         updateDownloadJob?.cancel()
-        updateDownloadJob = null
         container.updateManager.deleteDownloadedUpdate(downloadedUpdateFile)
         downloadedUpdateFile = null
         mutableUpdate.value = UpdateUiState()
@@ -424,7 +425,7 @@ class MainViewModel(
                         mutableCalibration.value = CalibrationUiState(true, progress, samples.size)
                     }
             }
-            runCatching {
+            try {
                 val capturedDuration = if (samples.size >= 2) {
                     samples.last().timestampNanos - samples.first().timestampNanos
                 } else {
@@ -433,20 +434,19 @@ class MainViewModel(
                 require(capturedDuration >= MIN_CALIBRATION_CAPTURE_NANOS) {
                     "Strumień przerwał się przed zebraniem pełnej kalibracji."
                 }
-                CalibrationCalculator.calculate(samples, System.currentTimeMillis())
+                val profile = CalibrationCalculator.calculate(samples, System.currentTimeMillis())
+                container.settingsRepository.saveCalibration(profile)
+                mutableCalibration.value = CalibrationUiState(
+                    running = false,
+                    progress = 1f,
+                    sampleCount = samples.size,
+                    result = profile,
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                mutableCalibration.value = CalibrationUiState(error = error.message ?: "Kalibracja nie powiodła się.")
             }
-                .onSuccess { profile ->
-                    container.settingsRepository.saveCalibration(profile)
-                    mutableCalibration.value = CalibrationUiState(
-                        running = false,
-                        progress = 1f,
-                        sampleCount = samples.size,
-                        result = profile,
-                    )
-                }
-                .onFailure { error ->
-                    mutableCalibration.value = CalibrationUiState(error = error.message ?: "Kalibracja nie powiodła się.")
-                }
         }
     }
 
@@ -535,7 +535,15 @@ class MainViewModel(
     private fun currentSettings(): AppSettings = mutableSettings.value ?: container.settings.value
 
     private fun launchHandled(block: suspend () -> Unit) {
-        viewModelScope.launch { runCatching { block() }.onFailure(::showError) }
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                showError(error)
+            }
+        }
     }
 
     private fun showError(error: Throwable) {

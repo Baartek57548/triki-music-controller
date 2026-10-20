@@ -1,5 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using TrikiMusicController_Windows.Models;
 using TrikiMusicController_Windows.Services;
 
@@ -7,6 +9,59 @@ namespace TrikiMusicController_Windows.Tests;
 
 public sealed class UpdateServiceTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CheckAsyncOnlyOffersNewerVersionWithVerifiedDigest(bool hasDigest)
+    {
+        var payload = CreateInstallerPayload();
+        var info = CreateUpdate(payload);
+        var json = JsonSerializer.Serialize(new
+        {
+            tag_name = info.TagName,
+            html_url = info.ReleasePage.AbsoluteUri,
+            assets = new[] { new {
+                name = info.AssetName, size = info.SizeBytes,
+                browser_download_url = info.DownloadUri.AbsoluteUri,
+                digest = hasDigest ? "sha256:" + info.Sha256 : null,
+            } },
+        });
+        using var service = new UpdateService(new StaticResponseHandler(Encoding.UTF8.GetBytes(json)), Path.GetTempPath());
+        if (hasDigest)
+        {
+            var available = await service.CheckAsync("3.1.6");
+            Assert.Equal(info.Sha256, available?.Sha256);
+            Assert.Null(await service.CheckAsync("9.9.9"));
+        }
+        else
+        {
+            await Assert.ThrowsAsync<UpdateException>(() => service.CheckAsync("3.1.6"));
+        }
+    }
+
+    [Fact]
+    public async Task InvalidHashRemovesPartialDownload()
+    {
+        var payload = CreateInstallerPayload();
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            using var service = new UpdateService(new StaticResponseHandler(payload), directory);
+            await Assert.ThrowsAsync<UpdateException>(() => service.DownloadAsync(CreateUpdate(payload) with { Sha256 = new string('0', 64) }));
+            Assert.Empty(Directory.GetFiles(directory));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task ForeignRepositoryCannotSupplyInstaller()
+    {
+        var payload = CreateInstallerPayload();
+        using var service = new UpdateService(new StaticResponseHandler(payload), Path.GetTempPath());
+        var update = CreateUpdate(payload) with { DownloadUri = new Uri("https://example.com/triki-setup.exe") };
+        await Assert.ThrowsAsync<UpdateException>(() => service.DownloadAsync(update));
+    }
+
     [Fact]
     public async Task DownloadAsync_ClosesTemporaryFileBeforeValidationAndMove()
     {

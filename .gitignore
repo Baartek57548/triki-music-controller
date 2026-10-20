@@ -13,3 +13,5 @@ windows/artifacts/
 **/bin/
 **/obj/
 **/TestResults/
+__pycache__/
+*.py[cod]

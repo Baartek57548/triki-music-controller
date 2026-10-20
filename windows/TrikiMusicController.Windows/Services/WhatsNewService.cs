@@ -9,6 +9,15 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.7",
+            "Stabilne połączenie i bezpieczna aktualizacja",
+            [
+                "Naprawiono rozłączanie po bezczynności i nasłuch wybudzenia przy wygaszonym ekranie Androida.",
+                "Własne mapowania przycisków pozostają zapisane, a licznik pakietów nie uruchamia sterowania jasnością.",
+                "Połączenie wymaga potwierdzonych ramek IMU; timeouty i nadzór strumienia przywracają je po błędzie.",
+                "Aktualizacja jest wykrywana również podczas startu w zasobniku. APK jest podpisany tym samym kluczem co poprzednie wydanie."
+            ]),
+        new ReleaseHighlight(
             "3.1.6",
             "Kompleksowy audyt projektu, synchronizacja platform i optymalizacje",
             [

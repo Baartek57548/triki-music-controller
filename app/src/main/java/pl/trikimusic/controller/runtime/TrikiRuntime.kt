@@ -129,6 +129,7 @@ class TrikiRuntime(
     fun resetProcessing() {
         sensorFilter.reset()
         volumeController.reset()
+        brightnessController.reset()
         rotationGestureDetector.reset()
         buttonInterpreter.reset()
         connectionActivityLease.reset()
@@ -137,6 +138,7 @@ class TrikiRuntime(
             it.copy(
                 history = emptyList(),
                 latestSample = null,
+                brightness = null,
                 volumeSensorValid = false,
                 volumeWithinTiltRange = false,
                 volumeAccelerationStable = false,
@@ -157,25 +159,19 @@ class TrikiRuntime(
         val filtered = sensorFilter.process(sample, settings.calibration)
         val buttonEvent = buttonInterpreter.process(sample)
         val rotationGestureResult = rotationGestureDetector.process(filtered)
-        val isButtonPressed = buttonInterpreter.isPressed || sample.status == 1
+        val isButtonPressed = buttonInterpreter.isPressed
         val brightnessResult = brightnessController.process(filtered, isButtonPressed)
         if (brightnessResult.active && isButtonPressed) {
             buttonInterpreter.consumeCurrentHold()
         }
-        val explicitConnectionActivity =
-            buttonEvent != null ||
-                buttonInterpreter.isPressed ||
-                brightnessResult.active ||
-                rotationGestureResult.phase in setOf(
-                    HoldGesturePhase.HOLDING,
-                    HoldGesturePhase.READY,
-                    HoldGesturePhase.TRACKING,
-                    HoldGesturePhase.COMPLETING,
-                    HoldGesturePhase.TRIGGERED,
-                )
         if (
             settings.connectOnlyWhenNeeded &&
-            connectionActivityLease.observe(filtered, explicitConnectionActivity)
+            connectionActivityLease.observe(
+                filtered,
+                buttonActivity = buttonEvent != null || buttonInterpreter.shouldSuppressMotionControl,
+                brightnessActivity = brightnessResult.active,
+                gesturePhase = rotationGestureResult.phase,
+            )
         ) {
             logger.log(LogCategory.BLE, "Brak aktywności przez 12 s; zamykam GATT i czekam na kolejne wybudzenie.")
             scope.launch {

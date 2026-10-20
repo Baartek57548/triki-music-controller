@@ -1,98 +1,129 @@
-﻿name: Triki Release CI/CD
+name: Triki verification and release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
+  pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-windows:
-    name: Build Windows Application
+  windows:
     runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify release versions
+        run: python scripts/verify_release.py
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
-      - name: Run Windows Unit Tests
-        run: dotnet test windows/TrikiMusicController.Windows.Tests/TrikiMusicController.Windows.Tests.csproj -c Release
-
-      - name: Publish Windows App
-        run: dotnet publish windows/TrikiMusicController.Windows/TrikiMusicController.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/artifacts/publish
-
-      - name: Install Inno Setup
-        run: choco install innosetup -y
-
-      - name: Compile Inno Setup Installer
+      - name: Run Windows regression tests
+        run: dotnet test windows/TrikiMusicController.Windows.Tests/TrikiMusicController.Windows.Tests.csproj -c Release -p:Platform=x64
+      - name: Publish self-contained application
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: dotnet publish windows/TrikiMusicController.Windows/TrikiMusicController.Windows.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -o windows/artifacts/publish
+      - name: Compile installer
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows/installer/TrikiMusicController.iss
-
-      - name: Upload Windows Installer Artifact
-        uses: actions/upload-artifact@v4
+          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler)) { choco install innosetup -y }
+          & $compiler windows/installer/TrikiMusicController.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: windows-installer
-          path: windows/artifacts/installer/*.exe
+          path: windows/artifacts/installer/triki-music-controller-windows-*-setup.exe
+          if-no-files-found: error
 
-  build-android:
-    name: Build Android APK
+  android:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          distribution: 'temurin'
+          python-version: '3.11'
+      - name: Verify release versions
+        id: version
+        run: python scripts/verify_release.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
           java-version: '17'
-
-      - name: Setup Gradle Cache
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Make Gradlew Executable
-        run: chmod +x gradlew
-
-      - name: Run Android Unit Tests
-        run: ./gradlew testReleaseUnitTest
-
-      - name: Build Android Release APK
-        run: ./gradlew assembleRelease
-
-      - name: Upload Android APK Artifact
-        uses: actions/upload-artifact@v4
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Prepare Android SDK
+        run: |
+          chmod +x gradlew
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run Android regression tests and lint
+        run: ./gradlew testReleaseUnitTest lintRelease --console=plain
+      - name: Restore existing release signing key
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TRIKI_KEYSTORE_BASE64 }}
+        run: |
+          python - <<'PY'
+          import base64, os
+          from pathlib import Path
+          encoded = os.environ['KEYSTORE_BASE64']
+          if not encoded:
+              raise SystemExit('Missing TRIKI_KEYSTORE_BASE64: publishing unsigned APK is forbidden.')
+          path = Path(os.environ['RUNNER_TEMP']) / 'triki-release.jks'
+          path.write_bytes(base64.b64decode(encoded, validate=True))
+          path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write(f'TRIKI_KEYSTORE_PATH={path}\n')
+          PY
+      - name: Build signed release APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TRIKI_KEYSTORE_PASSWORD: ${{ secrets.TRIKI_KEYSTORE_PASSWORD }}
+          TRIKI_KEY_ALIAS: ${{ secrets.TRIKI_KEY_ALIAS }}
+          TRIKI_KEY_PASSWORD: ${{ secrets.TRIKI_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --console=plain
+      - name: Verify APK certificate and package asset
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk > certificate.txt
+          cat certificate.txt
+          grep -Fq 'Signer #1 certificate SHA-256 digest: acbff7ef6c20087cc7c873f68037754992ca7269f7c5d75f7f72061db4b05e13' certificate.txt
+          mkdir -p release-assets
+          cp app/build/outputs/apk/release/app-release.apk "release-assets/triki-music-controller-android-v${VERSION}-release.apk"
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: android-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: release-assets/triki-music-controller-android-*-release.apk
+          if-no-files-found: error
 
-  publish-release:
-    name: Publish GitHub Release
-    needs: [build-windows, build-android]
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           name: windows-installer
-          path: release-assets/
-
-      - name: Download Android Artifact
-        uses: actions/download-artifact@v4
+          path: release-assets
+      - uses: actions/download-artifact@v4
         with:
           name: android-apk
-          path: release-assets/
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release-assets/*
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+          path: release-assets
+      - name: Publish verified update assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(find release-assets -type f | wc -l)" -eq 2
+          gh release create "$GITHUB_REF_NAME" release-assets/* --verify-tag --latest --title "Triki Music Controller $GITHUB_REF_NAME" --notes-file "docs/releases/Release-$GITHUB_REF_NAME.md"

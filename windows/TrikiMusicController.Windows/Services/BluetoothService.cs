@@ -12,6 +12,8 @@ public sealed class BluetoothService : IDisposable
 {
     private const long SampleRateWindowNanos = 2_000_000_000;
     private readonly object _stateLock = new();
+    private readonly object _decoderLock = new();
+    private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly TrikiProtocolDecoder _decoder = new();
     private readonly WakeAdvertisementGate _wakeAdvertisementGate = new();
@@ -25,6 +27,8 @@ public sealed class BluetoothService : IDisposable
     private GattCharacteristic? _rxCharacteristic;
     private GattCharacteristic? _ledCharacteristic;
     private CancellationTokenSource? _wakeArmCancellation;
+    private CancellationTokenSource? _connectionCancellation;
+    private TaskCompletionSource<bool>? _firstFrame;
     private ulong? _knownAddress;
     private string? _knownName;
     private bool _autoReconnect = true;
@@ -48,6 +52,10 @@ public sealed class BluetoothService : IDisposable
     public event EventHandler<BluetoothSnapshot>? StateChanged;
     public event EventHandler<TrikiSensorData>? SampleReceived;
     public BluetoothSnapshot State { get; private set; } = BluetoothSnapshot.Initial;
+
+    public BluetoothService() { }
+
+    internal BluetoothService(BluetoothSnapshot initialState) => State = initialState;
 
     public void SetMediaStateProviders(
         Func<bool> isMediaPlaying,
@@ -75,8 +83,13 @@ public sealed class BluetoothService : IDisposable
         _autoReconnect = autoReconnect;
         _connectOnlyWhenNeeded = connectOnlyWhenNeeded;
         _arbitrationMode = arbitrationMode;
-        _manualDisconnect = false;
         if (!configurationChanged) return;
+        _manualDisconnect = false;
+        if (State.ConnectionState is TrikiConnectionState.Ready or TrikiConnectionState.Connecting)
+        {
+            CancelWakeWatcher();
+            return;
+        }
         if (!autoReconnect || address is null)
         {
             CancelWakeWatcher();
@@ -104,6 +117,8 @@ public sealed class BluetoothService : IDisposable
         EnsureWatcher();
         if (_watcher!.Status is BluetoothLEAdvertisementWatcherStatus.Created or BluetoothLEAdvertisementWatcherStatus.Stopped)
             _watcher.Start();
+        if (State.ConnectionState is TrikiConnectionState.Ready or TrikiConnectionState.Connecting)
+            return Task.CompletedTask;
         UpdateState(state => state with
         {
             ConnectionState = _knownAddress is not null && _autoReconnect
@@ -122,6 +137,8 @@ public sealed class BluetoothService : IDisposable
         await _connectionGate.WaitAsync().ConfigureAwait(false);
         try
         {
+            ThrowIfDisposed();
+            if (!userInitiated && (_manualDisconnect || !_autoReconnect || _knownAddress != target.BluetoothAddress)) return;
             if (_device?.BluetoothAddress == target.BluetoothAddress && State.ConnectionState == TrikiConnectionState.Ready) return;
             _manualDisconnect = false;
             _lastAutoConnectAttemptNanos = TimestampNanos();
@@ -134,38 +151,43 @@ public sealed class BluetoothService : IDisposable
                 ErrorMessage = null,
             });
             CleanupConnection();
-            _decoder.Reset();
+            lock (_decoderLock) _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
+            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            cancellation.CancelAfter(TimeSpan.FromSeconds(30));
+            lock (_stateLock) _connectionCancellation = cancellation;
+            var token = cancellation.Token;
+            _firstFrame = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            _device = await BluetoothLEDevice.FromBluetoothAddressAsync(target.BluetoothAddress);
+            _device = await BluetoothLEDevice.FromBluetoothAddressAsync(target.BluetoothAddress).AsTask(token);
             if (_device is null) throw new IOException("Windows nie może otworzyć urządzenia BLE. Wybudź Triki i spróbuj ponownie.");
             _device.ConnectionStatusChanged += DeviceOnConnectionStatusChanged;
 
             try
             {
-                _gattSession = await GattSession.FromDeviceIdAsync(_device.BluetoothDeviceId);
+                _gattSession = await GattSession.FromDeviceIdAsync(_device.BluetoothDeviceId).AsTask(token);
                 if (_gattSession is not null)
                 {
                     _gattSession.MaintainConnection = true;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Debug.WriteLine($"GattSession error: {ex.Message}");
             }
 
-            var serviceResult = await _device.GetGattServicesForUuidAsync(TrikiProtocol.NusServiceUuid, BluetoothCacheMode.Uncached);
+            var serviceResult = await _device.GetGattServicesForUuidAsync(TrikiProtocol.NusServiceUuid, BluetoothCacheMode.Uncached).AsTask(token);
             if (serviceResult.Status != GattCommunicationStatus.Success || serviceResult.Services.Count == 0)
                 throw new IOException($"Triki nie udostępniło usługi Nordic UART ({serviceResult.Status}).");
             _nusService = serviceResult.Services[0];
 
-            _txCharacteristic = await GetRequiredCharacteristicAsync(_nusService, TrikiProtocol.NusTxUuid, "NUS TX");
-            _rxCharacteristic = await GetRequiredCharacteristicAsync(_nusService, TrikiProtocol.NusRxUuid, "NUS RX");
-            _ledCharacteristic = await GetOptionalCharacteristicAsync(_nusService, TrikiProtocol.LedUuid);
+            _txCharacteristic = await GetRequiredCharacteristicAsync(_nusService, TrikiProtocol.NusTxUuid, "NUS TX", token);
+            _rxCharacteristic = await GetRequiredCharacteristicAsync(_nusService, TrikiProtocol.NusRxUuid, "NUS RX", token);
+            _ledCharacteristic = await GetOptionalCharacteristicAsync(_nusService, TrikiProtocol.LedUuid, token);
 
             _txCharacteristic.ValueChanged += TxCharacteristicOnValueChanged;
             var notificationStatus = await _txCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(
-                GattClientCharacteristicConfigurationDescriptorValue.Notify);
+                GattClientCharacteristicConfigurationDescriptorValue.Notify).AsTask(token);
             if (notificationStatus != GattCommunicationStatus.Success)
                 throw new IOException($"Nie udało się włączyć notyfikacji IMU ({notificationStatus}).");
 
@@ -173,9 +195,13 @@ public sealed class BluetoothService : IDisposable
             writer.WriteBytes(TrikiProtocol.StartStreamCommand);
             var writeResult = await _rxCharacteristic.WriteValueWithResultAsync(
                 writer.DetachBuffer(),
-                GattWriteOption.WriteWithoutResponse);
+                GattWriteOption.WriteWithoutResponse).AsTask(token);
             if (writeResult.Status != GattCommunicationStatus.Success)
                 throw new IOException($"Triki odrzuciło komendę uruchomienia strumienia ({writeResult.Status}).");
+
+            await _firstFrame.Task.WaitAsync(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            cancellation.CancelAfter(Timeout.InfiniteTimeSpan);
 
             var connected = new TrikiDeviceInfo(
                 target.BluetoothAddress,
@@ -196,11 +222,13 @@ public sealed class BluetoothService : IDisposable
                 DroppedProtocolBytes = 0,
                 WakeWatcherArmed = false,
             });
+            _ = WatchStreamAsync(_device, token);
             _ = RefreshBatteryAsync(_device);
         }
         catch (Exception error)
         {
             CleanupConnection();
+            if (_disposed) return;
             var shouldWait = !_manualDisconnect && _autoReconnect && _knownAddress is not null;
             if (shouldWait && _connectOnlyWhenNeeded)
             {
@@ -210,7 +238,9 @@ public sealed class BluetoothService : IDisposable
             {
                 UpdateState(state => state with
                 {
-                    ConnectionState = shouldWait ? TrikiConnectionState.WaitingForDevice : TrikiConnectionState.Error,
+                    ConnectionState = _manualDisconnect ? TrikiConnectionState.Disconnected :
+                        shouldWait ? TrikiConnectionState.WaitingForDevice : TrikiConnectionState.Error,
+                    ConnectedDevice = null,
                     WakeWatcherArmed = false,
                     ErrorMessage = error.Message,
                 });
@@ -226,6 +256,8 @@ public sealed class BluetoothService : IDisposable
     public async Task DisconnectAsync(bool forgetDevice)
     {
         ThrowIfDisposed();
+        _manualDisconnect = true;
+        CancelConnection();
         await _connectionGate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -237,7 +269,7 @@ public sealed class BluetoothService : IDisposable
                 _knownName = null;
             }
             CleanupConnection();
-            _decoder.Reset();
+            lock (_decoderLock) _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
             PublishSnapshot(BluetoothSnapshot.Initial with
             {
@@ -261,7 +293,7 @@ public sealed class BluetoothService : IDisposable
             if (State.ConnectionState != TrikiConnectionState.Ready) return;
             _manualDisconnect = false;
             CleanupConnection();
-            _decoder.Reset();
+            lock (_decoderLock) _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
             BeginWaitingForWake();
         }
@@ -385,13 +417,13 @@ public sealed class BluetoothService : IDisposable
         _ = HandleUnexpectedDisconnectAsync(sender);
     }
 
-    private async Task HandleUnexpectedDisconnectAsync(BluetoothLEDevice sender)
+    private async Task HandleUnexpectedDisconnectAsync(BluetoothLEDevice sender, bool streamStalled = false)
     {
         await Task.Delay(600).ConfigureAwait(false);
         if (_disposed || !ReferenceEquals(sender, _device) || _manualDisconnect) return;
 
-        if (sender.ConnectionStatus == BluetoothConnectionStatus.Connected ||
-            (TimestampNanos() - _lastSampleReceivedNanos < 1_500_000_000))
+        if (!streamStalled && (sender.ConnectionStatus == BluetoothConnectionStatus.Connected ||
+            (TimestampNanos() - Interlocked.Read(ref _lastSampleReceivedNanos) < 1_500_000_000)))
         {
             return;
         }
@@ -430,13 +462,26 @@ public sealed class BluetoothService : IDisposable
 
     private void TxCharacteristicOnValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
     {
+        if (_disposed || !ReferenceEquals(sender, _txCharacteristic)) return;
         try
         {
-            _lastSampleReceivedNanos = TimestampNanos();
+            var receivedAt = TimestampNanos();
             using var reader = DataReader.FromBuffer(args.CharacteristicValue);
             var bytes = new byte[reader.UnconsumedBufferLength];
             reader.ReadBytes(bytes);
-            var samples = _decoder.Decode(bytes, _lastSampleReceivedNanos);
+            IReadOnlyList<TrikiSensorData> samples;
+            DecoderStatistics statistics;
+            lock (_decoderLock)
+            {
+                if (!ReferenceEquals(sender, _txCharacteristic)) return;
+                samples = _decoder.Decode(bytes, receivedAt);
+                statistics = _decoder.Statistics;
+            }
+            if (samples.Count > 0)
+            {
+                Interlocked.Exchange(ref _lastSampleReceivedNanos, receivedAt);
+                _firstFrame?.TrySetResult(true);
+            }
             foreach (var sample in samples)
             {
                 lock (_stateLock)
@@ -445,11 +490,11 @@ public sealed class BluetoothService : IDisposable
                     while (_sampleTimestamps.Count > 2 && sample.TimestampNanos - _sampleTimestamps.Peek() > SampleRateWindowNanos)
                         _sampleTimestamps.Dequeue();
                 }
-                SampleReceived?.Invoke(this, sample);
+                if (State.ConnectionState == TrikiConnectionState.Ready && ReferenceEquals(sender, _txCharacteristic))
+                    SampleReceived?.Invoke(this, sample);
             }
-            var statistics = _decoder.Statistics;
             var sampleRate = CalculateSampleRate();
-            var now = _lastSampleReceivedNanos;
+            var now = receivedAt;
             bool shouldPublishTelemetry;
             BluetoothSnapshot snapshot;
             lock (_stateLock)
@@ -501,17 +546,17 @@ public sealed class BluetoothService : IDisposable
         }
     }
 
-    private static async Task<GattCharacteristic> GetRequiredCharacteristicAsync(GattDeviceService service, Guid uuid, string label)
+    private static async Task<GattCharacteristic> GetRequiredCharacteristicAsync(GattDeviceService service, Guid uuid, string label, CancellationToken token)
     {
-        var result = await service.GetCharacteristicsForUuidAsync(uuid, BluetoothCacheMode.Uncached);
+        var result = await service.GetCharacteristicsForUuidAsync(uuid, BluetoothCacheMode.Uncached).AsTask(token);
         if (result.Status != GattCommunicationStatus.Success || result.Characteristics.Count == 0)
             throw new IOException($"Brak wymaganej charakterystyki {label} ({result.Status}).");
         return result.Characteristics[0];
     }
 
-    private static async Task<GattCharacteristic?> GetOptionalCharacteristicAsync(GattDeviceService service, Guid uuid)
+    private static async Task<GattCharacteristic?> GetOptionalCharacteristicAsync(GattDeviceService service, Guid uuid, CancellationToken token)
     {
-        var result = await service.GetCharacteristicsForUuidAsync(uuid, BluetoothCacheMode.Uncached);
+        var result = await service.GetCharacteristicsForUuidAsync(uuid, BluetoothCacheMode.Uncached).AsTask(token);
         return result.Status == GattCommunicationStatus.Success ? result.Characteristics.FirstOrDefault() : null;
     }
 
@@ -589,6 +634,7 @@ public sealed class BluetoothService : IDisposable
 
     private void CleanupConnection()
     {
+        CancelConnection();
         if (_txCharacteristic is not null) _txCharacteristic.ValueChanged -= TxCharacteristicOnValueChanged;
         if (_device is not null) _device.ConnectionStatusChanged -= DeviceOnConnectionStatusChanged;
         _txCharacteristic = null;
@@ -600,6 +646,35 @@ public sealed class BluetoothService : IDisposable
         _nusService = null;
         _device?.Dispose();
         _device = null;
+    }
+
+    private void CancelConnection()
+    {
+        lock (_stateLock)
+        {
+            _connectionCancellation?.Cancel();
+            _connectionCancellation?.Dispose();
+            _connectionCancellation = null;
+        }
+    }
+
+    private async Task WatchStreamAsync(BluetoothLEDevice device, CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+                if (TimestampNanos() - Interlocked.Read(ref _lastSampleReceivedNanos) <= 3_000_000_000) continue;
+                await HandleUnexpectedDisconnectAsync(device, streamStalled: true).ConfigureAwait(false);
+                return;
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            if (!_disposed) Debug.WriteLine($"Nadzór strumienia BLE: {error}");
+        }
     }
 
     private async Task RestartWatcherAsync()
@@ -655,10 +730,10 @@ public sealed class BluetoothService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _lifetime.Cancel();
         CancelWakeWatcher();
         DisposeWatcher();
         CleanupConnection();
-        _connectionGate.Dispose();
     }
 
     private static readonly TimeSpan WakeArmPollInterval = TimeSpan.FromMilliseconds(250);
