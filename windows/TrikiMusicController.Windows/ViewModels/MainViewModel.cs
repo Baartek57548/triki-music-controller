@@ -311,7 +311,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ? $"{_settings.Current.KnownDeviceName ?? "Triki"} • {address:X12}"
         : "Brak zapamiętanego urządzenia";
     public string ConnectionModeSummary => _settings.Current.ConnectOnlyWhenNeeded
-        ? "Po 12 sekundach bez ruchu lub przycisku aplikacja zamyka GATT. Następne wybudzenie automatycznie przywraca sterowanie."
+        ? "Tryb Eco zwalnia połączenie po 2 minutach bezczynności. Wznawianie jest automatyczne; ciągłe reklamy BLE nie blokują go dłużej niż 15 sekund."
         : "Połączenie pozostaje aktywne do czasu uśpienia kapsla lub ręcznego rozłączenia.";
     public string SettingsStatus
     {

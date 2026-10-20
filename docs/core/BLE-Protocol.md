@@ -35,7 +35,8 @@ Powiązane węzły:
 
 ## Tryb Połączenia na Żądanie (`WakeAdvertisementGate`)
 
-W celu maksymalizacji czasu pracy na baterii:
-1. Po **12 sekundach bezczynności** (brak ruchu i brak kliknięć) aplikacja zwalnia połączenie GATT i przechodzi w stan nasłuchiwania pasywnego (`WAITING_FOR_WAKE`).
-2. Kontroler po wykryciu ruchu wznawia rozgłaszanie pakietów Advertisement.
-3. Bramka `WakeAdvertisementGate` filtruje stare pakiety i łączy się natychmiast po wykryciu nowego rozgłoszenia po minimum 5 sekundach ciszy.
+Opcjonalny tryb Eco:
+1. Po **2 minutach bezczynności** (brak ruchu i brak kliknięć) aplikacja zwalnia połączenie GATT i przechodzi w stan nasłuchu (`WAITING_FOR_WAKE`).
+2. Po celowym zwolnieniu GATT bramka `WakeAdvertisementGate` dopuszcza reklamę po minimum 5 sekundach ciszy. Jeśli kontroler nadaje bez przerwy, dopuszcza ponowną próbę po maksymalnie 15 sekundach od rozpoczęcia oczekiwania.
+3. Start aplikacji i odzyskiwanie nieoczekiwanego rozłączenia pomijają oczekiwanie na ciszę; pierwsza reklama zapamiętanego kontrolera może rozpocząć łączenie.
+4. Wybrany arbitraż wielu urządzeń nadal ustala dopuszczenie i opóźnienie próby. Ręczne „Rozłącz” wyłącza automatyczne wznawianie.

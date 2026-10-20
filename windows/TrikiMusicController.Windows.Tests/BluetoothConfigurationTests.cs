@@ -5,6 +5,36 @@ namespace TrikiMusicController.Windows.Tests;
 
 public sealed class BluetoothConfigurationTests
 {
+    [Fact]
+    public void RememberedDeviceIsReadyForAdvertisementsWithoutWaitingForSilence()
+    {
+        using var service = new BluetoothService();
+        service.ConfigureRememberedDevice(0xAABBCCDDEEFF, "Triki", true, true);
+        Assert.Equal(TrikiConnectionState.WaitingForWake, service.State.ConnectionState);
+        Assert.True(service.State.WakeWatcherArmed);
+    }
+
+    [Fact]
+    public async Task DeliberateEcoParkingUsesTheBoundedWakePause()
+    {
+        using var service = new BluetoothService(BluetoothSnapshot.Initial with { ConnectionState = TrikiConnectionState.Ready });
+        service.ConfigureRememberedDevice(0xAABBCCDDEEFF, "Triki", true, true);
+        await service.ParkUntilWakeAsync();
+        Assert.Equal(TrikiConnectionState.WaitingForWake, service.State.ConnectionState);
+        Assert.False(service.State.WakeWatcherArmed);
+    }
+
+    [Fact]
+    public async Task ExplicitDisconnectStaysDisconnectedUntilUserConnects()
+    {
+        using var service = new BluetoothService();
+        service.ConfigureRememberedDevice(0xAABBCCDDEEFF, "Triki", true, true);
+        await service.DisconnectAsync(forgetDevice: false);
+        service.ConfigureRememberedDevice(0xAABBCCDDEEFF, "Triki", true, true);
+        Assert.Equal(TrikiConnectionState.Disconnected, service.State.ConnectionState);
+        Assert.False(service.State.WakeWatcherArmed);
+    }
+
     [Theory]
     [InlineData(TrikiConnectionState.Ready)]
     [InlineData(TrikiConnectionState.Connecting)]

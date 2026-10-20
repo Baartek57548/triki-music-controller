@@ -290,12 +290,13 @@ public sealed class BluetoothService : IDisposable
         await _connectionGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (State.ConnectionState != TrikiConnectionState.Ready) return;
+            if (_disposed || _manualDisconnect || !_connectOnlyWhenNeeded || !_autoReconnect ||
+                _knownAddress is null || State.ConnectionState != TrikiConnectionState.Ready) return;
             _manualDisconnect = false;
             CleanupConnection();
             lock (_decoderLock) _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
-            BeginWaitingForWake();
+            BeginWaitingForWake(waitForSilence: true);
         }
         finally
         {
@@ -577,13 +578,15 @@ public sealed class BluetoothService : IDisposable
             return _discovered.Values.OrderByDescending(device => device.BluetoothAddress == _knownAddress).ThenByDescending(device => device.Rssi).ToArray();
     }
 
-    private void BeginWaitingForWake(string? errorMessage = null)
+    private void BeginWaitingForWake(string? errorMessage = null, bool waitForSilence = false)
     {
         if (_disposed || _knownAddress is null || !_autoReconnect || !_connectOnlyWhenNeeded) return;
         CancelWakeWatcher();
         _waitingForWake = true;
-        _wakeWatcherArmed = false;
-        _wakeAdvertisementGate.Reset(TimestampNanos());
+        // Startup and connection loss must accept an already advertising controller immediately.
+        // Only deliberate Eco parking needs a short pause to avoid an instant disconnect/reconnect loop.
+        _wakeAdvertisementGate.Reset(TimestampNanos(), waitForSilence);
+        _wakeWatcherArmed = _wakeAdvertisementGate.IsArmed;
         var cancellation = new CancellationTokenSource();
         _wakeArmCancellation = cancellation;
         UpdateState(state => state with
@@ -594,7 +597,7 @@ public sealed class BluetoothService : IDisposable
             DecodedFrames = 0,
             DiscardedStartupFrames = 0,
             DroppedProtocolBytes = 0,
-            WakeWatcherArmed = false,
+            WakeWatcherArmed = _wakeWatcherArmed,
             ErrorMessage = errorMessage,
         });
         _ = ArmWakeWatcherAfterSilenceAsync(cancellation.Token);

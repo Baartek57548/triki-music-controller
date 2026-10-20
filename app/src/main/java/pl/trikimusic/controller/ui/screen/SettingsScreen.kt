@@ -83,7 +83,7 @@ fun SettingsScreen(
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     SettingSwitchRow(
                         title = "Oszczędzanie energii (Tryb Eco)",
-                        description = "Usypianie sesji Bluetooth po 12 sekundach bezczynności.",
+                        description = "Zwalnianie połączenia po 2 minutach bezczynności. Automatyczne wznawianie; ciągłe reklamy BLE nie blokują próby dłużej niż 15 sekund.",
                         checked = state.settings.connectOnlyWhenNeeded,
                         onCheckedChange = viewModel::setConnectOnlyWhenNeeded,
                     )

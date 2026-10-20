@@ -70,7 +70,7 @@ class ConnectionActivityLease(
     }
 
     companion object {
-        const val DEFAULT_IDLE_TIMEOUT_NANOS = 12_000_000_000L
+        const val DEFAULT_IDLE_TIMEOUT_NANOS = 120_000_000_000L
         const val DEFAULT_ACCELERATION_DELTA_THRESHOLD_G = 0.08f
         const val DEFAULT_GYROSCOPE_THRESHOLD_DPS = 5f
     }

@@ -8,13 +8,13 @@ public sealed class ConnectionActivityLeaseTests
     [Theory]
     [InlineData(-1f)]
     [InlineData(1f)]
-    public void StationarySensorAndRealGestureDetectorParkOnceAfterTwelveSeconds(float gravityZ)
+    public void StationarySensorAndRealGestureDetectorParkOnceAfterTwoMinutes(float gravityZ)
     {
         var lease = new ConnectionActivityLease();
         var filter = new SensorFilter();
         var detector = new FullRotationGestureDetector();
         var parks = new List<long>();
-        for (var index = 0; index <= 1_500; index++)
+        for (var index = 0; index <= 6_500; index++)
         {
             var input = SensorTestData.Filtered(index * SensorTestData.SamplePeriodNanos, new Vector3f(0, 0, gravityZ));
             var filtered = filter.Process(input.Source, new CalibrationProfile());
@@ -22,6 +22,18 @@ public sealed class ConnectionActivityLeaseTests
             if (lease.Observe(filtered, false, false, gesture.Phase)) parks.Add(input.Source.TimestampNanos);
         }
         Assert.Equal(new[] { ConnectionActivityLease.DefaultIdleTimeoutNanos }, parks);
+    }
+
+    [Fact]
+    public void DefaultLeaseKeepsConnectionForTwoMinutesAndRenewsOnActivity()
+    {
+        var lease = new ConnectionActivityLease();
+        Assert.False(lease.Observe(0, active: false));
+        Assert.False(lease.Observe(12_000_000_000, active: false));
+        Assert.False(lease.Observe(119_999_999_999, active: false));
+        Assert.False(lease.Observe(120_000_000_000, active: true));
+        Assert.False(lease.Observe(239_999_999_999, active: false));
+        Assert.True(lease.Observe(240_000_000_000, active: false));
     }
 
     [Fact]

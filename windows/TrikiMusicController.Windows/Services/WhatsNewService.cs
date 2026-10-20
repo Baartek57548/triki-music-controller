@@ -9,6 +9,15 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.8",
+            "Dłuższa gotowość i automatyczny powrót połączenia",
+            [
+                "Tryb Eco utrzymuje połączenie przez 2 minuty bezczynności zamiast 12 sekund.",
+                "Po zerwaniu połączenia i uruchomieniu aplikacji dostępne Triki łączy się bez oczekiwania na ciszę BLE.",
+                "Po celowym uśpieniu ciągłe nadawanie reklam nie blokuje ponownej próby dłużej niż 15 sekund.",
+                "Ręczne Rozłącz nadal zatrzymuje automatyczne łączenie. Zachowano priorytety wielu urządzeń."
+            ]),
+        new ReleaseHighlight(
             "3.1.7",
             "Stabilne połączenie i bezpieczna aktualizacja",
             [

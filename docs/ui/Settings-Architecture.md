@@ -20,7 +20,7 @@ Powiązane węzły:
 
 1. **Połączenie i Zasilanie**:
    - *Automatyczne łączenie*: Łączenie z zapamiętanym kontrolerem przy uruchomieniu.
-   - *Oszczędzanie energii (Tryb Eco)*: Zwalnianie połączenia po 12s bezczynności (`WakeAdvertisementGate`).
+   - *Oszczędzanie energii (Tryb Eco)*: Zwalnianie połączenia po 2 minutach bezczynności. Automatyczne wznawianie przez `WakeAdvertisementGate`, z limitem oczekiwania na ciszę reklam BLE wynoszącym 15 sekund.
    - *Priorytet wielu urządzeń*: Wybór trybu arbitrażu między komputerem a telefonem.
 
 2. **Działanie i Wygląd**:

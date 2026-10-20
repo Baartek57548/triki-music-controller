@@ -27,8 +27,8 @@
                                       OffContent="Stała gotowość"
                                       OnContent="Włączone (Eco)"
                                       IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}"
-                                      AutomationProperties.HelpText="Usypiaj sesję Bluetooth po 12 sekundach bezczynności kontrolera." />
-                        <TextBlock Text="W trybie Eco Triki zamyka połączenie Bluetooth po 12 sekundach bezczynności i wznawia je natychmiast po naciśnięciu przycisku lub wykryciu ruchu."
+                                      AutomationProperties.HelpText="Zwalniaj połączenie Bluetooth po 2 minutach bezczynności kontrolera. Ponowne łączenie odbywa się automatycznie." />
+                        <TextBlock Text="Tryb Eco zwalnia połączenie po 2 minutach bezczynności. Aplikacja automatycznie łączy dostępne Triki; po celowym uśpieniu czeka na nową reklamę po ciszy lub ponawia próbę po maksymalnie 15 sekundach ciągłego nadawania."
                                    Style="{StaticResource MetadataTextStyle}" />
 
                         <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />

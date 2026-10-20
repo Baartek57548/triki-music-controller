@@ -304,8 +304,9 @@ class TrikiBleManager(
             isKnown = true,
         )
         waitingForWake = true
-        wakeWatcherArmed = false
-        wakeAdvertisementGate.reset(SystemClock.elapsedRealtime())
+        // Startup and error recovery must not require the peripheral to stop advertising first.
+        wakeAdvertisementGate.reset(SystemClock.elapsedRealtime(), waitForSilence = disconnectCurrent)
+        wakeWatcherArmed = wakeAdvertisementGate.isArmed
         mutableState.update {
             it.copy(
                 connectionState = TrikiConnectionState.WAITING_FOR_WAKE,
@@ -317,13 +318,13 @@ class TrikiBleManager(
                 discardedStartupFrames = 0L,
                 droppedProtocolBytes = 0L,
                 lastPacketId = null,
-                wakeWatcherArmed = false,
+                wakeWatcherArmed = wakeWatcherArmed,
                 errorMessage = null,
             )
         }
         startScanner(ScanSettings.SCAN_MODE_BALANCED)
         startWakeArmMonitor()
-        logger.log(LogCategory.BLE, "Połączenie GATT uśpione; nasłuchuję nowego wybudzenia Triki.")
+        logger.log(LogCategory.BLE, "Nasłuchuję zapamiętanego Triki; połączenie zostanie wznowione automatycznie.")
     }.onFailure { error ->
         fail(error.message ?: "Nie udało się uruchomić nasłuchu wybudzenia Triki.", error)
     }

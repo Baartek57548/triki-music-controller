@@ -2,18 +2,22 @@ package pl.trikimusic.controller.core.bluetooth
 
 class WakeAdvertisementGate(
     private val requiredSilenceMillis: Long = DEFAULT_REQUIRED_SILENCE_MILLIS,
+    private val maximumWaitMillis: Long = DEFAULT_MAXIMUM_WAIT_MILLIS,
 ) {
     private var lastAdvertisementMillis: Long? = null
+    private var waitingSinceMillis: Long? = null
     private var armed = false
 
     init {
         require(requiredSilenceMillis > 0L)
+        require(maximumWaitMillis >= requiredSilenceMillis)
     }
 
     @Synchronized
-    fun reset(nowMillis: Long) {
+    fun reset(nowMillis: Long, waitForSilence: Boolean = true) {
         lastAdvertisementMillis = nowMillis.takeIf { it >= 0L }
-        armed = false
+        waitingSinceMillis = lastAdvertisementMillis
+        armed = !waitForSilence && nowMillis >= 0L
     }
 
     @Synchronized
@@ -24,11 +28,12 @@ class WakeAdvertisementGate(
         }
         val previous = lastAdvertisementMillis
         if (previous == null || nowMillis < previous) {
-            lastAdvertisementMillis = nowMillis
-            armed = false
+            reset(nowMillis)
             return false
         }
-        val mayConnect = armed || nowMillis - previous >= requiredSilenceMillis
+        // Firmware may keep advertising after GATT closes; always permit a bounded retry.
+        val waitedLongEnough = waitingSinceMillis?.let { nowMillis - it >= maximumWaitMillis } == true
+        val mayConnect = armed || nowMillis - previous >= requiredSilenceMillis || waitedLongEnough
         lastAdvertisementMillis = nowMillis
         return mayConnect
     }
@@ -40,7 +45,8 @@ class WakeAdvertisementGate(
             reset(nowMillis)
             return false
         }
-        if (armed || nowMillis - previous < requiredSilenceMillis) return false
+        val waitedLongEnough = waitingSinceMillis?.let { nowMillis - it >= maximumWaitMillis } == true
+        if (armed || (nowMillis - previous < requiredSilenceMillis && !waitedLongEnough)) return false
         armed = true
         return true
     }
@@ -51,5 +57,6 @@ class WakeAdvertisementGate(
 
     companion object {
         const val DEFAULT_REQUIRED_SILENCE_MILLIS = 5_000L
+        const val DEFAULT_MAXIMUM_WAIT_MILLIS = 15_000L
     }
 }

@@ -4,7 +4,7 @@ namespace TrikiMusicController_Windows.Core;
 
 public sealed class ConnectionActivityLease
 {
-    public const long DefaultIdleTimeoutNanos = 12_000_000_000;
+    public const long DefaultIdleTimeoutNanos = 120_000_000_000;
     public const float DefaultAccelerationDeltaThresholdG = 0.08f;
     public const float DefaultGyroscopeThresholdDps = 5f;
 

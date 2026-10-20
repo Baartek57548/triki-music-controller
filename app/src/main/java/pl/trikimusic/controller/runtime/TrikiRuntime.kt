@@ -173,7 +173,7 @@ class TrikiRuntime(
                 gesturePhase = rotationGestureResult.phase,
             )
         ) {
-            logger.log(LogCategory.BLE, "Brak aktywności przez 12 s; zamykam GATT i czekam na kolejne wybudzenie.")
+            logger.log(LogCategory.BLE, "Brak aktywności przez 2 minuty; zwalniam GATT z automatycznym wznawianiem.")
             scope.launch {
                 bleManager.parkUntilWake().onFailure { error ->
                     connectionActivityLease.reset()
