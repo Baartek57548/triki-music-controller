@@ -58,10 +58,13 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v3
-      - name: Prepare Android SDK
-        run: |
-          chmod +x gradlew
-          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: 'false'
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
       - name: Run Android regression tests and lint
         run: ./gradlew testReleaseUnitTest lintRelease --console=plain
       - name: Restore existing release signing key
