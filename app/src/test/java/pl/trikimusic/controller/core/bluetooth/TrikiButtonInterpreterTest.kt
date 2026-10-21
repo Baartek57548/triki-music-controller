@@ -97,34 +97,27 @@ class TrikiButtonInterpreterTest {
     }
 
     @Test
-    fun `checkAndConsumeHoldDuration consumes hold when duration is reached`() {
-        val fixture = Fixture().apply { identifyButtonFirmware() }
-
-        // Press and hold for 20 frames (approx 384 ms)
-        fixture.feed(1, frames = 20)
-        assertTrue(fixture.interpreter.isPressed)
-
-        // 500 ms required -> not yet reached (has been ~384 ms)
-        assertFalse(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 500_000_000L))
-
-        // Feed another 10 frames -> total ~576 ms
-        fixture.feed(1, frames = 10)
-        assertTrue(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 500_000_000L))
-
-        // Subsequent call returns false because it was already consumed
-        assertFalse(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 500_000_000L))
-
-        // Releasing after hold consumed produces no click events
-        fixture.feed(0, frames = 25)
-        assertTrue(fixture.events.isEmpty())
-        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
+    fun `long hold has no click and following normal click still works`() {
+        for (heldFrames in listOf(220, 520)) {
+            val fixture = Fixture().apply { identifyButtonFirmware() }
+            fixture.feed(1, frames = heldFrames)
+            assertTrue(fixture.interpreter.isPressed)
+            assertTrue(fixture.events.isEmpty())
+            fixture.feed(0, frames = 30)
+            assertTrue(fixture.events.isEmpty())
+            assertFalse(fixture.interpreter.shouldSuppressMotionControl)
+            fixture.click()
+            fixture.feed(0, frames = 30)
+            assertEquals(listOf(ButtonClickType.SINGLE), fixture.events)
+        }
     }
 
     @Test
-    fun `checkAndConsumeHoldDuration returns false when not pressed`() {
+    fun `consuming hold without pressed button has no effect`() {
         val fixture = Fixture().apply { identifyButtonFirmware() }
         assertFalse(fixture.interpreter.isPressed)
-        assertFalse(fixture.interpreter.checkAndConsumeHoldDuration(fixture.currentTimestamp, 100_000_000L))
+        assertFalse(fixture.interpreter.consumeCurrentHold())
+        assertFalse(fixture.interpreter.shouldSuppressMotionControl)
     }
 
     @Test
@@ -158,7 +151,6 @@ class TrikiButtonInterpreterTest {
         val events = mutableListOf<ButtonClickType>()
         var timestampNanos = 0L
             private set
-        val currentTimestamp: Long get() = timestampNanos
         private var nextFrameIndex = 0L
 
         fun identifyButtonFirmware() {

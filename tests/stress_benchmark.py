@@ -20,7 +20,6 @@ import time
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from tests.helpers.imu_math import (
-    AirMouseController,
     EdgePoseBrightnessController,
     FullRotationGestureDetector,
     GyroscopeVolumeController,
@@ -77,7 +76,6 @@ def stress_test_extreme_orientations_and_tumbling():
     vol_ctrl = GyroscopeVolumeController()
     bright_ctrl = EdgePoseBrightnessController(initial_brightness_percent=50.0)
     rot_ctrl = FullRotationGestureDetector()
-    mouse_ctrl = AirMouseController(is_active=True)
     
     rng = random.Random(42)
     iterations = 200_000
@@ -85,7 +83,6 @@ def stress_test_extreme_orientations_and_tumbling():
     
     vol_actions = 0
     rot_actions = 0
-    mouse_events = 0
     
     start_time = time.perf_counter()
     for i in range(iterations):
@@ -117,16 +114,12 @@ def stress_test_extreme_orientations_and_tumbling():
         if res_r.triggered:
             rot_actions += 1
             
-        res_m = mouse_ctrl.process(sample)
-        if res_m.is_active:
-            mouse_events += 1
-            assert isinstance(res_m.delta_x, int) and isinstance(res_m.delta_y, int), "Mouse delta non-integer"
             
         t += 20_000_000  # 20ms step
         
     duration = time.perf_counter() - start_time
     print(f"  Processed {iterations:,} chaotic IMU iterations in {duration:.3f}s")
-    print(f"  Volume actions: {vol_actions}, Rotation actions: {rot_actions}, Active mouse events: {mouse_events}")
+    print(f"  Volume actions: {vol_actions}, Rotation actions: {rot_actions}")
     print("  [PASS] Chaotic tumbling and extreme orientation stress test completed successfully.")
 
 

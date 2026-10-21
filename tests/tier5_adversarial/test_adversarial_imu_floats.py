@@ -17,7 +17,6 @@ import unittest
 from typing import List
 
 from tests.helpers.imu_math import (
-    AirMouseController,
     EdgePoseBrightnessController,
     FullRotationGestureDetector,
     GyroscopeVolumeController,
@@ -35,7 +34,6 @@ class TestAdversarialImuFloats(unittest.TestCase):
         self.volume_ctrl = GyroscopeVolumeController()
         self.brightness_ctrl = EdgePoseBrightnessController(initial_brightness_percent=50.0)
         self.rotation_detector = FullRotationGestureDetector()
-        self.mouse_ctrl = AirMouseController(is_active=True)
 
     # --------------------------------------------------------------------------
     # 1. Non-Finite Floats (NaN, +Inf, -Inf) in All Axes
@@ -144,18 +142,6 @@ class TestAdversarialImuFloats(unittest.TestCase):
             res_acc = self.rotation_detector.process(sample_acc)
             self.assertFalse(res_acc.triggered, f"Accidental trigger on accel val={val}")
 
-    def test_air_mouse_adversarial_nonfinite_safety(self):
-        """Stress test AirMouseController against NaN, Infs, and extreme values."""
-        nonfinite_values = [float("nan"), float("inf"), float("-inf")]
-
-        t = 1_000_000_000
-        for val in nonfinite_values:
-            t += 20_000_000
-            sample = create_filtered_sample(t, Vector3(val, val, val), Vector3(0.0, 0.0, 1.0))
-            out = self.mouse_ctrl.process(sample)
-            self.assertEqual(out.delta_x, 0)
-            self.assertEqual(out.delta_y, 0)
-            self.assertEqual(out.scroll_delta, 0)
 
     # --------------------------------------------------------------------------
     # 2. Subnormal Numbers & Underflow Stress
@@ -181,9 +167,6 @@ class TestAdversarialImuFloats(unittest.TestCase):
         rot_res = self.rotation_detector.process(sample)
         self.assertFalse(rot_res.triggered)
 
-        mouse_out = self.mouse_ctrl.process(sample)
-        self.assertEqual(mouse_out.delta_x, 0)
-        self.assertEqual(mouse_out.delta_y, 0)
 
     # --------------------------------------------------------------------------
     # 3. Stream Poisoning & Immediate Recovery
@@ -246,9 +229,6 @@ class TestAdversarialImuFloats(unittest.TestCase):
         bright_res2 = self.brightness_ctrl.process(s2, is_button_pressed=True)
         self.assertEqual(bright_res2.delta_percent, 0.0)
 
-        self.mouse_ctrl.process(s1)
-        mouse_out = self.mouse_ctrl.process(s2)
-        self.assertIsNotNone(mouse_out)
 
 
 if __name__ == "__main__":

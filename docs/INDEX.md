@@ -26,7 +26,8 @@ Witamy w centralnej bazie wiedzy i grafie powiązań projektu **Triki Music Cont
 - [[Gyro-Volume-Control]] — Płynna regulacja głośności w pozycji stojącej z 2-sekundową bramką stabilizacji.
 - [[Inverted-Capsule-Gestures]] — Przełączanie utworów (Next/Previous) gestem odwróconego kapsla z konfigurowalnym kątem (`90°–360°`).
 - [[Edge-Brightness-Control]] — Regulacja jasności ekranu na krawędzi (90°) z wymogiem przytrzymania przycisku.
-- [[Air-Mouse-Mode]] — Tryb myszki żyroskopowej (kursor, LPM, PPM, scroll 90°, aktywacja 4s).
+- [[Air-Mouse-Mode]] — Archiwum usuniętego trybu myszki (wycofany w wersji 3.1.9).
+- [[Next-Improvements]] — Propozycje kolejnych usprawnień: czas Eco, historia połączeń i czułość gestów.
 - [[Button-Interpreter]] — Obsługa kliknięć, eliminacja odbić styku i konsumpcja przytrzymania (`ConsumeCurrentHold`).
 - [[Multi-Device-Arbitration]] — Inteligentne przełączanie kontrolera między komputerem a telefonem.
 - [[Spotify-Connect-Integration]] — Zdalne sterowanie urządzeniami w sieci domowej przez Spotify Connect.

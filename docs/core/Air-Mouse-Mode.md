@@ -6,7 +6,9 @@ tags:
   - imu
 ---
 
-# Tryb Myszki Żyroskopowej (Air Mouse)
+# Air Mouse — dokument archiwalny
+
+Funkcja została usunięta w [[Release-v3.1.9]]. Poniższy opis dokumentuje historyczne wydania 3.1.0–3.1.8 i nie dotyczy bieżącej aplikacji.
 
 Tryb **Air Mouse** pozwala przekształcić kontroler Triki w bezprzewodowy wskaźnik i mysz komputerową ze sterowaniem kursorem w powietrzu, lewym/prawym przyciskiem myszy oraz przewijaniem stron (scroll).
 

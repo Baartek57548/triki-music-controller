@@ -73,9 +73,7 @@ public sealed record RuntimeSnapshot(
     TrikiButtonProtocolMode ButtonProtocol,
     MediaAction? LastAction,
     string LastActionStatus,
-    DateTimeOffset? LastActionAt,
-    bool IsMouseMode = false,
-    bool IsMouseScrollMode = false)
+    DateTimeOffset? LastActionAt)
 {
     public static RuntimeSnapshot Initial { get; } = new(
         null,
@@ -85,9 +83,7 @@ public sealed record RuntimeSnapshot(
         TrikiButtonProtocolMode.Unknown,
         null,
         "Oczekiwanie na dane Triki",
-        null,
-        false,
-        false);
+        null);
 }
 
 public sealed class AppSettings

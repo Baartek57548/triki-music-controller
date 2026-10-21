@@ -3,13 +3,12 @@ Tier 4 Workload Test: Full End-to-End User Playback Workflow Simulation.
 
 Simulates a complete, multi-stage user session covering BLE wake gating, stream startup,
 rotary volume adjustment, inverted track skipping, edge brightness control,
-air mouse navigation, and clean disconnection.
+and clean disconnection.
 Strict 0-emoji compliance enforced.
 """
 
 import unittest
 from tests.helpers.imu_math import (
-    AirMouseController,
     EdgePoseBrightnessController,
     FullRotationGestureDetector,
     GyroscopeVolumeController,
@@ -138,36 +137,11 @@ class TestE2ePlaybackWorkflow(unittest.TestCase):
         self.assertAlmostEqual(bright_ctrl.current_brightness_percent, 70.0, delta=1.0)
 
         # -------------------------------------------------------------------
-        # Phase 6: Free-Air Air Mouse Navigation and Lateral Scroll
-        # -------------------------------------------------------------------
-        air_mouse = AirMouseController(is_active=True)
-        # Lift into free air (Acc Y = 0.5g, Acc Z = 0.0g) and move wrist
-        t_current += 20_000_000
-        sample_air = create_filtered_sample(t_current, Vector3(25.0, 0, -25.0), Vector3(0, 0.5, 0.0))
-        out_mouse = air_mouse.process(sample_air)
-        self.assertTrue(out_mouse.is_active)
-        self.assertFalse(out_mouse.is_scroll_mode)
-        self.assertTrue(out_mouse.delta_x != 0 or out_mouse.delta_y != 0)
-
-        # Tilt to 90 deg lateral edge (Acc Y = 0.8g, Acc Z = 0.1g) -> engages scroll mode
-        t_current += 20_000_000
-        sample_scroll = create_filtered_sample(t_current, Vector3(0, 0, 40.0), Vector3(0, 0.8, 0.1))
-        out_scroll = air_mouse.process(sample_scroll)
-        self.assertTrue(out_scroll.is_scroll_mode)
-
-        # Rotate for 0.5s to generate scroll steps
-        for i in range(25):
-            t_current += 20_000_000
-            sample = create_filtered_sample(t_current, Vector3(0, 0, 40.0), Vector3(0, 0.8, 0.1))
-            out_scroll = air_mouse.process(sample)
-
-        # -------------------------------------------------------------------
-        # Phase 7: Session Termination and Reset
+        # Phase 6: Session Termination and Reset
         # -------------------------------------------------------------------
         vol_ctrl.reset()
         bright_ctrl.reset()
         rot_detector.reset()
-        air_mouse.reset()
         decoder.reset()
 
         self.assertEqual(decoder.statistics.decoded_frames, 0)

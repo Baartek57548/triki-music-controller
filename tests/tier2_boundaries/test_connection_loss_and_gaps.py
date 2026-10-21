@@ -8,7 +8,6 @@ Strict 0-emoji compliance enforced.
 
 import unittest
 from tests.helpers.imu_math import (
-    AirMouseController,
     EdgePoseBrightnessController,
     FullRotationGestureDetector,
     GyroscopeVolumeController,
@@ -55,19 +54,6 @@ class TestConnectionLossAndGaps(unittest.TestCase):
         self.assertEqual(res_gap.delta_percent, 0.0)
         self.assertEqual(res_gap.brightness_percent, 50.0)
 
-    def test_air_mouse_clears_momentum_on_gap(self):
-        """Verify Air Mouse resets smoothed velocity and subpixel buffers on gap > 250ms."""
-        mouse = AirMouseController(is_active=True)
-        t0 = 1_000_000_000
-
-        # Rapid movement
-        mouse.process(create_filtered_sample(t0, Vector3(0, 0, -50.0), Vector3(0, 0.5, 0)))
-        mouse.process(create_filtered_sample(t0 + 20_000_000, Vector3(0, 0, -50.0), Vector3(0, 0.5, 0)))
-
-        # Stream gap of 500 ms with gentle movement
-        out = mouse.process(create_filtered_sample(t0 + 520_000_000, Vector3(0, 0, 0.0), Vector3(0, 0.5, 0)))
-        self.assertEqual(out.delta_x, 0)
-        self.assertEqual(out.delta_y, 0)
 
 
 if __name__ == "__main__":

@@ -11,14 +11,11 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly MediaControlService _media;
     private readonly SystemVolumeService _systemVolume;
     private readonly SystemBrightnessService _systemBrightness;
-    private readonly SystemMouseService _mouse;
     private readonly SettingsService _settings;
     private readonly FeedbackToneService _ratingFeedback;
-    private readonly CompactHudService _hud;
     private readonly SensorFilter _sensorFilter = new();
     private readonly GyroscopeVolumeController _volumeController = new();
     private readonly EdgePoseBrightnessController _brightnessController = new();
-    private readonly AirMouseController _airMouseController = new();
     private FullRotationGestureDetector _rotationGestureDetector;
     private readonly TrikiButtonInterpreter _buttonInterpreter = new();
     private readonly ConnectionActivityLease _connectionActivityLease = new();
@@ -30,19 +27,15 @@ public sealed class TrikiRuntimeEngine : IDisposable
         MediaControlService media,
         SystemVolumeService systemVolume,
         SystemBrightnessService systemBrightness,
-        SystemMouseService mouse,
         SettingsService settings,
-        FeedbackToneService ratingFeedback,
-        CompactHudService hud)
+        FeedbackToneService ratingFeedback)
     {
         _bluetooth = bluetooth;
         _media = media;
         _systemVolume = systemVolume;
         _systemBrightness = systemBrightness;
-        _mouse = mouse;
         _settings = settings;
         _ratingFeedback = ratingFeedback;
-        _hud = hud;
         _brightnessController.CurrentBrightnessPercent = _systemBrightness.GetBrightness();
         _rotationGestureDetector = CreateGestureDetector(_settings.Current.RotationAngleDegrees);
         _bluetooth.SampleReceived += BluetoothOnSampleReceived;
@@ -82,7 +75,6 @@ public sealed class TrikiRuntimeEngine : IDisposable
             _volumeController.Reset();
             _brightnessController.Reset();
             _rotationGestureDetector.Reset();
-            _airMouseController.Reset();
             _buttonInterpreter.Reset();
             _connectionActivityLease.Reset();
             State = RuntimeSnapshot.Initial;
@@ -111,193 +103,89 @@ public sealed class TrikiRuntimeEngine : IDisposable
             var buttonEvent = _buttonInterpreter.Process(sample);
             var gesture = _rotationGestureDetector.Process(filtered);
 
-            // Sprawdzenie przytrzymania przycisku przez 4 sekundy (przełączenie trybu myszki)
-            if (_buttonInterpreter.CheckAndConsumeHoldDuration(sample.TimestampNanos, 4_000_000_000L))
-            {
-                _airMouseController.IsActive = !_airMouseController.IsActive;
-                _volumeController.Reset();
-                _brightnessController.Reset();
-                _rotationGestureDetector.Reset();
-                _ratingFeedback.PlayMouseMode(_airMouseController.IsActive);
-                _hud.ShowMouseMode(_airMouseController.IsActive);
-            }
-
             var isButtonPressed = _buttonInterpreter.IsPressed;
 
-            if (_airMouseController.IsActive)
+            var brightness = _brightnessController.Process(filtered, isButtonPressed);
+            if (brightness.Active && isButtonPressed)
+            {
+                _buttonInterpreter.ConsumeCurrentHold();
+            }
+            shouldParkConnection = _settings.Current.ConnectOnlyWhenNeeded &&
+                _connectionActivityLease.Observe(filtered,
+                    buttonEvent is not null || _buttonInterpreter.ShouldSuppressMotionControl,
+                    brightness.Active, gesture.Phase);
+
+            if (brightness.Active)
+            {
+                _volumeController.Reset();
+                _rotationGestureDetector.Reset();
+                if (brightness.DeltaPercent != 0f)
+                {
+                    _systemBrightness.StepBrightness(brightness.DeltaPercent);
+                }
+                State = State with
+                {
+                    LatestSample = filtered,
+                    Brightness = brightness,
+                    Volume = null,
+                    Gesture = gesture,
+                    ButtonProtocol = _buttonInterpreter.ProtocolMode,
+                };
+            }
+            else if (buttonEvent is null && gesture.Triggered)
             {
                 _volumeController.Reset();
                 _brightnessController.Reset();
-                _rotationGestureDetector.Reset();
-
-                if (buttonEvent is not null)
+                actionToExecute = gesture.Direction?.ToInvertedCapsuleNavigationAction() ?? MediaAction.None;
+                State = State with
                 {
-                    _airMouseController.NotifyClickTransient(sample.TimestampNanos);
-                    if (buttonEvent.Type == ButtonClickType.Single)
-                    {
-                        _mouse.LeftClick();
-                        State = State with
-                        {
-                            LatestSample = filtered,
-                            Volume = null,
-                            Brightness = null,
-                            Gesture = gesture,
-                            ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                            IsMouseMode = true,
-                            IsMouseScrollMode = _airMouseController.IsScrollMode,
-                            LastAction = null,
-                            LastActionStatus = "Mysz: Lewy Przycisk Myszy (LPM)",
-                            LastActionAt = DateTimeOffset.Now,
-                        };
-                    }
-                    else if (buttonEvent.Type is ButtonClickType.Double or ButtonClickType.Triple)
-                    {
-                        _mouse.RightClick();
-                        State = State with
-                        {
-                            LatestSample = filtered,
-                            Volume = null,
-                            Brightness = null,
-                            Gesture = gesture,
-                            ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                            IsMouseMode = true,
-                            IsMouseScrollMode = _airMouseController.IsScrollMode,
-                            LastAction = null,
-                            LastActionStatus = "Mysz: Prawy Przycisk Myszy (PPM)",
-                            LastActionAt = DateTimeOffset.Now,
-                        };
-                    }
-                }
-                else
+                    LatestSample = filtered,
+                    Brightness = null,
+                    Gesture = gesture,
+                    ButtonProtocol = _buttonInterpreter.ProtocolMode,
+                    LastActionStatus = $"Rozpoznano obrót: {actionToExecute.Value.DisplayName()}",
+                };
+            }
+            else if (buttonEvent is not null)
+            {
+                _volumeController.Reset();
+                _brightnessController.Reset();
+                actionToExecute = _settings.Current.ActionFor(buttonEvent.Type);
+                State = State with
                 {
-                    if (isButtonPressed)
-                    {
-                        _airMouseController.NotifyClickTransient(sample.TimestampNanos);
-                    }
-
-                    var mouseOutput = _airMouseController.Process(filtered);
-                    if (mouseOutput.IsScrollMode)
-                    {
-                        if (mouseOutput.ScrollDelta != 0)
-                        {
-                            _mouse.Scroll(mouseOutput.ScrollDelta);
-                        }
-                    }
-                    else
-                    {
-                        if (mouseOutput.DeltaX != 0 || mouseOutput.DeltaY != 0)
-                        {
-                            _mouse.Move(mouseOutput.DeltaX, mouseOutput.DeltaY);
-                        }
-                    }
-
-                    State = State with
-                    {
-                        LatestSample = filtered,
-                        Volume = null,
-                        Brightness = null,
-                        Gesture = gesture,
-                        ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                        IsMouseMode = true,
-                        IsMouseScrollMode = mouseOutput.IsScrollMode,
-                        LastActionStatus = mouseOutput.IsScrollMode ? "Mysz: Kółko (Scroll 90°)" : "Mysz: Kursor (Air Mouse)",
-                    };
-                }
+                    LatestSample = filtered,
+                    Brightness = null,
+                    Gesture = gesture,
+                    ButtonProtocol = _buttonInterpreter.ProtocolMode,
+                    LastActionStatus = $"Przycisk: {buttonEvent.Type}",
+                };
+            }
+            else if (_buttonInterpreter.ShouldSuppressMotionControl)
+            {
+                _volumeController.Reset();
+                _brightnessController.Reset();
+                State = State with
+                {
+                    LatestSample = filtered,
+                    Brightness = null,
+                    Gesture = gesture,
+                    ButtonProtocol = _buttonInterpreter.ProtocolMode,
+                    Volume = null,
+                };
             }
             else
             {
-                var brightness = _brightnessController.Process(filtered, isButtonPressed);
-                if (brightness.Active && isButtonPressed)
+                _brightnessController.Reset();
+                var volume = _volumeController.Process(filtered);
+                actionToExecute = volume.Action;
+                State = State with
                 {
-                    _buttonInterpreter.ConsumeCurrentHold();
-                }
-                shouldParkConnection = _settings.Current.ConnectOnlyWhenNeeded &&
-                    _connectionActivityLease.Observe(filtered,
-                        buttonEvent is not null || _buttonInterpreter.ShouldSuppressMotionControl,
-                        brightness.Active, gesture.Phase);
-
-                if (brightness.Active)
-                {
-                    _volumeController.Reset();
-                    _rotationGestureDetector.Reset();
-                    if (brightness.DeltaPercent != 0f)
-                    {
-                        _systemBrightness.StepBrightness(brightness.DeltaPercent);
-                    }
-                    State = State with
-                    {
-                        LatestSample = filtered,
-                        Brightness = brightness,
-                        Volume = null,
-                        Gesture = gesture,
-                        ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                        IsMouseMode = false,
-                        IsMouseScrollMode = false,
-                    };
-                }
-                else if (buttonEvent is null && gesture.Triggered)
-                {
-                    _volumeController.Reset();
-                    _brightnessController.Reset();
-                    actionToExecute = gesture.Direction?.ToInvertedCapsuleNavigationAction() ?? MediaAction.None;
-                    State = State with
-                    {
-                        LatestSample = filtered,
-                        Brightness = null,
-                        Gesture = gesture,
-                        ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                        IsMouseMode = false,
-                        IsMouseScrollMode = false,
-                        LastActionStatus = $"Rozpoznano obrót: {actionToExecute.Value.DisplayName()}",
-                    };
-                }
-                else if (buttonEvent is not null)
-                {
-                    _volumeController.Reset();
-                    _brightnessController.Reset();
-                    actionToExecute = _settings.Current.ActionFor(buttonEvent.Type);
-                    State = State with
-                    {
-                        LatestSample = filtered,
-                        Brightness = null,
-                        Gesture = gesture,
-                        ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                        IsMouseMode = false,
-                        IsMouseScrollMode = false,
-                        LastActionStatus = $"Przycisk: {buttonEvent.Type}",
-                    };
-                }
-                else if (_buttonInterpreter.ShouldSuppressMotionControl)
-                {
-                    _volumeController.Reset();
-                    _brightnessController.Reset();
-                    State = State with
-                    {
-                        LatestSample = filtered,
-                        Brightness = null,
-                        Gesture = gesture,
-                        ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                        Volume = null,
-                        IsMouseMode = false,
-                        IsMouseScrollMode = false,
-                    };
-                }
-                else
-                {
-                    _brightnessController.Reset();
-                    var volume = _volumeController.Process(filtered);
-                    actionToExecute = volume.Action;
-                    State = State with
-                    {
-                        LatestSample = filtered,
-                        Brightness = null,
-                        Volume = volume,
-                        Gesture = gesture,
-                        ButtonProtocol = _buttonInterpreter.ProtocolMode,
-                        IsMouseMode = false,
-                        IsMouseScrollMode = false,
-                    };
-                }
+                    LatestSample = filtered,
+                    Brightness = null,
+                    Volume = volume,
+                    Gesture = gesture,
+                    ButtonProtocol = _buttonInterpreter.ProtocolMode,
+                };
             }
         }
         StateChanged?.Invoke(this, State);

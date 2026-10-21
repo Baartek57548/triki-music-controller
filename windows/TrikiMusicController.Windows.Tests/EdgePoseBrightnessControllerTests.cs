@@ -6,6 +6,37 @@ namespace TrikiMusicController.Windows.Tests;
 public sealed class EdgePoseBrightnessControllerTests
 {
     [Fact]
+    public void LongBrightnessHoldKeepsWorkingBeyondFourSecondsWithoutMediaClick()
+    {
+        var brightness = new EdgePoseBrightnessController(20f);
+        var button = new TrikiButtonInterpreter();
+        long timestamp = 1_000_000_000;
+        for (var index = 0; index < 15; index++)
+        {
+            timestamp += SensorTestData.SamplePeriodNanos;
+            button.Process(SensorTestData.Filtered(timestamp, new Vector3f(0, 0, -1)).Source);
+        }
+        BrightnessControlResult? result = null;
+        for (var index = 0; index < 300; index++)
+        {
+            timestamp += SensorTestData.SamplePeriodNanos;
+            var sample = SensorTestData.Filtered(timestamp, new Vector3f(0, 1, 0), new Vector3f(0, 0, 20), status: 1);
+            Assert.Null(button.Process(sample.Source));
+            result = brightness.Process(sample, button.IsPressed);
+            if (result.Active && button.IsPressed) button.ConsumeCurrentHold();
+        }
+        Assert.NotNull(result);
+        Assert.True(result.Ready);
+        Assert.True(result.BrightnessPercent > 20f);
+        for (var index = 0; index < 30; index++)
+        {
+            timestamp += SensorTestData.SamplePeriodNanos;
+            Assert.Null(button.Process(SensorTestData.Filtered(timestamp, new Vector3f(0, 1, 0)).Source));
+        }
+        Assert.False(button.ShouldSuppressMotionControl);
+    }
+
+    [Fact]
     public void FlatPoseIsNotActive()
     {
         var controller = new EdgePoseBrightnessController(50f);

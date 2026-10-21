@@ -10,7 +10,6 @@ Strict 0-emoji compliance enforced.
 import struct
 import unittest
 from tests.helpers.imu_math import (
-    AirMouseController,
     EdgePoseBrightnessController,
     FullRotationGestureDetector,
     GyroscopeVolumeController,

@@ -150,80 +150,49 @@ public sealed class TrikiButtonInterpreterTests
         Assert.Equal(ButtonClickType.Triple, thirdRelease.Type);
     }
 
-    [Fact]
-    public void CheckAndConsumeHoldDuration_WhenNotPressed_ReturnsFalse()
+    [Theory]
+    [InlineData(210)]
+    [InlineData(500)]
+    public void LongHoldDoesNotGenerateClickAndNextNormalClickStillWorks(int heldSamples)
     {
         var interpreter = new TrikiButtonInterpreter();
         long time = 1_000_000_000L;
         ArmButtonFlagProtocol(interpreter, ref time);
+        for (var index = 0; index < heldSamples; index++)
+        {
+            time += SampleDt;
+            Assert.Null(interpreter.Process(CreateSample(time, 1)));
+        }
+        Assert.True(interpreter.IsPressed);
+        for (var index = 0; index < 30; index++)
+        {
+            time += SampleDt;
+            Assert.Null(interpreter.Process(CreateSample(time, 0)));
+        }
+        Assert.False(interpreter.ShouldSuppressMotionControl);
 
-        Assert.False(interpreter.IsPressed);
-        Assert.False(interpreter.CheckAndConsumeHoldDuration(time, 4_000_000_000L));
+        for (var index = 0; index < 5; index++)
+        {
+            time += SampleDt;
+            Assert.Null(interpreter.Process(CreateSample(time, 1)));
+        }
+        var clicks = new List<ButtonClickEvent>();
+        for (var index = 0; index < 30; index++)
+        {
+            time += SampleDt;
+            if (interpreter.Process(CreateSample(time, 0)) is { } click) clicks.Add(click);
+        }
+        Assert.Equal(ButtonClickType.Single, Assert.Single(clicks).Type);
     }
 
     [Fact]
-    public void CheckAndConsumeHoldDuration_WhenPressedShorterThanRequired_ReturnsFalse()
+    public void ConsumeCurrentHoldWithoutPressDoesNotSuppressNextInteraction()
     {
         var interpreter = new TrikiButtonInterpreter();
         long time = 1_000_000_000L;
         ArmButtonFlagProtocol(interpreter, ref time);
-
-        // Press and hold for 2.0 seconds (100 samples)
-        for (int i = 0; i < 100; i++)
-        {
-            time += SampleDt;
-            interpreter.Process(CreateSample(time, 1));
-        }
-
-        Assert.True(interpreter.IsPressed);
-        // Checking for 4.0s hold when only 2.0s elapsed
-        Assert.False(interpreter.CheckAndConsumeHoldDuration(time, 4_000_000_000L));
-    }
-
-    [Fact]
-    public void CheckAndConsumeHoldDuration_WhenPressedLongerThanRequired_ConsumesAndSuppressesClickOnRelease()
-    {
-        var interpreter = new TrikiButtonInterpreter();
-        long time = 1_000_000_000L;
-        ArmButtonFlagProtocol(interpreter, ref time);
-
-        // Press and hold for 4.2 seconds (210 samples)
-        for (int i = 0; i < 210; i++)
-        {
-            time += SampleDt;
-            interpreter.Process(CreateSample(time, 1));
-        }
-
-        Assert.True(interpreter.IsPressed);
-
-        // 1. First check: threshold reached (4.2s >= 4.0s) -> returns true and marks consumed
-        Assert.True(interpreter.CheckAndConsumeHoldDuration(time, 4_000_000_000L));
-
-        // 2. Second check: already consumed -> returns false
-        Assert.False(interpreter.CheckAndConsumeHoldDuration(time + SampleDt, 4_000_000_000L));
-
-        // 3. Keep holding for another 1 second
-        for (int i = 0; i < 50; i++)
-        {
-            time += SampleDt;
-            interpreter.Process(CreateSample(time, 1));
-        }
-
-        // 4. Release button
-        time += SampleDt;
-        var releaseResult = interpreter.Process(CreateSample(time, 0));
-        Assert.Null(releaseResult);
-
-        // 5. Advance time past timeout: NO click event emitted
-        ButtonClickEvent? eventResult = null;
-        for (int i = 0; i < 25; i++)
-        {
-            time += SampleDt;
-            var res = interpreter.Process(CreateSample(time, 0));
-            if (res is not null) eventResult = res;
-        }
-
-        Assert.Null(eventResult);
+        Assert.False(interpreter.ConsumeCurrentHold());
+        Assert.False(interpreter.ShouldSuppressMotionControl);
     }
 
     [Fact]

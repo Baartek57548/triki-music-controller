@@ -9,7 +9,6 @@ Strict 0-emoji compliance enforced.
 import math
 import unittest
 from tests.helpers.imu_math import (
-    AirMouseController,
     EdgePoseBrightnessController,
     FullRotationGestureDetector,
     GyroscopeVolumeController,
@@ -45,18 +44,6 @@ class TestFloatingPointSafety(unittest.TestCase):
         self.assertFalse(res_acc.active)
         self.assertIsNone(res_acc.action)
 
-    def test_infinity_inputs_in_air_mouse(self):
-        """Verify AirMouseController handles Infinity safely without crashing."""
-        mouse = AirMouseController(is_active=True)
-        inf_sample = create_filtered_sample(
-            timestamp_nanos=1_000_000_000,
-            gyro=Vector3(float("inf"), 0.0, 0.0),
-            accel=Vector3(0.0, 0.0, -1.0),
-        )
-        out = mouse.process(inf_sample)
-        self.assertEqual(out.delta_x, 0)
-        self.assertEqual(out.delta_y, 0)
-        self.assertEqual(out.scroll_delta, 0)
 
     def test_zero_acceleration_vector_division_guard(self):
         """Verify division-by-zero protection when accelerometer magnitude is 0.0."""

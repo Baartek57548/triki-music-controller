@@ -9,6 +9,15 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.1.9",
+            "Sterowanie muzyką bez Air Mouse",
+            [
+                "Usunięto tryb Air Mouse, jego aktywację przytrzymaniem oraz generowanie ruchów i kliknięć myszy.",
+                "Usunięto kartę myszki z zakładki Sterowanie, powiązane komunikaty HUD i dźwięki.",
+                "Długie przytrzymanie pozostaje dostępne do regulacji jasności i nie generuje kliknięcia po puszczeniu.",
+                "Wydanie zawiera automatyczne wznawianie BLE i dwuminutowy timeout trybu Eco z wersji 3.1.8."
+            ]),
+        new ReleaseHighlight(
             "3.1.8",
             "Dłuższa gotowość i automatyczny powrót połączenia",
             [

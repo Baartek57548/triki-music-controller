@@ -235,15 +235,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ => _lastRuntime.Volume is { TiltStable: false } volume ? volume.StabilizationProgress : 0,
     };
 
-    public bool IsMouseMode => _lastRuntime.IsMouseMode;
-    public bool IsMouseScrollMode => _lastRuntime.IsMouseScrollMode;
-    public string MouseModeStatusText => _lastRuntime.IsMouseMode
-        ? (_lastRuntime.IsMouseScrollMode ? "Aktywny (Kółko przewijania • pozycja 90°)" : "Aktywny (Kursor myszy • 1x LPM, 2x PPM)")
-        : "Nieaktywny (Przytrzymaj przycisk 4s, aby włączyć)";
-
-    public string ControllerStatusTitle => _lastRuntime.IsMouseMode
-        ? (_lastRuntime.IsMouseScrollMode ? "Tryb myszki (Scroll 90°)" : "Tryb myszki (Kursor)")
-        : _lastBluetooth.ConnectionState != TrikiConnectionState.Ready
+    public string ControllerStatusTitle => _lastBluetooth.ConnectionState != TrikiConnectionState.Ready
             ? "Sterowanie nieaktywne"
             : _lastRuntime.Gesture.Phase switch
             {

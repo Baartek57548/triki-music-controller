@@ -75,24 +75,6 @@ public sealed class CompactHudService : IDisposable
         });
     }
 
-    public void ShowMouseMode(bool enabled, bool isScroll = false)
-    {
-        if (_disposed) return;
-        _dispatcherQueue.TryEnqueue(() =>
-        {
-            if (_disposed) return;
-            try
-            {
-                var win = GetOrCreateWindow();
-                win?.ShowMouseMode(enabled, isScroll);
-            }
-            catch
-            {
-                // UI dispatcher safety
-            }
-        });
-    }
-
     public void Dispose()
     {
         if (_disposed) return;
