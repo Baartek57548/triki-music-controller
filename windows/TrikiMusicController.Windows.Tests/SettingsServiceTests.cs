@@ -40,7 +40,7 @@ public sealed class SettingsServiceTests : IDisposable
             SingleClickAction = MediaAction.PlayPause,
             DoubleClickAction = MediaAction.Like,
             TripleClickAction = MediaAction.Dislike,
-            ConnectOnlyWhenNeeded = false,
+            ConnectionPowerMode = ConnectionPowerMode.AlwaysOn,
             AutoReconnect = true,
             KnownDeviceAddressHex = "001122334455",
             KnownDeviceName = "Triki Custom",
@@ -122,7 +122,7 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var settings = new AppSettings
         {
-            ConnectOnlyWhenNeeded = true,
+            ConnectionPowerMode = ConnectionPowerMode.Normal,
             AutoReconnect = false,
         };
 

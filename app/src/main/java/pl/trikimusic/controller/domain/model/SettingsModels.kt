@@ -66,14 +66,30 @@ data class AppSettings(
     val calibration: CalibrationProfile = CalibrationProfile(),
     val developerMode: Boolean = false,
     val backgroundEnabled: Boolean = true,
-    val connectOnlyWhenNeeded: Boolean = false,
+    val connectionPowerMode: ConnectionPowerMode = ConnectionPowerMode.NORMAL,
+    val volumeSensitivityPercent: Int = 100,
+    val brightnessSensitivityPercent: Int = 100,
+    val volumeGestureEnabled: Boolean = true,
+    val brightnessGestureEnabled: Boolean = true,
     val multiDeviceArbitration: MultiDeviceArbitrationMode = MultiDeviceArbitrationMode.MEDIA_PRIORITY,
     val rotationAngleDegrees: Int = 200,
     val enableSoundFeedback: Boolean = true,
     val theme: ThemePreference = ThemePreference.SYSTEM,
 ) {
+    val connectOnlyWhenNeeded: Boolean get() = connectionPowerMode != ConnectionPowerMode.ALWAYS_ON
     val activeProfile: ControlProfile
         get() = profiles.firstOrNull { it.id == activeProfileId } ?: profiles.first()
+}
+
+@Serializable
+enum class ConnectionPowerMode(val displayName: String, val idleMinutes: Int?) {
+    NORMAL("Normal — 30 minut", 30),
+    ECO_2("Eco — 2 minuty", 2),
+    ECO_5("Eco — 5 minut", 5),
+    ECO_10("Eco — 10 minut", 10),
+    ALWAYS_ON("Stałe połączenie", null);
+
+    val idleTimeoutNanos: Long get() = (idleMinutes ?: 30) * 60_000_000_000L
 }
 
 const val DEFAULT_PROFILE_ID = "music"

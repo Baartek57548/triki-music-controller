@@ -24,6 +24,18 @@ public sealed class GyroscopeVolumeController
     private float? _smoothedGyroscopeZ;
     private long? _lastVolumeStepNanos;
     private bool _tiltStable;
+    private float _sensitivity = 1f;
+    public float Sensitivity
+    {
+        get => _sensitivity;
+        set
+        {
+            if (!float.IsFinite(value) || value is < 0.5f or > 2f) throw new ArgumentOutOfRangeException(nameof(value));
+            if (_sensitivity == value) return;
+            _sensitivity = value;
+            Reset();
+        }
+    }
 
     public GyroscopeVolumeController(VolumeControllerConfiguration? configuration = null)
     {
@@ -107,7 +119,7 @@ public sealed class GyroscopeVolumeController
 
         _activeDirection = direction;
         _accumulatedRotationDegrees = Math.Clamp(
-            _accumulatedRotationDegrees + filteredZ * deltaSeconds,
+            _accumulatedRotationDegrees + filteredZ * deltaSeconds * _sensitivity,
             -_configuration.DegreesPerVolumeStep,
             _configuration.DegreesPerVolumeStep);
         var minimumIntervalNanos = _configuration.MinimumStepIntervalMillis * 1_000_000;

@@ -19,7 +19,7 @@ class ConnectionActivityLeaseTest {
             val filter = SensorFilter()
             val detector = FullRotationGestureDetector()
             val parks = mutableListOf<Long>()
-            repeat(6_501) { index ->
+            repeat((ConnectionActivityLease.DEFAULT_IDLE_TIMEOUT_NANOS / 20_000_000L).toInt() + 101) { index ->
                 val timestamp = index * 20_000_000L
                 val source = TrikiSensorData(index.toLong(), timestamp, Vector3(0f, 0f, 0f),
                     Vector3(0f, 0f, gravityZ), RawVector3(0, 0, 0), RawVector3(0, 0, 0), 0)
@@ -32,14 +32,14 @@ class ConnectionActivityLeaseTest {
     }
 
     @Test
-    fun `default lease stays connected for two minutes and renews on activity`() {
+    fun `default lease stays connected for thirty minutes and renews on activity`() {
         val lease = ConnectionActivityLease()
         assertFalse(lease.observe(0L, active = false))
         assertFalse(lease.observe(12_000_000_000L, active = false))
-        assertFalse(lease.observe(119_999_999_999L, active = false))
-        assertFalse(lease.observe(120_000_000_000L, active = true))
-        assertFalse(lease.observe(239_999_999_999L, active = false))
-        assertTrue(lease.observe(240_000_000_000L, active = false))
+        assertFalse(lease.observe(1_799_999_999_999L, active = false))
+        assertFalse(lease.observe(1_800_000_000_000L, active = true))
+        assertFalse(lease.observe(3_599_999_999_999L, active = false))
+        assertTrue(lease.observe(3_600_000_000_000L, active = false))
     }
 
     @Test

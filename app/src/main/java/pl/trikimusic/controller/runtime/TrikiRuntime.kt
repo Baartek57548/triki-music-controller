@@ -95,13 +95,22 @@ class TrikiRuntime(
         scope.launch {
             settingsRepository.settings.collectLatest { value ->
                 val calibrationChanged = value.calibration != settings.calibration
-                val connectionModeChanged = value.connectOnlyWhenNeeded != settings.connectOnlyWhenNeeded
+                val powerModeChanged = value.connectionPowerMode != settings.connectionPowerMode
+                val gesturesChanged = value.volumeGestureEnabled != settings.volumeGestureEnabled ||
+                    value.brightnessGestureEnabled != settings.brightnessGestureEnabled
                 settings = value
+                connectionActivityLease.configureTimeout(value.connectionPowerMode.idleTimeoutNanos)
+                if (powerModeChanged) connectionActivityLease.reset()
+                volumeController.sensitivity = value.volumeSensitivityPercent / 100f
+                brightnessController.sensitivity = value.brightnessSensitivityPercent / 100f
+                if (gesturesChanged) {
+                    volumeController.reset()
+                    brightnessController.reset()
+                }
                 rotationGestureDetector.updateRotationAngle(value.rotationAngleDegrees)
                 bleManager.setConnectOnlyWhenNeeded(value.connectOnlyWhenNeeded)
                 bleManager.setRawCaptureEnabled(value.developerMode)
                 if (calibrationChanged) resetProcessing()
-                else if (connectionModeChanged) connectionActivityLease.reset()
             }
         }
         scope.launch {
@@ -160,8 +169,8 @@ class TrikiRuntime(
         val buttonEvent = buttonInterpreter.process(sample)
         val rotationGestureResult = rotationGestureDetector.process(filtered)
         val isButtonPressed = buttonInterpreter.isPressed
-        val brightnessResult = brightnessController.process(filtered, isButtonPressed)
-        if (brightnessResult.active && isButtonPressed) {
+        val brightnessResult = if (settings.brightnessGestureEnabled) brightnessController.process(filtered, isButtonPressed) else null
+        if (brightnessResult?.active == true && isButtonPressed) {
             buttonInterpreter.consumeCurrentHold()
         }
         if (
@@ -169,12 +178,14 @@ class TrikiRuntime(
             connectionActivityLease.observe(
                 filtered,
                 buttonActivity = buttonEvent != null || buttonInterpreter.shouldSuppressMotionControl,
-                brightnessActivity = brightnessResult.active,
+                brightnessActivity = brightnessResult?.active == true && isButtonPressed,
                 gesturePhase = rotationGestureResult.phase,
             )
         ) {
-            logger.log(LogCategory.BLE, "Brak aktywności przez 2 minuty; zwalniam GATT z automatycznym wznawianiem.")
+            logger.log(LogCategory.BLE, "Brak aktywności przez ${settings.connectionPowerMode.idleMinutes} minut; zwalniam GATT z automatycznym wznawianiem.")
+            val requestedMode = settings.connectionPowerMode
             scope.launch {
+                if (settings.connectionPowerMode != requestedMode || !connectionActivityLease.isParkingRequested) return@launch
                 bleManager.parkUntilWake().onFailure { error ->
                     connectionActivityLease.reset()
                     logger.log(LogCategory.BLE, "Nie udało się przejść w tryb połączenia na żądanie.", error)
@@ -201,7 +212,7 @@ class TrikiRuntime(
                 rotationGestureFaceDown = rotationGestureResult.faceDown,
             )
         }
-        if (brightnessResult.active) {
+        if (brightnessResult?.active == true) {
             volumeController.reset()
             rotationGestureDetector.reset()
             if (brightnessResult.deltaPercent != 0f) {
@@ -268,6 +279,12 @@ class TrikiRuntime(
             return
         }
 
+        if (!settings.volumeGestureEnabled) {
+            volumeController.reset()
+            mutableState.update { it.copy(volumeSensorValid = false, volumeWithinTiltRange = false,
+                volumeAccelerationStable = false, volumeTiltStable = false, volumeStabilizationProgress = 0f) }
+            return
+        }
         val volumeResult = volumeController.process(filtered)
         mutableState.update {
             it.copy(

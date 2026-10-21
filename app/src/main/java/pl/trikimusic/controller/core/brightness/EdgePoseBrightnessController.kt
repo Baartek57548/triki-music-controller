@@ -32,6 +32,13 @@ class EdgePoseBrightnessController(
     private var lastTimestampNanos: Long? = null
     private var accumulatedDegrees = 0f
     private var isCurrentlyInEdge = false
+    var sensitivity: Float = 1f
+        set(value) {
+            require(value.isFinite() && value in 0.5f..2f)
+            if (field == value) return
+            field = value
+            reset()
+        }
 
     fun getBrightness(): Float = currentBrightnessPercent
 
@@ -127,7 +134,7 @@ class EdgePoseBrightnessController(
 
             if (abs(gyroZ) >= GYROSCOPE_DEADBAND_DPS) {
                 val deltaDegrees = gyroZ * dtSeconds
-                accumulatedDegrees += deltaDegrees
+                accumulatedDegrees += deltaDegrees * sensitivity
 
                 if (abs(accumulatedDegrees) >= DEGREES_PER_PERCENT_BRIGHTNESS) {
                     val steps = (accumulatedDegrees / DEGREES_PER_PERCENT_BRIGHTNESS).toInt().toFloat()

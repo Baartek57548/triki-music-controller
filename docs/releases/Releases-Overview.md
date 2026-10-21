@@ -12,7 +12,8 @@ Poniżej znajduje się chronologiczny wykaz wydań projektu **Triki Music Contro
 
 ## Wykaz Wydań
 
-- [[Release-v3.1.9]] — Wersja 3.1.9 (Aktualna stabilna): Usunięcie Air Mouse i uproszczenie obsługi gestów oraz przycisku.
+- [[Release-v3.2.0]] — Wersja 3.2.0 (Aktualna stabilna): Normal 30 minut, wybór Eco, trwała historia połączeń i osobna czułość gestów.
+- [[Release-v3.1.9]] — Wersja 3.1.9: Usunięcie Air Mouse i uproszczenie obsługi gestów oraz przycisku.
 - [[Release-v3.1.8]] — Wersja 3.1.8: Tryb Eco po 2 minutach i automatyczne wznawianie mimo ciągłych reklam BLE.
 - [[Release-v3.1.7]] — Wersja 3.1.7: Naprawy BLE, bezczynności, zapisu ustawień i publikacji podpisanych aktualizacji.
 - [[Release-v3.1.6]] — Wersja 3.1.6: Kompleksowy audyt architektury, pełny cykl IDisposable, synchronizacja platformy Android i zestaw testów E2E.

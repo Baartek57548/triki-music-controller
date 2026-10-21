@@ -24,7 +24,9 @@ Projekt posiada kompletną, modularną bazę wiedzy zintegrowaną z **Obsidian G
 ## Funkcje
 
 - pełny cykl BLE: skan pierwszego urządzenia na żądanie, zapamiętanie po udanym połączeniu, automatyczne wybudzanie, discovery, NUS notifications, timeout, RSSI i bateria;
-- dodatkowy **Tryb Eco**: po 2 minutach bez ruchu lub przycisku zwalnia aktywne GATT i automatycznie wznawia połączenie; ciągłe reklamy BLE nie blokują ponownej próby dłużej niż 15 sekund;
+- tryby połączenia: domyślny **Normal — 30 minut bezczynności**, Eco 2/5/10 minut i stałe połączenie; automatyczne wznawianie BLE;
+- trwała historia ostatnich 200 zdarzeń połączenia z eksportem JSON i czyszczeniem;
+- niezależna czułość głośności i jasności 50–200% oraz włączniki obu gestów;
 - potwierdzony dekoder ramek IMU z resynchronizacją po rozciętych i sklejonych notyfikacjach;
 - ciągły regulator głośności wykorzystujący dokładnie przefiltrowaną wartość żyroskopu Z: dodatnie Z podgłaśnia, ujemne Z ścisza;
 - 2-sekundowa stabilizacja kąta 0–25° bez wymogu odkładania kapsla; gwałtowne przyspieszenie poza 0,80–1,20 g natychmiast wstrzymuje regulację i rozpoczyna stabilizację od nowa;
@@ -70,7 +72,7 @@ Projekt używa Android Gradle Plugin 8.13.2 i wrappera Gradle 8.13. Wersje zosta
 9. Uruchom muzykę i utrzymuj kapsel górą do góry w przechyle 0–25° przez 2 sekundy. Nie musi leżeć nieruchomo, ale unikaj szarpnięć; gwałtowne przyspieszenie ponownie uruchamia 2-sekundową stabilizację. Gdy UI pokaże „Regulator gotowy”, obracaj go łagodnie: dodatnia wartość Z podgłaśnia, ujemna ścisza.
 10. Aby ocenić utwór, użyj przycisku: dwa kliknięcia oznaczają Like, a trzy kliknięcia Dislike (mapowania można zmienić w profilu). Aby zmienić utwór bez przycisku, odwróć kapsel, odczekaj około pół sekundy stabilizacji i obróć go o 270° wokół osi Z. Kierunek jest liczony jako ruch dłoni: lewo przechodzi do następnego utworu, prawo do poprzedniego.
 11. Gdy Triki uśnie i rozłączy BLE, naciśnij jego fizyczny przycisk. Przy włączonym **Sterowaniu w tle** Android automatycznie dokończy oczekujące połączenie z zapamiętanym kapslem — bez ponownego wybierania urządzenia.
-12. Opcjonalnie włącz **Ustawienia → Oszczędzanie energii (Tryb Eco)**. Aplikacja zwolni aktywne połączenie po 2 minutach bezczynności i automatycznie połączy dostępny kapsel. Po celowym uśpieniu czeka na reklamę po ciszy albo dopuszcza próbę po maksymalnie 15 sekundach ciągłego nadawania. Po nieoczekiwanym zerwaniu połączenia ponawia łączenie bez oczekiwania na ciszę.
+12. W **Ustawienia → Tryb połączenia** wybierz Normal (domyślnie 30 minut), Eco 2/5/10 minut lub stałe połączenie. Aplikacja zwolni GATT po wybranym czasie bez ruchu lub przycisku i automatycznie połączy dostępny kapsel. Po celowym uśpieniu czeka na reklamę po ciszy albo dopuszcza próbę po maksymalnie 15 sekundach ciągłego nadawania. Po nieoczekiwanym zerwaniu połączenia ponawia łączenie bez oczekiwania na ciszę.
 
 Build z linii poleceń na Windows:
 

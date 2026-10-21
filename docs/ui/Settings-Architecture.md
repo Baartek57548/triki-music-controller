@@ -20,8 +20,11 @@ Powiązane węzły:
 
 1. **Połączenie i Zasilanie**:
    - *Automatyczne łączenie*: Łączenie z zapamiętanym kontrolerem przy uruchomieniu.
-   - *Oszczędzanie energii (Tryb Eco)*: Zwalnianie połączenia po 2 minutach bezczynności. Automatyczne wznawianie przez `WakeAdvertisementGate`, z limitem oczekiwania na ciszę reklam BLE wynoszącym 15 sekund.
+   - *Tryb połączenia*: Normal 30 minut (domyślnie), Eco 2/5/10 minut lub stałe połączenie. Automatyczne wznawianie przez `WakeAdvertisementGate`, z limitem oczekiwania na ciszę reklam BLE wynoszącym 15 sekund.
    - *Priorytet wielu urządzeń*: Wybór trybu arbitrażu między komputerem a telefonem.
+
+   - *Historia połączeń*: Ostatnich 200 zdarzeń, trwały zapis lokalny, eksport JSON i czyszczenie.
+   - *Czułość gestów*: Osobne suwaki 50–200% i włączniki głośności oraz jasności.
 
 2. **Działanie i Wygląd**:
    - *Dźwięki potwierdzenia akcji*: Odtwarzanie subtelnych sygnałów dźwiękowych po wykonaniu gestu lub kliknięcia.

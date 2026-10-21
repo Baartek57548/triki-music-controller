@@ -20,6 +20,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
     private readonly TrikiButtonInterpreter _buttonInterpreter = new();
     private readonly ConnectionActivityLease _connectionActivityLease = new();
     private bool _connectionWasReady;
+    private ConnectionPowerMode? _lastPowerMode;
     private bool _disposed;
 
     public TrikiRuntimeEngine(
@@ -67,6 +68,11 @@ public sealed class TrikiRuntimeEngine : IDisposable
     public RuntimeSnapshot State { get; private set; } = RuntimeSnapshot.Initial;
     public event EventHandler<RuntimeSnapshot>? StateChanged;
 
+    public void ResetConnectionActivity()
+    {
+        lock (_sync) _connectionActivityLease.Reset();
+    }
+
     public void Reset()
     {
         lock (_sync)
@@ -99,23 +105,32 @@ public sealed class TrikiRuntimeEngine : IDisposable
         var shouldParkConnection = false;
         lock (_sync)
         {
+            if (_lastPowerMode != _settings.Current.ConnectionPowerMode)
+            {
+                _lastPowerMode = _settings.Current.ConnectionPowerMode;
+                _connectionActivityLease.Reset();
+            }
+            _connectionActivityLease.ConfigureTimeout(_settings.Current.ConnectionPowerMode.IdleTimeoutNanos());
+            _volumeController.Sensitivity = _settings.Current.VolumeSensitivityPercent / 100f;
+            _brightnessController.Sensitivity = _settings.Current.BrightnessSensitivityPercent / 100f;
             var filtered = _sensorFilter.Process(sample, _settings.Current.Calibration);
             var buttonEvent = _buttonInterpreter.Process(sample);
             var gesture = _rotationGestureDetector.Process(filtered);
 
             var isButtonPressed = _buttonInterpreter.IsPressed;
 
-            var brightness = _brightnessController.Process(filtered, isButtonPressed);
-            if (brightness.Active && isButtonPressed)
+            var brightness = _settings.Current.BrightnessGestureEnabled ? _brightnessController.Process(filtered, isButtonPressed) : null;
+            if (!_settings.Current.BrightnessGestureEnabled) _brightnessController.Reset();
+            if (brightness?.Active == true && isButtonPressed)
             {
                 _buttonInterpreter.ConsumeCurrentHold();
             }
             shouldParkConnection = _settings.Current.ConnectOnlyWhenNeeded &&
                 _connectionActivityLease.Observe(filtered,
                     buttonEvent is not null || _buttonInterpreter.ShouldSuppressMotionControl,
-                    brightness.Active, gesture.Phase);
+                    brightness?.Active == true && isButtonPressed, gesture.Phase);
 
-            if (brightness.Active)
+            if (brightness?.Active == true)
             {
                 _volumeController.Reset();
                 _rotationGestureDetector.Reset();
@@ -173,7 +188,7 @@ public sealed class TrikiRuntimeEngine : IDisposable
                     Volume = null,
                 };
             }
-            else
+            else if (_settings.Current.VolumeGestureEnabled)
             {
                 _brightnessController.Reset();
                 var volume = _volumeController.Process(filtered);
@@ -187,6 +202,12 @@ public sealed class TrikiRuntimeEngine : IDisposable
                     ButtonProtocol = _buttonInterpreter.ProtocolMode,
                 };
             }
+            else
+            {
+                _volumeController.Reset();
+                State = State with { LatestSample = filtered, Brightness = null, Volume = null, Gesture = gesture,
+                    ButtonProtocol = _buttonInterpreter.ProtocolMode };
+            }
         }
         StateChanged?.Invoke(this, State);
 
@@ -197,9 +218,13 @@ public sealed class TrikiRuntimeEngine : IDisposable
 
     private async Task ParkConnectionAfterIdleAsync()
     {
+        var requestedMode = _lastPowerMode;
         try
         {
-            await _bluetooth.ParkUntilWakeAsync().ConfigureAwait(false);
+            await _bluetooth.ParkUntilWakeAsync(() =>
+            {
+                lock (_sync) return requestedMode == _settings.Current.ConnectionPowerMode && _connectionActivityLease.ParkingRequested;
+            }).ConfigureAwait(false);
         }
         catch (Exception error)
         {

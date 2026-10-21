@@ -79,6 +79,8 @@ data class MainUiState(
     val userMessage: String? = null,
     val update: UpdateUiState = UpdateUiState(),
     val settingsLoaded: Boolean = false,
+    val connectionHistory: List<pl.trikimusic.controller.core.logging.ConnectionHistoryEntry> = emptyList(),
+    val connectionHistoryError: String? = null,
 )
 
 class MainViewModel(
@@ -119,7 +121,7 @@ class MainViewModel(
         )
     }
 
-    val uiState: StateFlow<MainUiState> = combine(
+    private val baseUiState: StateFlow<MainUiState> = combine(
         coreState,
         mutablePermissions,
         container.logger.entries,
@@ -127,6 +129,10 @@ class MainViewModel(
         mutableUpdate,
     ) { core, permissions, logs, message, update ->
         core.copy(permissions = permissions, logs = logs, userMessage = message, update = update)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
+
+    val uiState = combine(baseUiState, container.connectionHistory.entries, container.connectionHistory.persistenceError) { core, history, error ->
+        core.copy(connectionHistory = history, connectionHistoryError = error)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     init {
@@ -236,6 +242,27 @@ class MainViewModel(
 
     fun setConnectOnlyWhenNeeded(enabled: Boolean) = launchHandled {
         container.settingsRepository.setConnectOnlyWhenNeeded(enabled)
+    }
+
+    fun setConnectionPowerMode(mode: pl.trikimusic.controller.domain.model.ConnectionPowerMode) = launchHandled {
+        container.settingsRepository.setConnectionPowerMode(mode)
+    }
+    fun setVolumeSensitivity(percent: Int) = launchHandled { container.settingsRepository.setGestureSensitivity(volumePercent = percent.coerceIn(50, 200)) }
+    fun setBrightnessSensitivity(percent: Int) = launchHandled { container.settingsRepository.setGestureSensitivity(brightnessPercent = percent.coerceIn(50, 200)) }
+    fun setVolumeGestureEnabled(enabled: Boolean) = launchHandled { container.settingsRepository.setGesturesEnabled(volume = enabled) }
+    fun setBrightnessGestureEnabled(enabled: Boolean) = launchHandled { container.settingsRepository.setGesturesEnabled(brightness = enabled) }
+    fun clearConnectionHistory() = launchHandled {
+        container.connectionHistory.clear()
+        mutableUserMessage.value = "Historia połączeń wyczyszczona."
+    }
+    fun exportConnectionHistory(uri: android.net.Uri) = launchHandled {
+        val json = container.connectionHistory.exportJson()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val output = getApplication<Application>().contentResolver.openOutputStream(uri, "wt")
+                ?: throw java.io.IOException("Nie można otworzyć pliku eksportu.")
+            output.bufferedWriter(Charsets.UTF_8).use { it.write(json) }
+        }
+        mutableUserMessage.value = "Wyeksportowano historię połączeń."
     }
 
     fun setRotationAngleDegrees(degrees: Int) = launchHandled {

@@ -14,12 +14,13 @@ public sealed class AppServices : IDisposable
         Brightness = new SystemBrightnessService();
         Media = new MediaControlService(Volume);
         Updates = new UpdateService();
-        Bluetooth = new BluetoothService();
+        ConnectionHistory = new ConnectionHistoryService();
+        Bluetooth = new BluetoothService(ConnectionHistory);
         RatingFeedback = new FeedbackToneService();
         Spotify = new SpotifyConnectService();
         Hud = new CompactHudService(dispatcherQueue);
         Runtime = new TrikiRuntimeEngine(Bluetooth, Media, Volume, Brightness, Settings, RatingFeedback);
-        ViewModel = new MainViewModel(dispatcherQueue, Settings, Bluetooth, Media, Runtime, Hud);
+        ViewModel = new MainViewModel(dispatcherQueue, Settings, Bluetooth, Media, Runtime, Hud, ConnectionHistory);
     }
 
     public SettingsService Settings { get; }
@@ -30,6 +31,7 @@ public sealed class AppServices : IDisposable
     public MediaControlService Media { get; }
     public UpdateService Updates { get; }
     public BluetoothService Bluetooth { get; }
+    public ConnectionHistoryService ConnectionHistory { get; }
     public FeedbackToneService RatingFeedback { get; }
     public TrikiRuntimeEngine Runtime { get; }
     public MainViewModel ViewModel { get; }
@@ -41,6 +43,7 @@ public sealed class AppServices : IDisposable
         Spotify.Dispose();
         RatingFeedback.Dispose();
         Bluetooth.Dispose();
+        ConnectionHistory.Dispose();
         Media.Dispose();
         Updates.Dispose();
         Hud.Dispose();

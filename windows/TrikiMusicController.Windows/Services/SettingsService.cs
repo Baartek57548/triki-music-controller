@@ -103,7 +103,9 @@ public sealed class SettingsService
         settings.SingleClickAction = NormalizeAction(settings.SingleClickAction, MediaAction.PlayPause);
         settings.DoubleClickAction = NormalizeAction(settings.DoubleClickAction, MediaAction.Like);
         settings.TripleClickAction = NormalizeAction(settings.TripleClickAction, MediaAction.Dislike);
-        if (!settings.AutoReconnect) settings.ConnectOnlyWhenNeeded = false;
+        if (!Enum.IsDefined(settings.ConnectionPowerMode)) settings.ConnectionPowerMode = ConnectionPowerMode.Normal;
+        if (settings.VolumeSensitivityPercent is < 50 or > 200) settings.VolumeSensitivityPercent = 100;
+        if (settings.BrightnessSensitivityPercent is < 50 or > 200) settings.BrightnessSensitivityPercent = 100;
 
         if (!ulong.TryParse(settings.KnownDeviceAddressHex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var address) ||
             address is 0 or > 0xFFFFFFFFFFFF)

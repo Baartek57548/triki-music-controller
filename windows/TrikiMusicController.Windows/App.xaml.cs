@@ -52,6 +52,7 @@ public partial class App : Microsoft.UI.Xaml.Application
             _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
             _mainInstance.Activated += MainInstance_Activated;
             Services = new AppServices(settings, _dispatcherQueue);
+            await Services.ConnectionHistory.Ready;
             _window = new MainWindow();
             _window.AppWindow.Closing += Window_Closing;
             _window.AppWindow.Changed += Window_Changed;
@@ -136,12 +137,27 @@ public partial class App : Microsoft.UI.Xaml.Application
     internal void NotifyUpdateAvailable(Version version) =>
         _trayIcon?.ShowToastNotification($"Dostępna aktualizacja {version}", "Otwórz Triki, aby pobrać i zainstalować nową wersję.");
 
-    public void Shutdown()
+    public async void Shutdown()
     {
         if (_shutdownStarted) return;
         _shutdownStarted = true;
         _trayIcon?.Dispose();
         _trayIcon = null;
+        try
+        {
+            if (!_applicationResourcesDisposed)
+            {
+                Services.Runtime.Dispose();
+                Services.Bluetooth.Dispose();
+                Services.ConnectionHistory.Record(new(DateTimeOffset.UtcNow, TrikiConnectionState.Disconnected,
+                    "Zakończenie aplikacji; zatrzymano obsługę Bluetooth.", null));
+                await Services.ConnectionHistory.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+            }
+        }
+        catch (Exception error)
+        {
+            System.Diagnostics.Trace.WriteLine($"Zamykanie historii połączeń: {error}");
+        }
         if (_window is not null)
             _window.Close();
         else

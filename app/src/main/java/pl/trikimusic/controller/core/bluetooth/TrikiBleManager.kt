@@ -54,10 +54,12 @@ class TrikiBleManager(
     private val scope: CoroutineScope,
     private val permissionManager: PermissionManager,
     private val logger: AppLogger,
+    private val connectionHistory: pl.trikimusic.controller.core.logging.ConnectionHistoryStore? = null,
 ) {
     private val bluetoothManager = context.getSystemService(BluetoothManager::class.java)
     private val decoder = TrikiProtocolDecoder()
     private val mutableState = MutableStateFlow(TrikiBleState())
+    private val historyStateLock = Any()
     private val mutableSamples = MutableSharedFlow<TrikiSensorData>(
         extraBufferCapacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -131,7 +133,7 @@ class TrikiBleManager(
         cancelWakeWatcher()
         manualDisconnect = false
         if (knownAddress != null) autoConnectAddress = knownAddress
-        mutableState.update {
+        updateState {
             it.copy(
                 connectionState = if (reconnecting) TrikiConnectionState.RECONNECTING else TrikiConnectionState.SCANNING,
                 discoveredDevices = if (reconnecting) it.discoveredDevices else emptyList(),
@@ -147,7 +149,7 @@ class TrikiBleManager(
                 if (knownAddress != null && !manualDisconnect) {
                     scheduleReconnect()
                 } else {
-                    mutableState.update { it.copy(connectionState = TrikiConnectionState.DISCONNECTED) }
+                    updateState { it.copy(connectionState = TrikiConnectionState.DISCONNECTED) }
                 }
             }
         }
@@ -230,7 +232,7 @@ class TrikiBleManager(
         gattUsesAutoConnect = false
         decoder.reset()
         sampleRateWindow.clear()
-        mutableState.update {
+        updateState("Ręczne rozłączenie; automatyczne łączenie wstrzymane.") {
             it.copy(
                 connectionState = TrikiConnectionState.DISCONNECTED,
                 selectedDevice = null,
@@ -307,7 +309,7 @@ class TrikiBleManager(
         // Startup and error recovery must not require the peripheral to stop advertising first.
         wakeAdvertisementGate.reset(SystemClock.elapsedRealtime(), waitForSilence = disconnectCurrent)
         wakeWatcherArmed = wakeAdvertisementGate.isArmed
-        mutableState.update {
+        updateState(if (disconnectCurrent) "Upłynął ustawiony czas bezczynności; zwolniono GATT. Automatyczna próba po ciszy lub maksymalnie 15 sekundach." else "Nasłuch kontrolera; automatyczne łączenie.") {
             it.copy(
                 connectionState = TrikiConnectionState.WAITING_FOR_WAKE,
                 selectedDevice = device,
@@ -410,7 +412,7 @@ class TrikiBleManager(
                 wakeArmJob = null
                 arbitrationDelayJob?.cancel()
                 arbitrationDelayJob = null
-                mutableState.update { it.copy(wakeWatcherArmed = false) }
+                updateState { it.copy(wakeWatcherArmed = false) }
                 runCatching { connect(result.device, device, useAutoConnect = false) }
                     .onFailure { error ->
                         fail(error.message ?: "Połączenie po wybudzeniu nie powiodło się.", error)
@@ -425,7 +427,7 @@ class TrikiBleManager(
                         wakeWatcherArmed = false
                         wakeArmJob?.cancel()
                         wakeArmJob = null
-                        mutableState.update { it.copy(wakeWatcherArmed = false) }
+                        updateState { it.copy(wakeWatcherArmed = false) }
                         runCatching { connect(result.device, device, useAutoConnect = false) }
                             .onFailure { error ->
                                 fail(error.message ?: "Połączenie po wybudzeniu nie powiodło się.", error)
@@ -436,7 +438,7 @@ class TrikiBleManager(
             }
             return
         }
-        mutableState.update { current ->
+        updateState { current ->
             val devices = (current.discoveredDevices.filterNot { it.address == device.address } + device)
                 .sortedWith(compareByDescending<TrikiDevice> { it.isKnown }.thenByDescending { it.rssi ?: Int.MIN_VALUE })
             current.copy(
@@ -456,7 +458,7 @@ class TrikiBleManager(
         cancelWakeWatcher()
         closeGatt()
         manualDisconnect = false
-        mutableState.update {
+        updateState {
             it.copy(
                 connectionState = if (useAutoConnect) TrikiConnectionState.RECONNECTING else TrikiConnectionState.CONNECTING,
                 selectedDevice = model,
@@ -490,7 +492,7 @@ class TrikiBleManager(
             }
             if (status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
                 armSetupTimeout(gatt)
-                mutableState.update { it.copy(connectionState = TrikiConnectionState.CONNECTED, errorMessage = null) }
+                updateState { it.copy(connectionState = TrikiConnectionState.CONNECTED, errorMessage = null) }
                 logger.log(LogCategory.BLE, "Połączono; rozpoczynam discovery services.")
                 if (!gatt.discoverServices()) recoverFromGattSetupFailure(gatt, "Nie udało się rozpocząć odkrywania usług GATT.")
                 return
@@ -500,20 +502,21 @@ class TrikiBleManager(
                 streamWatchdogJob?.cancel()
                 awaitingFirstFrame = false
                 logger.log(LogCategory.BLE, "Połączenie BLE przerwane (status=$status).")
+                if (!manualDisconnect) connectionHistory?.recordTransition(mutableState.value, mutableState.value, "Połączenie GATT przerwane (status=$status).")
                 rssiJob?.cancel()
                 rssiJob = null
                 decoder.reset()
                 sampleRateWindow.clear()
                 if (manualDisconnect || mutableState.value.selectedDevice == null) {
                     closeGatt(gatt)
-                    mutableState.update { it.disconnectedTelemetry() }
+                    updateState { it.disconnectedTelemetry() }
                 } else if (connectOnlyWhenNeeded) {
                     closeGatt(gatt)
                     scheduleReconnect()
                 } else if (gattUsesAutoConnect && status == BluetoothGatt.GATT_SUCCESS) {
                     // A successful peripheral-side disconnect keeps an autoConnect GATT alive;
                     // Android will reconnect this same client after the button wakes Triki.
-                    mutableState.update { it.waitingForWakeTelemetry() }
+                        updateState("Połączenie BLE przerwane; system oczekuje na ponowną dostępność kontrolera.") { it.waitingForWakeTelemetry() }
                     logger.log(LogCategory.BLE, "Triki śpi; system czeka na wybudzenie przyciskiem.")
                 } else {
                     // Link-loss statuses can terminate a pending client on some Android stacks.
@@ -527,7 +530,7 @@ class TrikiBleManager(
                 logger.log(LogCategory.BLE, "Błąd GATT podczas łączenia: $status.")
                 closeGatt(gatt)
                 if (!manualDisconnect) scheduleReconnect()
-                else mutableState.update { it.disconnectedTelemetry() }
+                else updateState { it.disconnectedTelemetry() }
             }
         }
 
@@ -541,7 +544,7 @@ class TrikiBleManager(
                 return
             }
             val services = gatt.services.map(::mapService)
-            mutableState.update { it.copy(gattServices = services) }
+            updateState { it.copy(gattServices = services) }
             logger.log(LogCategory.BLE, "GATT: ${services.size} usług, ${services.sumOf { it.characteristics.size }} charakterystyk.")
             if (findCharacteristic(gatt, TrikiProtocol.NUS_TX_UUID) == null || findCharacteristic(gatt, TrikiProtocol.NUS_RX_UUID) == null) {
                 recoverFromGattSetupFailure(gatt, "Urządzenie nie udostępnia potwierdzonego profilu Nordic UART Triki.")
@@ -594,7 +597,7 @@ class TrikiBleManager(
 
         override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
             if (gatt === bluetoothGatt && status == BluetoothGatt.GATT_SUCCESS) {
-                mutableState.update { it.copy(rssi = rssi) }
+                updateState { it.copy(rssi = rssi) }
             }
         }
     }
@@ -675,7 +678,7 @@ class TrikiBleManager(
         }
         awaitingFirstFrame = true
         armSetupTimeout(gatt, 5_000L)
-        mutableState.update {
+        updateState {
             it.copy(
                 connectionState = TrikiConnectionState.CONNECTED,
                 errorMessage = null,
@@ -695,7 +698,7 @@ class TrikiBleManager(
         setupTimeoutJob = null
         reconnectAttempt = 0
         autoReconnectAuthorized = true
-        mutableState.update { it.copy(connectionState = TrikiConnectionState.READY, errorMessage = null) }
+        updateState { it.copy(connectionState = TrikiConnectionState.READY, errorMessage = null) }
         startRssiPolling(gatt)
         streamWatchdogJob?.cancel()
         streamWatchdogJob = scope.launch {
@@ -737,11 +740,12 @@ class TrikiBleManager(
             closeGatt(gatt)
             return
         }
+        connectionHistory?.recordTransition(mutableState.value, mutableState.value, message)
         closeGatt(gatt)
         if (!manualDisconnect && mutableState.value.selectedDevice != null) {
             scheduleReconnect()
         } else {
-            mutableState.update { it.copy(connectionState = TrikiConnectionState.ERROR, errorMessage = message) }
+            updateState { it.copy(connectionState = TrikiConnectionState.ERROR, errorMessage = message) }
         }
     }
 
@@ -769,7 +773,7 @@ class TrikiBleManager(
         trimSampleRateWindow()
         val rate = measuredSampleRate()
         val statistics = decoder.statistics
-        mutableState.update {
+        updateState {
             it.copy(
                 lastFrameMillis = nowMillis.takeIf { samples.isNotEmpty() } ?: it.lastFrameMillis,
                 measuredSampleRateHz = rate,
@@ -801,7 +805,7 @@ class TrikiBleManager(
             return
         }
         val text = value.toString(StandardCharsets.UTF_8).trimEnd('\u0000').takeIf { it.isNotBlank() }
-        mutableState.update { current ->
+        updateState { current ->
             val info = when (uuid) {
                 TrikiProtocol.MANUFACTURER_NAME_UUID -> current.deviceInfo.copy(manufacturer = text)
                 TrikiProtocol.MODEL_NUMBER_UUID -> current.deviceInfo.copy(model = text)
@@ -816,7 +820,7 @@ class TrikiBleManager(
     }
 
     private fun updateBattery(percent: Int) {
-        mutableState.update { it.copy(battery = TrikiBatteryState(percent, System.currentTimeMillis())) }
+        updateState { it.copy(battery = TrikiBatteryState(percent, System.currentTimeMillis())) }
     }
 
     @SuppressLint("MissingPermission")
@@ -832,7 +836,7 @@ class TrikiBleManager(
 
     private fun scheduleReconnect() {
         if (!autoReconnectAuthorized) {
-            mutableState.update { it.disconnectedTelemetry() }
+            updateState { it.disconnectedTelemetry() }
             return
         }
         val address = mutableState.value.selectedDevice?.address ?: autoConnectAddress ?: return
@@ -840,7 +844,7 @@ class TrikiBleManager(
         reconnectJob?.cancel()
         val delayMillis = minOf(MAX_RECONNECT_DELAY_MILLIS, BASE_RECONNECT_DELAY_MILLIS * 2.0.pow(reconnectAttempt).toLong())
         reconnectAttempt = minOf(reconnectAttempt + 1, MAX_RECONNECT_ATTEMPT_EXPONENT)
-        mutableState.update { it.waitingForWakeTelemetry() }
+        updateState("Ponowna próba połączenia za ${delayMillis / 1_000}s.") { it.waitingForWakeTelemetry() }
         logger.log(LogCategory.BLE, "Ponowne zarejestrowanie autoConnect za ${delayMillis / 1_000}s.")
         reconnectJob = scope.launch {
             delay(delayMillis)
@@ -890,7 +894,7 @@ class TrikiBleManager(
                 delay(WAKE_ARM_POLL_MILLIS)
                 if (wakeAdvertisementGate.tryArm(SystemClock.elapsedRealtime())) {
                     wakeWatcherArmed = true
-                    mutableState.update { state ->
+                    updateState { state ->
                         if (state.connectionState == TrikiConnectionState.WAITING_FOR_WAKE) {
                             state.copy(wakeWatcherArmed = true)
                         } else {
@@ -948,7 +952,7 @@ class TrikiBleManager(
 
     private fun fail(message: String, throwable: Throwable? = null) {
         logger.log(LogCategory.BLE, message, throwable)
-        mutableState.update { it.copy(connectionState = TrikiConnectionState.ERROR, errorMessage = message) }
+        updateState { it.copy(connectionState = TrikiConnectionState.ERROR, errorMessage = message) }
     }
 
     private fun mapService(service: BluetoothGattService): GattServiceInfo = GattServiceInfo(
@@ -964,7 +968,7 @@ class TrikiBleManager(
 
     private fun updateGattValue(uuid: UUID, value: ByteArray) {
         val hex = value.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
-        mutableState.update { current ->
+        updateState { current ->
             current.copy(
                 gattServices = current.gattServices.map { service ->
                     service.copy(
@@ -1012,6 +1016,15 @@ class TrikiBleManager(
         characteristic.writeType = writeType
         characteristic.value = value
         if (gatt.writeCharacteristic(characteristic)) BluetoothGatt.GATT_SUCCESS else GATT_REQUEST_REJECTED
+    }
+
+    private fun updateState(reason: String? = null, transform: (TrikiBleState) -> TrikiBleState) {
+        synchronized(historyStateLock) {
+            val previous = mutableState.value
+            val current = transform(previous)
+            mutableState.value = current
+            connectionHistory?.recordTransition(previous, current, reason)
+        }
     }
 
     private companion object {

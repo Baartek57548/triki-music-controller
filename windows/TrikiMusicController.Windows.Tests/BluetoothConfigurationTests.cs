@@ -6,6 +6,15 @@ namespace TrikiMusicController.Windows.Tests;
 public sealed class BluetoothConfigurationTests
 {
     [Fact]
+    public async Task CancelledIdleRequestDoesNotDisconnectTheController()
+    {
+        using var service = new BluetoothService(BluetoothSnapshot.Initial with { ConnectionState = TrikiConnectionState.Ready });
+        service.ConfigureRememberedDevice(0xAABBCCDDEEFF, "Triki", true, true);
+        await service.ParkUntilWakeAsync(() => false);
+        Assert.Equal(TrikiConnectionState.Ready, service.State.ConnectionState);
+    }
+
+    [Fact]
     public void RememberedDeviceIsReadyForAdvertisementsWithoutWaitingForSilence()
     {
         using var service = new BluetoothService();

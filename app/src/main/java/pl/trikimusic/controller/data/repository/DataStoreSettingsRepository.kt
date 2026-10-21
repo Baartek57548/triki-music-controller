@@ -81,7 +81,21 @@ class DataStoreSettingsRepository(
     override suspend fun setBackgroundEnabled(enabled: Boolean) = update { copy(backgroundEnabled = enabled) }
 
     override suspend fun setConnectOnlyWhenNeeded(enabled: Boolean) = update {
-        copy(connectOnlyWhenNeeded = enabled)
+        copy(connectionPowerMode = if (enabled) pl.trikimusic.controller.domain.model.ConnectionPowerMode.NORMAL
+            else pl.trikimusic.controller.domain.model.ConnectionPowerMode.ALWAYS_ON)
+    }
+
+    override suspend fun setConnectionPowerMode(mode: pl.trikimusic.controller.domain.model.ConnectionPowerMode) = update {
+        copy(connectionPowerMode = mode)
+    }
+
+    override suspend fun setGestureSensitivity(volumePercent: Int?, brightnessPercent: Int?) = update {
+        require((volumePercent == null || volumePercent in 50..200) && (brightnessPercent == null || brightnessPercent in 50..200))
+        copy(volumeSensitivityPercent = volumePercent ?: volumeSensitivityPercent, brightnessSensitivityPercent = brightnessPercent ?: brightnessSensitivityPercent)
+    }
+
+    override suspend fun setGesturesEnabled(volume: Boolean?, brightness: Boolean?) = update {
+        copy(volumeGestureEnabled = volume ?: volumeGestureEnabled, brightnessGestureEnabled = brightness ?: brightnessGestureEnabled)
     }
 
     override suspend fun setRotationAngleDegrees(degrees: Int) = update {

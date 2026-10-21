@@ -24,6 +24,8 @@ import pl.trikimusic.controller.runtime.TrikiRuntime
 class AppContainer(application: Application) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val logger = AppLogger()
+    val connectionHistory = pl.trikimusic.controller.core.logging.ConnectionHistoryStore(
+        java.io.File(application.filesDir, "connection-history.json"), scope)
     val permissionManager = PermissionManager(application)
     val updateManager = GitHubUpdateManager(application, logger)
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(application, logger)
@@ -32,7 +34,7 @@ class AppContainer(application: Application) {
         SharingStarted.Eagerly,
         AppSettings(),
     )
-    val bleManager = TrikiBleManager(application, scope, permissionManager, logger)
+    val bleManager = TrikiBleManager(application, scope, permissionManager, logger, connectionHistory)
     val mediaController = AndroidMediaControllerGateway(application, logger)
     val actionMapper = ActionMapper(mediaController)
     val ratingFeedback = RatingFeedbackPlayer(logger)

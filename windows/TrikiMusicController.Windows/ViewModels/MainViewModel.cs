@@ -15,6 +15,8 @@ namespace TrikiMusicController_Windows.ViewModels;
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly SettingsService _settings;
+    private readonly DispatcherQueue _dispatcherQueue;
+    private readonly ConnectionHistoryService? _connectionHistory;
     private readonly BluetoothService _bluetooth;
     private readonly MediaControlService _media;
     private readonly TrikiRuntimeEngine _runtime;
@@ -40,8 +42,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         BluetoothService bluetooth,
         MediaControlService media,
         TrikiRuntimeEngine runtime,
-        CompactHudService? hud = null)
+        CompactHudService? hud = null,
+        ConnectionHistoryService? connectionHistory = null)
     {
+        _dispatcherQueue = dispatcherQueue;
+        _connectionHistory = connectionHistory;
+        if (_connectionHistory is not null) _connectionHistory.Changed += HistoryOnChanged;
         _settings = settings;
         _bluetooth = bluetooth;
         _media = media;
@@ -62,6 +68,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public ObservableCollection<TrikiDeviceInfo> Devices { get; } = [];
+    public ObservableCollection<ConnectionHistoryEntry> ConnectionHistory { get; } = [];
+    public IReadOnlyList<ConnectionPowerOption> AvailablePowerModes { get; } = Enum.GetValues<ConnectionPowerMode>()
+        .Select(mode => new ConnectionPowerOption(mode, mode.DisplayName())).ToArray();
+    public string ConnectionHistoryStatus => _connectionHistory?.PersistenceError ?? $"Zapisanych zdarzeń: {ConnectionHistory.Count}/200. Historia jest zachowywana po restarcie.";
     public IReadOnlyList<MediaActionOption> AvailableActions { get; } = Enum.GetValues<MediaAction>()
         .Select(action => new MediaActionOption(action, action.DisplayName()))
         .ToArray();
@@ -161,7 +171,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string VolumeTiltStatusText => _lastRuntime.Volume is null ? "Brak danych" : (_lastRuntime.Volume.WithinTiltRange ? "Poziom (0–25° OK)" : "Zbyt duży przechył (>25°)");
     public string VolumeAccStatusText => _lastRuntime.Volume is null ? "Brak danych" : (_lastRuntime.Volume.AccelerationStable ? "Stabilnie" : "Wykryto przyspieszenie");
 
-    public string VolumeControlTitle => _lastRuntime.Volume switch
+    public string VolumeControlTitle => !_settings.Current.VolumeGestureEnabled ? "Gest głośności wyłączony" : _lastRuntime.Volume switch
     {
         null => "Sterowanie nieaktywne",
         { SensorValid: false } => "Sprawdź połączenie",
@@ -170,7 +180,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         { TiltStable: false } => "Przygotowywanie sterowania…",
         _ => "Gotowe do regulacji",
     };
-    public string VolumeControlDetails => _lastRuntime.Volume is { } volume
+    public string VolumeControlDetails => !_settings.Current.VolumeGestureEnabled ? "Włącz gest głośności w Ustawieniach, aby korzystać z regulacji ruchem." : _lastRuntime.Volume is { } volume
         ? volume switch
         {
             { SensorValid: false } => "Nie otrzymuję prawidłowych danych ruchu z Triki.",
@@ -302,8 +312,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string RememberedDevice => _settings.Current.KnownDeviceAddress is ulong address
         ? $"{_settings.Current.KnownDeviceName ?? "Triki"} • {address:X12}"
         : "Brak zapamiętanego urządzenia";
-    public string ConnectionModeSummary => _settings.Current.ConnectOnlyWhenNeeded
-        ? "Tryb Eco zwalnia połączenie po 2 minutach bezczynności. Wznawianie jest automatyczne; ciągłe reklamy BLE nie blokują go dłużej niż 15 sekund."
+    public string ConnectionModeSummary => !_settings.Current.AutoReconnect
+        ? "Automatyczne łączenie jest wyłączone — aplikacja nie zwalnia GATT po bezczynności."
+        : _settings.Current.ConnectOnlyWhenNeeded
+        ? $"{_settings.Current.ConnectionPowerMode.DisplayName()}: po ustawionym czasie bez ruchu lub przycisku połączenie jest zwalniane. Wznawianie jest automatyczne."
         : "Połączenie pozostaje aktywne do czasu uśpienia kapsla lub ręcznego rozłączenia.";
     public string SettingsStatus
     {
@@ -318,12 +330,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (_settings.Current.AutoReconnect == value) return;
             _settings.Current.AutoReconnect = value;
-            if (!value && _settings.Current.ConnectOnlyWhenNeeded)
-            {
-                _settings.Current.ConnectOnlyWhenNeeded = false;
-                OnPropertyChanged(nameof(ConnectOnlyWhenNeeded));
-                OnPropertyChanged(nameof(ConnectionModeSummary));
-            }
+            _runtime.ResetConnectionActivity();
+            OnPropertyChanged(nameof(ConnectionModeSummary));
             _bluetooth.ConfigureRememberedDevice(
                 _settings.Current.KnownDeviceAddress,
                 _settings.Current.KnownDeviceName,
@@ -335,28 +343,93 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    public bool ConnectOnlyWhenNeeded
+    public ConnectionPowerOption SelectedPowerMode
     {
-        get => _settings.Current.ConnectOnlyWhenNeeded;
+        get => AvailablePowerModes.First(option => option.Mode == _settings.Current.ConnectionPowerMode);
         set
         {
-            if (_settings.Current.ConnectOnlyWhenNeeded == value) return;
-            _settings.Current.ConnectOnlyWhenNeeded = value;
-            if (value && !_settings.Current.AutoReconnect)
-            {
-                _settings.Current.AutoReconnect = true;
-                OnPropertyChanged(nameof(AutoReconnect));
-            }
+            if (value is null || _settings.Current.ConnectionPowerMode == value.Mode) return;
+            _settings.Current.ConnectionPowerMode = value.Mode;
+            _runtime.ResetConnectionActivity();
             _bluetooth.ConfigureRememberedDevice(
                 _settings.Current.KnownDeviceAddress,
                 _settings.Current.KnownDeviceName,
                 _settings.Current.AutoReconnect,
-                value,
+                _settings.Current.ConnectOnlyWhenNeeded,
                 _settings.Current.MultiDeviceArbitration);
             OnPropertyChanged();
             OnPropertyChanged(nameof(ConnectionModeSummary));
             _ = SaveSettingsAsync();
         }
+    }
+
+    public double VolumeSensitivityPercent
+    {
+        get => _settings.Current.VolumeSensitivityPercent;
+        set
+        {
+            if (!double.IsFinite(value)) return;
+            var safe = Math.Clamp((int)Math.Round(Math.Clamp(value, 50, 200) / 10) * 10, 50, 200);
+            if (_settings.Current.VolumeSensitivityPercent == safe) return;
+            _settings.Current.VolumeSensitivityPercent = safe;
+            OnPropertyChanged(); OnPropertyChanged(nameof(VolumeSensitivityLabel));
+            _ = SaveSettingsAsync();
+        }
+    }
+    public string VolumeSensitivityLabel => $"Czułość głośności: {_settings.Current.VolumeSensitivityPercent}%";
+    public double BrightnessSensitivityPercent
+    {
+        get => _settings.Current.BrightnessSensitivityPercent;
+        set
+        {
+            if (!double.IsFinite(value)) return;
+            var safe = Math.Clamp((int)Math.Round(Math.Clamp(value, 50, 200) / 10) * 10, 50, 200);
+            if (_settings.Current.BrightnessSensitivityPercent == safe) return;
+            _settings.Current.BrightnessSensitivityPercent = safe;
+            OnPropertyChanged(); OnPropertyChanged(nameof(BrightnessSensitivityLabel));
+            _ = SaveSettingsAsync();
+        }
+    }
+    public string BrightnessSensitivityLabel => $"Czułość jasności: {_settings.Current.BrightnessSensitivityPercent}%";
+    public bool VolumeGestureEnabled
+    {
+        get => _settings.Current.VolumeGestureEnabled;
+        set { if (_settings.Current.VolumeGestureEnabled == value) return; _settings.Current.VolumeGestureEnabled = value; OnPropertyChanged(); _ = SaveSettingsAsync(); }
+    }
+    public bool BrightnessGestureEnabled
+    {
+        get => _settings.Current.BrightnessGestureEnabled;
+        set { if (_settings.Current.BrightnessGestureEnabled == value) return; _settings.Current.BrightnessGestureEnabled = value; OnPropertyChanged(); _ = SaveSettingsAsync(); }
+    }
+
+    private void HistoryOnChanged(object? sender, EventArgs args) => _dispatcherQueue.TryEnqueue(RefreshConnectionHistory);
+    private void RefreshConnectionHistory()
+    {
+        if (_disposed || _connectionHistory is null) return;
+        ConnectionHistory.Clear();
+        foreach (var entry in _connectionHistory.Entries) ConnectionHistory.Add(entry);
+        OnPropertyChanged(nameof(ConnectionHistoryStatus));
+    }
+    public async Task ClearConnectionHistoryAsync()
+    {
+        if (_connectionHistory is null) return;
+        try { await _connectionHistory.ClearAsync(); SettingsStatus = "Historia połączeń wyczyszczona."; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { SettingsStatus = error.Message; }
+    }
+    public async Task ExportConnectionHistoryAsync()
+    {
+        if (_connectionHistory is null || ((App)Microsoft.UI.Xaml.Application.Current).MainWindow is not { } window) return;
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker { SuggestedFileName = $"Triki-polaczenia-{DateTime.Now:yyyyMMdd-HHmmss}" };
+            picker.FileTypeChoices.Add("Historia JSON", new List<string> { ".json" });
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(window));
+            var file = await picker.PickSaveFileAsync();
+            if (file is null) return;
+            await _connectionHistory.ExportAsync(file.Path);
+            SettingsStatus = "Wyeksportowano historię połączeń.";
+        }
+        catch (Exception error) { SettingsStatus = $"Nie udało się wyeksportować historii: {error.Message}"; }
     }
 
     public MultiDeviceArbitrationOption SelectedArbitrationMode
@@ -466,6 +539,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         if (_initialized) return;
         _initialized = true;
+        if (_connectionHistory is not null) await _connectionHistory.Ready;
+        RefreshConnectionHistory();
         _bluetooth.ConfigureRememberedDevice(
             _settings.Current.KnownDeviceAddress,
             _settings.Current.KnownDeviceName,
@@ -714,5 +789,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _bluetooth.StateChanged -= BluetoothOnStateChanged;
         _media.StateChanged -= MediaOnStateChanged;
         _runtime.StateChanged -= RuntimeOnStateChanged;
+        if (_connectionHistory is not null) _connectionHistory.Changed -= HistoryOnChanged;
     }
 }

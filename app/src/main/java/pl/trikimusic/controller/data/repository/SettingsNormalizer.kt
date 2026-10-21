@@ -17,6 +17,8 @@ internal fun AppSettings.normalized(): AppSettings {
         knownDeviceAddress = safeAddress,
         knownDeviceName = safeAddress?.let { knownDeviceName?.takeIf(String::isNotBlank) ?: "Triki" },
         rotationAngleDegrees = rotationAngleDegrees.takeIf { it in 90..360 } ?: 200,
+        volumeSensitivityPercent = volumeSensitivityPercent.takeIf { it in 50..200 } ?: 100,
+        brightnessSensitivityPercent = brightnessSensitivityPercent.takeIf { it in 50..200 } ?: 100,
         calibration = calibration.sanitized(),
     )
 }

@@ -4,15 +4,16 @@ namespace TrikiMusicController_Windows.Core;
 
 public sealed class ConnectionActivityLease
 {
-    public const long DefaultIdleTimeoutNanos = 120_000_000_000;
+    public const long DefaultIdleTimeoutNanos = 1_800_000_000_000;
     public const float DefaultAccelerationDeltaThresholdG = 0.08f;
     public const float DefaultGyroscopeThresholdDps = 5f;
 
-    private readonly long _idleTimeoutNanos;
+    private long _idleTimeoutNanos;
     private readonly float _accelerationDeltaThresholdG;
     private readonly float _gyroscopeThresholdDps;
     private long? _lastActivityTimestampNanos;
     private bool _parkingRequested;
+    public bool ParkingRequested => _parkingRequested;
 
     public ConnectionActivityLease(
         long idleTimeoutNanos = DefaultIdleTimeoutNanos,
@@ -71,5 +72,13 @@ public sealed class ConnectionActivityLease
     {
         _lastActivityTimestampNanos = null;
         _parkingRequested = false;
+    }
+
+    public void ConfigureTimeout(long idleTimeoutNanos)
+    {
+        if (idleTimeoutNanos <= 0) throw new ArgumentOutOfRangeException(nameof(idleTimeoutNanos));
+        if (_idleTimeoutNanos == idleTimeoutNanos) return;
+        _idleTimeoutNanos = idleTimeoutNanos;
+        Reset();
     }
 }

@@ -4,6 +4,7 @@ import pl.trikimusic.controller.domain.model.TrikiConnectionState
 import pl.trikimusic.controller.ui.MainUiState
 
 enum class VolumeGateState {
+    DISABLED,
     NO_DATA,
     SENSOR_INVALID,
     UPSIDE_DOWN,
@@ -21,6 +22,9 @@ data class VolumeControlPresentation(
 )
 
 fun MainUiState.volumeControlPresentation(): VolumeControlPresentation = when {
+    !settings.volumeGestureEnabled -> VolumeControlPresentation(
+        VolumeGateState.DISABLED, "Gest głośności wyłączony", "Włącz gest głośności w Ustawieniach, aby korzystać z regulacji ruchem.", false,
+    )
     ble.connectionState != TrikiConnectionState.READY || runtime.latestSample == null -> VolumeControlPresentation(
         VolumeGateState.NO_DATA,
         "Regulator nieaktywny",

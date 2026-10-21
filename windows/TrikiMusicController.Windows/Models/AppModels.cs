@@ -91,7 +91,13 @@ public sealed class AppSettings
     public string? KnownDeviceAddressHex { get; set; }
     public string? KnownDeviceName { get; set; }
     public bool AutoReconnect { get; set; } = true;
-    public bool ConnectOnlyWhenNeeded { get; set; }
+    public ConnectionPowerMode ConnectionPowerMode { get; set; } = ConnectionPowerMode.Normal;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ConnectOnlyWhenNeeded => AutoReconnect && ConnectionPowerMode != ConnectionPowerMode.AlwaysOn;
+    public int VolumeSensitivityPercent { get; set; } = 100;
+    public int BrightnessSensitivityPercent { get; set; } = 100;
+    public bool VolumeGestureEnabled { get; set; } = true;
+    public bool BrightnessGestureEnabled { get; set; } = true;
     public MultiDeviceArbitrationMode MultiDeviceArbitration { get; set; } = MultiDeviceArbitrationMode.MediaPriority;
     public bool StartWithWindows { get; set; }
     public string Theme { get; set; } = "System";

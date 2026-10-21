@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BluetoothConnected
@@ -30,7 +33,14 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +63,11 @@ fun SettingsScreen(
     onInspector: () -> Unit,
     onInfo: () -> Unit,
 ) {
+    var historyExpanded by rememberSaveable { mutableStateOf(false) }
+    val exportHistory = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.exportConnectionHistory(uri)
+    }
+    val historyTime = remember { java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss").withZone(java.time.ZoneId.systemDefault()) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -81,12 +96,16 @@ fun SettingsScreen(
                         onCheckedChange = viewModel::setBackgroundEnabled,
                     )
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                    SettingSwitchRow(
-                        title = "Oszczędzanie energii (Tryb Eco)",
-                        description = "Zwalnianie połączenia po 2 minutach bezczynności. Automatyczne wznawianie; ciągłe reklamy BLE nie blokują próby dłużej niż 15 sekund.",
-                        checked = state.settings.connectOnlyWhenNeeded,
-                        onCheckedChange = viewModel::setConnectOnlyWhenNeeded,
-                    )
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Tryb połączenia", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Czas bez ruchu i przycisku. Domyślnie Normal: 30 minut. Ponowne łączenie odbywa się automatycznie.", style = MaterialTheme.typography.bodySmall)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pl.trikimusic.controller.domain.model.ConnectionPowerMode.entries.forEach { mode ->
+                                FilterChip(selected = state.settings.connectionPowerMode == mode,
+                                    onClick = { viewModel.setConnectionPowerMode(mode) }, label = { Text(mode.displayName) }, enabled = state.settingsLoaded)
+                            }
+                        }
+                    }
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
@@ -111,6 +130,51 @@ fun SettingsScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        item { SectionTitle(title = "Czułość gestów", icon = Icons.Default.Sensors) }
+        item {
+            TrikiCard {
+                Column(Modifier.fillMaxWidth()) {
+                    SettingSwitchRow(title = "Gest głośności", checked = state.settings.volumeGestureEnabled,
+                        onCheckedChange = viewModel::setVolumeGestureEnabled)
+                    SensitivitySetting("Czułość głośności", state.settings.volumeSensitivityPercent,
+                        state.settingsLoaded && state.settings.volumeGestureEnabled, viewModel::setVolumeSensitivity)
+                    HorizontalDivider()
+                    SettingSwitchRow(title = "Gest jasności", checked = state.settings.brightnessGestureEnabled,
+                        onCheckedChange = viewModel::setBrightnessGestureEnabled)
+                    SensitivitySetting("Czułość jasności", state.settings.brightnessSensitivityPercent,
+                        state.settingsLoaded && state.settings.brightnessGestureEnabled, viewModel::setBrightnessSensitivity)
+                    Text("100% to dotychczasowa czułość. Większa wartość daje silniejszą reakcję na ten sam ruch.",
+                        modifier = Modifier.padding(20.dp), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        item {
+            TextButton(onClick = { historyExpanded = !historyExpanded }) {
+                Text("Historia połączeń (${state.connectionHistory.size}/200) — ${if (historyExpanded) "zwiń" else "rozwiń"}")
+            }
+        }
+        if (historyExpanded) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(state.connectionHistoryError ?: "Historia jest zapisywana lokalnie i zachowywana po restarcie.", style = MaterialTheme.typography.bodySmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { exportHistory.launch("Triki-polaczenia-${System.currentTimeMillis()}.json") }) { Text("Eksportuj JSON") }
+                        TextButton(onClick = viewModel::clearConnectionHistory, enabled = state.connectionHistory.isNotEmpty()) { Text("Wyczyść historię") }
+                    }
+                    if (state.connectionHistory.isEmpty()) Text("Zdarzenia pojawią się po zmianie stanu połączenia.")
+                }
+            }
+            items(state.connectionHistory) { entry ->
+                TrikiCard {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(historyTime.format(java.time.Instant.ofEpochMilli(entry.timestampMillis)), fontWeight = FontWeight.SemiBold)
+                        entry.deviceName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        Text(entry.message, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -233,6 +297,17 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SensitivitySetting(title: String, percent: Int, enabled: Boolean, onChange: (Int) -> Unit) {
+    var pending by remember(percent) { mutableStateOf(percent.toFloat()) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        Text("$title: ${pending.toInt()}%", style = MaterialTheme.typography.bodyMedium)
+        Slider(value = pending, onValueChange = { pending = it },
+            onValueChangeFinished = { onChange((kotlin.math.round(pending / 10f) * 10).toInt().coerceIn(50, 200)) },
+            valueRange = 50f..200f, steps = 14, enabled = enabled)
     }
 }
 

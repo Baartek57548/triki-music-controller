@@ -41,7 +41,10 @@ class SettingsPersistenceTest {
             ),
             developerMode = true,
             backgroundEnabled = false,
-            connectOnlyWhenNeeded = true,
+            connectionPowerMode = ConnectionPowerMode.ECO_5,
+            volumeSensitivityPercent = 150,
+            brightnessSensitivityPercent = 80,
+            volumeGestureEnabled = false,
             theme = ThemePreference.DARK,
         )
 

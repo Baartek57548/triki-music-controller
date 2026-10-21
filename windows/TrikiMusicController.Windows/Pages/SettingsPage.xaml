@@ -23,12 +23,10 @@
 
                         <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
-                        <ToggleSwitch Header="Oszczędzanie energii (Tryb Eco)"
-                                      OffContent="Stała gotowość"
-                                      OnContent="Włączone (Eco)"
-                                      IsOn="{Binding ConnectOnlyWhenNeeded, Mode=TwoWay}"
-                                      AutomationProperties.HelpText="Zwalniaj połączenie Bluetooth po 2 minutach bezczynności kontrolera. Ponowne łączenie odbywa się automatycznie." />
-                        <TextBlock Text="Tryb Eco zwalnia połączenie po 2 minutach bezczynności. Aplikacja automatycznie łączy dostępne Triki; po celowym uśpieniu czeka na nową reklamę po ciszy lub ponawia próbę po maksymalnie 15 sekundach ciągłego nadawania."
+                        <ComboBox Header="Tryb połączenia" ItemsSource="{Binding AvailablePowerModes}"
+                                  SelectedItem="{Binding SelectedPowerMode, Mode=TwoWay}" DisplayMemberPath="DisplayName"
+                                  HorizontalAlignment="Stretch" AutomationProperties.HelpText="Czas bez ruchu i przycisku. Domyślnie Normal: 30 minut." />
+                        <TextBlock Text="{Binding ConnectionModeSummary}"
                                    Style="{StaticResource MetadataTextStyle}" />
 
                         <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
@@ -44,6 +42,48 @@
                     </StackPanel>
                 </Border>
             </StackPanel>
+
+            <StackPanel Spacing="10">
+                <TextBlock Text="Czułość gestów" Style="{StaticResource SectionTitleStyle}" />
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="100% oznacza dotychczasową czułość. Większa wartość daje silniejszą reakcję na ten sam ruch."
+                                   Style="{StaticResource MetadataTextStyle}" />
+                        <ToggleSwitch Header="Gest głośności" IsOn="{Binding VolumeGestureEnabled, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding VolumeSensitivityLabel}" />
+                        <Slider Minimum="50" Maximum="200" StepFrequency="10" SnapsTo="StepValues"
+                                Value="{Binding VolumeSensitivityPercent, Mode=TwoWay}" IsEnabled="{Binding VolumeGestureEnabled}"
+                                AutomationProperties.Name="Czułość gestu głośności w procentach" />
+                        <ToggleSwitch Header="Gest jasności" IsOn="{Binding BrightnessGestureEnabled, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding BrightnessSensitivityLabel}" />
+                        <Slider Minimum="50" Maximum="200" StepFrequency="10" SnapsTo="StepValues"
+                                Value="{Binding BrightnessSensitivityPercent, Mode=TwoWay}" IsEnabled="{Binding BrightnessGestureEnabled}"
+                                AutomationProperties.Name="Czułość gestu jasności w procentach" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <Expander Header="Historia połączeń" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="{Binding ConnectionHistoryStatus}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Eksportuj JSON" Click="ExportHistory_Click" />
+                        <Button Content="Wyczyść historię" Click="ClearHistory_Click" />
+                    </StackPanel>
+                    <ListView ItemsSource="{Binding ConnectionHistory}" MaxHeight="320" SelectionMode="None"
+                              AutomationProperties.Name="Zdarzenia połączeń od najnowszego">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Spacing="4" Padding="0,6">
+                                    <TextBlock Text="{Binding TimeDisplay}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Details}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Expander>
+            <TextBlock Text="{Binding SettingsStatus}" TextWrapping="Wrap" Style="{StaticResource MetadataTextStyle}" />
 
             <!-- 2. Działanie aplikacji -->
             <StackPanel Spacing="10">

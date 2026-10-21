@@ -12,6 +12,7 @@ public sealed class BluetoothService : IDisposable
 {
     private const long SampleRateWindowNanos = 2_000_000_000;
     private readonly object _stateLock = new();
+    private readonly ConnectionHistoryService? _history;
     private readonly object _decoderLock = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
@@ -53,7 +54,7 @@ public sealed class BluetoothService : IDisposable
     public event EventHandler<TrikiSensorData>? SampleReceived;
     public BluetoothSnapshot State { get; private set; } = BluetoothSnapshot.Initial;
 
-    public BluetoothService() { }
+    public BluetoothService(ConnectionHistoryService? history = null) { _history = history; }
 
     internal BluetoothService(BluetoothSnapshot initialState) => State = initialState;
 
@@ -149,7 +150,7 @@ public sealed class BluetoothService : IDisposable
                 ConnectedDevice = target,
                 WakeWatcherArmed = false,
                 ErrorMessage = null,
-            });
+            }, userInitiated ? "Ręczne rozpoczęcie łączenia." : "Automatyczne rozpoczęcie łączenia.");
             CleanupConnection();
             lock (_decoderLock) _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
@@ -275,7 +276,7 @@ public sealed class BluetoothService : IDisposable
             {
                 ConnectionState = TrikiConnectionState.Disconnected,
                 DiscoveredDevices = SnapshotDiscoveredDevices(),
-            });
+            }, forgetDevice ? "Ręcznie rozłączono i zapomniano kontroler." : "Ręczne rozłączenie; automatyczne łączenie wstrzymane.");
         }
         finally
         {
@@ -283,7 +284,7 @@ public sealed class BluetoothService : IDisposable
         }
     }
 
-    public async Task ParkUntilWakeAsync()
+    public async Task ParkUntilWakeAsync(Func<bool>? canPark = null)
     {
         ThrowIfDisposed();
         if (!_connectOnlyWhenNeeded || !_autoReconnect || _knownAddress is null) return;
@@ -291,12 +292,12 @@ public sealed class BluetoothService : IDisposable
         try
         {
             if (_disposed || _manualDisconnect || !_connectOnlyWhenNeeded || !_autoReconnect ||
-                _knownAddress is null || State.ConnectionState != TrikiConnectionState.Ready) return;
+                _knownAddress is null || State.ConnectionState != TrikiConnectionState.Ready || canPark?.Invoke() == false) return;
             _manualDisconnect = false;
             CleanupConnection();
             lock (_decoderLock) _decoder.Reset();
             lock (_stateLock) _sampleTimestamps.Clear();
-            BeginWaitingForWake(waitForSilence: true);
+            BeginWaitingForWake(waitForSilence: true, reason: "Upłynął ustawiony czas bezczynności; zwolniono GATT. Automatyczna próba jest dopuszczana po ciszy lub najpóźniej po 15 sekundach.");
         }
         finally
         {
@@ -436,7 +437,7 @@ public sealed class BluetoothService : IDisposable
             CleanupConnection();
             if (!_manualDisconnect && _autoReconnect && _knownAddress is not null && _connectOnlyWhenNeeded)
             {
-                BeginWaitingForWake();
+                BeginWaitingForWake(reason: streamStalled ? "Brak poprawnych danych IMU; automatyczne wznawianie." : "Utrata połączenia BLE; automatyczne wznawianie.");
             }
             else
             {
@@ -448,7 +449,7 @@ public sealed class BluetoothService : IDisposable
                     ConnectedDevice = null,
                     WakeWatcherArmed = false,
                     ErrorMessage = null,
-                });
+                }, streamStalled ? "Brak poprawnych danych IMU; połączenie wymaga wznowienia." : "Utrata połączenia BLE.");
             }
         }
         catch (Exception error)
@@ -578,7 +579,7 @@ public sealed class BluetoothService : IDisposable
             return _discovered.Values.OrderByDescending(device => device.BluetoothAddress == _knownAddress).ThenByDescending(device => device.Rssi).ToArray();
     }
 
-    private void BeginWaitingForWake(string? errorMessage = null, bool waitForSilence = false)
+    private void BeginWaitingForWake(string? errorMessage = null, bool waitForSilence = false, string? reason = null)
     {
         if (_disposed || _knownAddress is null || !_autoReconnect || !_connectOnlyWhenNeeded) return;
         CancelWakeWatcher();
@@ -599,7 +600,7 @@ public sealed class BluetoothService : IDisposable
             DroppedProtocolBytes = 0,
             WakeWatcherArmed = _wakeWatcherArmed,
             ErrorMessage = errorMessage,
-        });
+        }, reason);
         _ = ArmWakeWatcherAfterSilenceAsync(cancellation.Token);
     }
 
@@ -709,22 +710,21 @@ public sealed class BluetoothService : IDisposable
         _watcher = null;
     }
 
-    private void UpdateState(Func<BluetoothSnapshot, BluetoothSnapshot> update)
+    private void UpdateState(Func<BluetoothSnapshot, BluetoothSnapshot> update, string? reason = null)
     {
         BluetoothSnapshot state;
+        BluetoothSnapshot previous;
         lock (_stateLock)
         {
+            previous = State;
             State = update(State);
             state = State;
         }
+        _history?.RecordTransition(previous, state, reason);
         StateChanged?.Invoke(this, state);
     }
 
-    private void PublishSnapshot(BluetoothSnapshot state)
-    {
-        lock (_stateLock) State = state;
-        StateChanged?.Invoke(this, state);
-    }
+    private void PublishSnapshot(BluetoothSnapshot state, string? reason = null) => UpdateState(_ => state, reason);
 
     private static long TimestampNanos() => (long)(Stopwatch.GetTimestamp() * (1_000_000_000d / Stopwatch.Frequency));
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

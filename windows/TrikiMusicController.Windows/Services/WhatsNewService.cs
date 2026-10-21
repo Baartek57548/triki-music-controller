@@ -9,6 +9,15 @@ public static class WhatsNewService
     private static readonly IReadOnlyList<ReleaseHighlight> Releases =
     [
         new ReleaseHighlight(
+            "3.2.0",
+            "Tryby zasilania, historia i osobna czułość gestów",
+            [
+                "Domyślny tryb Normal utrzymuje połączenie przez 30 minut bezczynności. Dostępne są także Eco 2/5/10 minut i stałe połączenie.",
+                "Historia połączeń zachowuje ostatnich 200 zdarzeń po restarcie; można ją wyeksportować do JSON lub wyczyścić.",
+                "Gesty głośności i jasności mają niezależną czułość 50–200% oraz osobne włączniki.",
+                "Przy aktualizacji starszych ustawień włączany jest domyślny tryb Normal; mapowania, kalibracja i pozostałe preferencje są zachowane."
+            ]),
+        new ReleaseHighlight(
             "3.1.9",
             "Sterowanie muzyką bez Air Mouse",
             [

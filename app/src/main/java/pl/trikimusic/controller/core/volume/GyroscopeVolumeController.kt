@@ -56,6 +56,13 @@ class GyroscopeVolumeController(
     private var smoothedGyroscopeZ: Float? = null
     private var lastVolumeStepNanos: Long? = null
     private var tiltStable = false
+    var sensitivity: Float = 1f
+        set(value) {
+            require(value.isFinite() && value in 0.5f..2f)
+            if (field == value) return
+            field = value
+            reset()
+        }
 
     fun reset() {
         previousTimestampNanos = null
@@ -166,7 +173,7 @@ class GyroscopeVolumeController(
         }
 
         activeDirection = direction
-        accumulatedRotationDegrees = (accumulatedRotationDegrees + filteredGyroscopeZ * deltaSeconds).coerceIn(
+        accumulatedRotationDegrees = (accumulatedRotationDegrees + filteredGyroscopeZ * deltaSeconds * sensitivity).coerceIn(
             -configuration.degreesPerVolumeStep * MAX_PENDING_VOLUME_STEPS,
             configuration.degreesPerVolumeStep * MAX_PENDING_VOLUME_STEPS,
         )

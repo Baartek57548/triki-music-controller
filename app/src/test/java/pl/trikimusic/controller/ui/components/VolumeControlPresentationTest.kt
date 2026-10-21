@@ -17,6 +17,14 @@ import pl.trikimusic.controller.ui.MainUiState
 
 class VolumeControlPresentationTest {
     @Test
+    fun `disabled gesture never presents stale sensor state as ready`() {
+        val state = uiState(settings = AppSettings(volumeGestureEnabled = false), runtime = runtime(withinRange = true, stable = true, tilt = 0f))
+        val presentation = state.volumeControlPresentation()
+        assertEquals(VolumeGateState.DISABLED, presentation.state)
+        assertFalse(presentation.ready)
+    }
+
+    @Test
     fun `disconnected state takes priority over stale sensor readiness`() {
         val state = uiState(
             connectionState = TrikiConnectionState.DISCONNECTED,

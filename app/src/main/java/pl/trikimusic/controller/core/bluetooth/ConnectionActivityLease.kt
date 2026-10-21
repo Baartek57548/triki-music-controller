@@ -5,12 +5,13 @@ import pl.trikimusic.controller.domain.model.FilteredSensorData
 import pl.trikimusic.controller.core.gesture.HoldGesturePhase
 
 class ConnectionActivityLease(
-    private val idleTimeoutNanos: Long = DEFAULT_IDLE_TIMEOUT_NANOS,
+    private var idleTimeoutNanos: Long = DEFAULT_IDLE_TIMEOUT_NANOS,
     private val accelerationDeltaThresholdG: Float = DEFAULT_ACCELERATION_DELTA_THRESHOLD_G,
     private val gyroscopeThresholdDps: Float = DEFAULT_GYROSCOPE_THRESHOLD_DPS,
 ) {
     private var lastActivityTimestampNanos: Long? = null
     private var parkingRequested = false
+    val isParkingRequested: Boolean get() = parkingRequested
 
     init {
         require(idleTimeoutNanos > 0L)
@@ -69,8 +70,15 @@ class ConnectionActivityLease(
         parkingRequested = false
     }
 
+    fun configureTimeout(timeoutNanos: Long) {
+        require(timeoutNanos > 0L)
+        if (idleTimeoutNanos == timeoutNanos) return
+        idleTimeoutNanos = timeoutNanos
+        reset()
+    }
+
     companion object {
-        const val DEFAULT_IDLE_TIMEOUT_NANOS = 120_000_000_000L
+        const val DEFAULT_IDLE_TIMEOUT_NANOS = 1_800_000_000_000L
         const val DEFAULT_ACCELERATION_DELTA_THRESHOLD_G = 0.08f
         const val DEFAULT_GYROSCOPE_THRESHOLD_DPS = 5f
     }

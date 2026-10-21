@@ -26,6 +26,18 @@ public sealed class EdgePoseBrightnessController
     private float _accumulatedDegrees;
     private float _currentBrightnessPercent = 60f;
     private bool _isCurrentlyInEdge;
+    private float _sensitivity = 1f;
+    public float Sensitivity
+    {
+        get => _sensitivity;
+        set
+        {
+            if (!float.IsFinite(value) || value is < 0.5f or > 2f) throw new ArgumentOutOfRangeException(nameof(value));
+            if (_sensitivity == value) return;
+            _sensitivity = value;
+            Reset();
+        }
+    }
 
     public EdgePoseBrightnessController(
         float initialBrightnessPercent = 60f,
@@ -129,7 +141,7 @@ public sealed class EdgePoseBrightnessController
             if (Math.Abs(gyroZ) >= GyroscopeDeadbandDps)
             {
                 var deltaDegrees = gyroZ * dtSeconds;
-                _accumulatedDegrees += deltaDegrees;
+                _accumulatedDegrees += deltaDegrees * _sensitivity;
 
                 if (Math.Abs(_accumulatedDegrees) >= DegreesPerPercentBrightness)
                 {

@@ -12,6 +12,8 @@ public sealed partial class SettingsPage : Page
     }
 
     private void Diagnostics_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(DiagnosticsPage));
+    private async void ExportHistory_Click(object sender, RoutedEventArgs e) => await App.Services.ViewModel.ExportConnectionHistoryAsync();
+    private async void ClearHistory_Click(object sender, RoutedEventArgs e) => await App.Services.ViewModel.ClearConnectionHistoryAsync();
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
